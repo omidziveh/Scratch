@@ -1,36 +1,25 @@
 #pragma once
 #include <vector>
 #include <string>
+using namespace std;
+#define MOVE 0
+#define TURN 1
+#define SAY 2
+#define WAIT 3
+#define IF 4
+#define REPEAT 5
+#define EVENT_CLICK 6
 
-enum BlockType { 
-    CMD_MOVE, CMD_TURN, CMD_SAY, CMD_WAIT,    // Action
-    CMD_IF, CMD_REPEAT,                       // Control
-    CMD_EVENT_CLICK                           // Events
-};
-
-// The Data Structure (NO METHODS allowed inside)
 struct Block {
-    int id;
-    BlockType type;
-    
-    // Visual Data (Frontend modifies these)
-    float x, y;
-    float width, height;
-    
-    // Logic Data (Backend reads these)
-    // Example: "Move 10" -> args[0] = "10"
-    std::vector<std::string> args; 
-    
-    // Connectivity
-    Block* next = nullptr;   // The block attached below
-    Block* inner = nullptr;  // The block inside (for IF/REPEAT)
+    int id, type;
+    float x, y, w, h;
+    vector<string> args;
+    Block *next, *inner, *parent;
 };
 
 struct Sprite {
-    float x = 0;
-    float y = 0;
-    float angle = 0;
-    bool isPenDown = false;
-    std::vector<std::string> costumes; // Paths to images
-    int currentCostumeIndex = 0;
+    float x, y, angle;
+    bool pen = false;
+    vector<string> costumes;
+    int costume = 0;
 };
