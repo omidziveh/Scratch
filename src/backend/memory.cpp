@@ -20,26 +20,26 @@ Block* create_block(BlockType t) {
     newBlock->inner = nullptr;
     
     // HEADS UP:
-    // switch(t) {
-    //     case CMD_MOVE:
-    //         newBlock->args.push_back("10");  // Default: move 10 steps
-    //         break;
-    //     case CMD_TURN:
-    //         newBlock->args.push_back("15");  // Default: turn 15 degrees
-    //         break;
-    //     case CMD_SAY:
-    //         newBlock->args.push_back("Hello!"); // Default message
-    //         newBlock->args.push_back("2");      // Default duration
-    //         break;
-    //     case CMD_WAIT:
-    //         newBlock->args.push_back("1");   // Default: wait 1 second
-    //         break;
-    //     case CMD_REPEAT:
-    //         newBlock->args.push_back("10");  // Default: repeat 10 times
-    //         break;
-    //     default:
-    //         break;
-    // }
+    switch(t) {
+        case CMD_MOVE:
+            newBlock->args.push_back("10");  // Default: move 10 steps
+            break;
+        case CMD_TURN:
+            newBlock->args.push_back("15");  // Default: turn 15 degrees
+            break;
+        case CMD_SAY:
+            newBlock->args.push_back("Hello!"); // Default message
+            newBlock->args.push_back("2");      // Default duration
+            break;
+        case CMD_WAIT:
+            newBlock->args.push_back("1");   // Default: wait 1 second
+            break;
+        case CMD_REPEAT:
+            newBlock->args.push_back("10");  // Default: repeat 10 times
+            break;
+        default:
+            break;
+    }
     
     return newBlock;
 }
