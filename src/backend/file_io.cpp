@@ -51,7 +51,7 @@ BlockType string_to_blocktype(const std::string& str) {
 }
 
 // Save sprite data
-void save_to_file(Block* head, std::string filename) {
+bool save_to_file(Block* head, std::string filename) {
     // Add .txt extension if not present
     // if (filename.find(".txt") == std::string::npos && 
     //     filename.find(".csv") == std::string::npos) {
@@ -63,7 +63,7 @@ void save_to_file(Block* head, std::string filename) {
     
     if (!outFile.is_open()) {
         log_error("Could not open file for writing: " + filename);
-        return;
+        return false;
     }
     
     log_debug("File opened successfully");
@@ -144,6 +144,7 @@ void save_to_file(Block* head, std::string filename) {
     
     outFile.close();
     log_success("Project saved successfully: saves/" + filename + " (" + std::to_string(blockCount) + "blocks)");
+    return true;
 }
 
 // Load a block chain from a file
@@ -183,7 +184,7 @@ Block* load_from_file(std::string filename) {
             tokens.push_back(token);
         }
         
-        if (tokens.size() < MIN_BLOCK_DATA_COUNT) {
+        if ((int)tokens.size() < MIN_BLOCK_DATA_COUNT) {
             continue;
         }
         
@@ -205,7 +206,7 @@ Block* load_from_file(std::string filename) {
         block->height = height;
         
         block->args.clear(); // Heads up -> potential removal
-        for (int i = 0; i < argCount && (MIN_BLOCK_DATA_COUNT + i) < tokens.size(); i++) {
+        for (int i = 0; i < argCount && (MIN_BLOCK_DATA_COUNT + i) < (int)tokens.size(); i++) {
             block->args.push_back(tokens[MIN_BLOCK_DATA_COUNT + i]);
         }
         
@@ -284,7 +285,7 @@ Sprite load_sprite(std::string filename) {
         tokens.push_back(token);
     }
     
-    if (tokens.size() < MIN_SPRITE_DATA_COUNT) return sprite;
+    if ((int)tokens.size() < MIN_SPRITE_DATA_COUNT) return sprite;
 
     sprite.x = std::stof(tokens[0]);
     sprite.y = std::stof(tokens[1]);
