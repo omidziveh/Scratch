@@ -1,25 +1,33 @@
 #pragma once
-#include <vector>
 #include <string>
 using namespace std;
 #define MOVE 0
 #define TURN 1
-#define SAY 2
-#define WAIT 3
+#define GOTO 2
+#define REPEAT 3
 #define IF 4
-#define REPEAT 5
-#define EVENT_CLICK 6
+#define WAIT 5
 
-struct Block {
-    int id, type;
-    float x, y, w, h;
-    vector<string> args;
-    Block *next, *inner, *parent;
-};
+#define CATEGORY_MOTION 0
+#define CATEGORY_CONTROL 1
+#define CATEGORY_LOOKS 2
 
 struct Sprite {
-    float x, y, angle;
-    bool pen = false;
-    vector<string> costumes;
-    int costume = 0;
+    int x;
+    int y;
+    int width;
+    int height;
+    string image_path;
+};
+
+struct Block {
+    int type;          
+    int category;      
+    int x;             
+    int y;              
+    int width;         
+    int height;         
+    int param1;         
+    int param2;         
+    string text;      
 };

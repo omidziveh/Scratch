@@ -1,60 +1,59 @@
-#include "frontend/draw.h"
-#include "common/definitions.h"
+#include "src/frontend/draw.h"
+#include "src/common/definitions.h"
 #include <SDL2/SDL.h>
-#include <iostream>
-#include <chrono>
-#include <thread>
-using namespace std;
 
-int main() {
-    
-    cout << "=== Block Coding System ===" << endl;
-
-    // Initialize SDL
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-        cerr << "SDL Init Failed: " << SDL_GetError() << endl;
-        return 1;
-    }
-
-    // Initialize graphics
+int main(int argc, char* argv[]) {
     if (!init_graphics()) {
-        cerr << "Graphics Init Failed!" << endl;
-        SDL_Quit();
-        return 1;
+        return -1;
     }
-    
-    cout << "Graphics initialized successfully" << endl;
 
-    // Main loop
+    Block move_block;
+    move_block.type = MOVE;
+    move_block.x = 100;
+    move_block.y = 100;
+    move_block.width = BLOCK_WIDTH;
+    move_block.height = BLOCK_HEIGHT;
+
+    Block repeat_block;
+    repeat_block.type = REPEAT;
+    repeat_block.x = 100;
+    repeat_block.y = 200;
+    repeat_block.width = BLOCK_WIDTH;
+    repeat_block.height = BLOCK_HEIGHT;
+
+    Block turn_block;
+    turn_block.type = TURN;
+    turn_block.x = 100;
+    turn_block.y = 300;
+    turn_block.width = BLOCK_WIDTH;
+    turn_block.height = BLOCK_HEIGHT;
+
+    Block if_block;
+    if_block.type = IF;
+    if_block.x = 350;
+    if_block.y = 100;
+    if_block.width = BLOCK_WIDTH;
+    if_block.height = BLOCK_HEIGHT;
+
     bool running = true;
     SDL_Event event;
 
     while (running) {
-        
-        // Handle events
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT) {
                 running = false;
-                cout << "Window close requested" << endl;
-            }
-            else if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE) {
-                running = false;
-                cout << "ESC pressed - exiting" << endl;
             }
         }
+        clear(50, 50, 50);
+        draw_block(&move_block);
+        draw_block(&repeat_block);
+        draw_block(&turn_block);
+        draw_block(&if_block);
 
-        clear(240, 240, 240);
-        set_color(100, 150, 255);
-        fill_rect(100, 100, 200, 150);
-        set_color(255, 100, 100);
-        fill_rect(400, 100, 200, 150);
-        set_color(100, 255, 100);
-        fill_rect(700, 100, 200, 150);
-        render();
-        this_thread::sleep_for(chrono::milliseconds(16));
+        present();
+        SDL_Delay(16);
     }
+
     shutdown_graphics();
-    cout << "Application closed" << endl;
-    
     return 0;
 }
