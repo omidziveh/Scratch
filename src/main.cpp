@@ -1,59 +1,74 @@
+// main.cpp
 #include "src/frontend/draw.h"
+#include "src/frontend/input.h"
 #include "src/common/definitions.h"
 #include <SDL2/SDL.h>
+#include <vector>
+
+using namespace BlockCoding;
+
+// Global block list (MUST be defined outside main)
+std::vector<Block*> all_blocks;
 
 int main(int argc, char* argv[]) {
-    if (!init_graphics()) {
-        return -1;
-    }
-
-    Block move_block;
-    move_block.type = MOVE;
-    move_block.x = 100;
-    move_block.y = 100;
-    move_block.width = BLOCK_WIDTH;
-    move_block.height = BLOCK_HEIGHT;
-
-    Block repeat_block;
-    repeat_block.type = REPEAT;
-    repeat_block.x = 100;
-    repeat_block.y = 200;
-    repeat_block.width = BLOCK_WIDTH;
-    repeat_block.height = BLOCK_HEIGHT;
-
-    Block turn_block;
-    turn_block.type = TURN;
-    turn_block.x = 100;
-    turn_block.y = 300;
-    turn_block.width = BLOCK_WIDTH;
-    turn_block.height = BLOCK_HEIGHT;
-
-    Block if_block;
-    if_block.type = IF;
-    if_block.x = 350;
-    if_block.y = 100;
-    if_block.width = BLOCK_WIDTH;
-    if_block.height = BLOCK_HEIGHT;
-
+    // Initialize graphics
+    GraphicsContext ctx;
+    init_graphics(&ctx);
+    
+    // Create test blocks
+    Block* b1 = new Block;
+    b1->type = BLOCK_MOVE;
+    b1->x = 100;
+    b1->y = 100;
+    b1->next = nullptr;
+    all_blocks.push_back(b1);
+    
+    Block* b2 = new Block;
+    b2->type = BLOCK_REPEAT;
+    b2->x = 300;
+    b2->y = 200;
+    b2->next = nullptr;
+    all_blocks.push_back(b2);
+    
+    // Main loop
     bool running = true;
     SDL_Event event;
-
+    
     while (running) {
+        // Process events
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT) {
                 running = false;
             }
+            else if (event.type == SDL_MOUSEBUTTONDOWN) {
+                handle_mouse_down(event.button.x, event.button.y);
+            }
+            else if (event.type == SDL_MOUSEMOTION) {
+                handle_mouse_motion(event.motion.x, event.motion.y);
+            }
+            else if (event.type == SDL_MOUSEBUTTONUP) {
+                handle_mouse_up(event.button.x, event.button.y);
+            }
         }
-        clear(50, 50, 50);
-        draw_block(&move_block);
-        draw_block(&repeat_block);
-        draw_block(&turn_block);
-        draw_block(&if_block);
-
-        present();
-        SDL_Delay(16);
+        
+        // Clear screen (light gray)
+        clear(&ctx, 240, 240, 240);
+        
+        // Draw all blocks
+        for (Block* b : all_blocks) {
+            draw_block(b);
+        }
+        
+        // Update screen
+        SDL_RenderPresent(ctx.renderer);
+        SDL_Delay(16);  // ~60 FPS
     }
-
-    shutdown_graphics();
+    
+    // Cleanup
+    for (Block* b : all_blocks) {
+        delete b;
+    }
+    shutdown_graphics(&ctx);
+    
     return 0;
 }

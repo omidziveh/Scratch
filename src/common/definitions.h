@@ -1,33 +1,29 @@
-#pragma once
-#include <string>
-using namespace std;
-#define MOVE 0
-#define TURN 1
-#define GOTO 2
-#define REPEAT 3
-#define IF 4
-#define WAIT 5
+#ifndef DEFINITIONS_H
+#define DEFINITIONS_H
 
-#define CATEGORY_MOTION 0
-#define CATEGORY_CONTROL 1
-#define CATEGORY_LOOKS 2
+namespace BlockCoding {
+    enum BlockType {
+        BLOCK_MOVE = 0,
+        BLOCK_TURN,
+        BLOCK_GOTO,
+        BLOCK_REPEAT,
+        BLOCK_IF,
+        BLOCK_WAIT
+    };
+    
+    struct Block {
+        BlockType type;
+        int x;
+        int y;
+        Block* next; 
+    };
+    
+    struct Sprite {
+        int x;
+        int y;
+        int angle;
+        bool visible;
+    };
+}
 
-struct Sprite {
-    int x;
-    int y;
-    int width;
-    int height;
-    string image_path;
-};
-
-struct Block {
-    int type;          
-    int category;      
-    int x;             
-    int y;              
-    int width;         
-    int height;         
-    int param1;         
-    int param2;         
-    string text;      
-};
+#endif

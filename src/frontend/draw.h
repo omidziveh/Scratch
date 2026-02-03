@@ -1,18 +1,20 @@
-#pragma once
-#include <SDL2/SDL.h>
-#include "../common/globals.h"
+// src/frontend/draw.h
+#ifndef DRAW_H
+#define DRAW_H
+
 #include "../common/definitions.h"
+#include <SDL2/SDL.h>
 
-extern SDL_Window* window;
-extern SDL_Renderer* renderer;
+namespace BlockCoding {
+    struct GraphicsContext {
+        SDL_Window* window;
+        SDL_Renderer* renderer;
+    };
+    
+    void init_graphics(GraphicsContext* ctx);
+    void clear(GraphicsContext* ctx, int r, int g, int b);
+    void draw_block(Block* b);
+    void shutdown_graphics(GraphicsContext* ctx);
+}
 
-// Graphics functions
-bool init_graphics();
-void shutdown_graphics();
-void clear(int r, int g, int b);
-void present();
-void fill_rect(int x, int y, int w, int h);
-void set_color(int r, int g, int b);
-
-// Block drawing
-void draw_block(Block* b);
+#endif
