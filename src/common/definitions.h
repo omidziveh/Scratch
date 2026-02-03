@@ -1,28 +1,23 @@
 #ifndef DEFINITIONS_H
 #define DEFINITIONS_H
 
+#include <vector>
+
+#define BLOCK_WIDTH 120
+#define BLOCK_HEIGHT 40
+
+#define BLOCK_MOVE 0
+#define BLOCK_TURN 1
+#define BLOCK_GOTO 2
+#define BLOCK_REPEAT 3
+#define BLOCK_IF 4
+#define BLOCK_WAIT 5
+
 namespace BlockCoding {
-    enum BlockType {
-        BLOCK_MOVE = 0,
-        BLOCK_TURN,
-        BLOCK_GOTO,
-        BLOCK_REPEAT,
-        BLOCK_IF,
-        BLOCK_WAIT
-    };
-    
     struct Block {
-        BlockType type;
-        int x;
-        int y;
-        Block* next; 
-    };
-    
-    struct Sprite {
-        int x;
-        int y;
-        int angle;
-        bool visible;
+        int type;
+        int x, y;
+        Block* next;
     };
 }
 

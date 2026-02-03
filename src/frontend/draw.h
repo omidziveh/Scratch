@@ -1,4 +1,3 @@
-// src/frontend/draw.h
 #ifndef DRAW_H
 #define DRAW_H
 
@@ -15,6 +14,8 @@ namespace BlockCoding {
     void clear(GraphicsContext* ctx, int r, int g, int b);
     void draw_block(Block* b);
     void shutdown_graphics(GraphicsContext* ctx);
+    
+    void draw_snap_preview(Block* dragging, Block* target);
 }
 
 #endif

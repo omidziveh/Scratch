@@ -22,7 +22,7 @@ namespace BlockCoding {
     }
     
     void draw_block(Block* b) {
-        SDL_Rect rect = {b->x, b->y, 120, 40};
+        SDL_Rect rect = {b->x, b->y, BLOCK_WIDTH, BLOCK_HEIGHT};
         
         if (b->type == BLOCK_MOVE || b->type == BLOCK_TURN || b->type == BLOCK_GOTO) {
             SDL_SetRenderDrawColor(g_renderer, 70, 130, 180, 255);  
@@ -38,5 +38,18 @@ namespace BlockCoding {
         SDL_DestroyRenderer(ctx->renderer);
         SDL_DestroyWindow(ctx->window);
         SDL_Quit();
+    }
+    
+    void draw_snap_preview(Block* dragging, Block* target) {
+        if (!dragging || !target) return;
+        
+        SDL_SetRenderDrawColor(g_renderer, 100, 200, 100, 150);
+        
+        int x1 = dragging->x + 60;
+        int y1 = dragging->y;
+        int x2 = target->x + 60;
+        int y2 = target->y + BLOCK_HEIGHT;
+        
+        SDL_RenderDrawLine(g_renderer, x1, y1, x2, y2);
     }
 }
