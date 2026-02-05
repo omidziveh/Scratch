@@ -3,7 +3,7 @@
 #include <string>
 
 // Save a block chain to a file
-void save_to_file(Block* head, std::string filename);
+bool save_to_file(Block* head, std::string filename);
 
 // Load a block chain from a file
 Block* load_from_file(std::string filename);

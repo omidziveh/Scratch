@@ -1,12 +1,23 @@
 #include "memory.h"
 #include <iostream>
 
+// Global block ID counter
+static int blockIdCounter = 1;
+
+// Reset the block ID counter
+void reset_block_counter(int newValue) {
+    blockIdCounter = newValue;
+}
+
+// Get the current block ID counter value
+int get_block_counter() {
+    return blockIdCounter;
+}
+
 // Creates and initializes a new block with the given type
 // Returns a pointer to the newly allocated block
 Block* create_block(BlockType t) {
     Block* newBlock = new Block;
-    
-    static int blockIdCounter = 1;
     
     newBlock->id = blockIdCounter++;
     newBlock->type = t;

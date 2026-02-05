@@ -13,3 +13,9 @@ void delete_block(Block* b);
 
 // Utility function to count total blocks in a chain
 int count_blocks(Block* b);
+
+// Reset the block ID counter 
+void reset_block_counter(int newValue = 1);
+
+// Get the current block ID counter value
+int get_block_counter();
