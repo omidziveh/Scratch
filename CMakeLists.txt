@@ -19,7 +19,12 @@ find_package(SDL2_image REQUIRED)
 
 # 3. Collect all source files
 # This includes your main.cpp and the SDL2_gfx .c files you added
-file(GLOB SOURCES "src/*.cpp" "src/gfx/*.c")
+file(GLOB SOURCES "src/*.cpp" "src/backend/*.cpp" "src/frontend/*.cpp" "src/common/*.cpp" "src/gfx/*.c")
+message(STATUS "Found source files:")
+foreach(SOURCE_FILE ${SOURCES})
+    message(STATUS "  ${SOURCE_FILE}")
+endforeach()
+
 add_executable(${PROJECT_NAME} ${SOURCES})
 
 # 4. Include Headers
