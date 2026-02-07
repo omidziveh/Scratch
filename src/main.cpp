@@ -1,166 +1,93 @@
-#include "frontend/draw.h"
-#include "frontend/input.h"
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_image.h>
 #include "common/definitions.h"
 #include "common/globals.h"
-#include "backend/runtime.h"
-#include "backend/logger.h"
-#include <SDL2/SDL.h>
-#include <cmath>
-#include <vector>
-
-using namespace BlockCoding;
-
-namespace BlockCoding {
-    std::vector<Block*> all_blocks;
-}
+#include "frontend/draw.h"
 
 int main(int argc, char* argv[]) {
-    init_logger();
-    log_info("Starting application");
-
-    GraphicsContext ctx;
-    init_graphics(&ctx);
-
-    // tester
-    Block* b1 = new Block;
-    b1->id = 1;
-    b1->type = CMD_MOVE;
-    b1->x = 100;
-    b1->y = 100;
-    b1->width = BLOCK_WIDTH;
-    b1->height = BLOCK_HEIGHT;
-    b1->args.push_back("20");
-    all_blocks.push_back(b1);
-
-    Block* b2 = new Block;
-    b2->id = 2;
-    b2->type = CMD_TURN;
-    b2->x = 100;
-    b2->y = 150;
-    b2->width = BLOCK_WIDTH;
-    b2->height = BLOCK_HEIGHT;
-    b2->args.push_back("45");
-    all_blocks.push_back(b2);
-
-    Block* b3 = new Block;
-    b3->id = 3;
-    b3->type = CMD_WAIT;
-    b3->x = 100;
-    b3->y = 200;
-    b3->width = BLOCK_WIDTH;
-    b3->height = BLOCK_HEIGHT;
-    b3->args.push_back("0.5");
-    all_blocks.push_back(b3);
-
-    b1->next = b2;
-    b2->next = b3;
-
-    Sprite playerSprite;
-    playerSprite.x = WINDOW_WIDTH / 2.0f;
-    playerSprite.y = WINDOW_HEIGHT / 2.0f;
-    playerSprite.angle = 0;
-
-    Runtime runtime;
-    runtime_init(&runtime, b1, &playerSprite);
-
-    bool running = true;
+    SDL_Init(SDL_INIT_VIDEO);
+    IMG_Init(IMG_INIT_PNG);
+    
+    SDL_Window* window = SDL_CreateWindow(
+        "Scratch Clone - Sprite Rendering",
+        SDL_WINDOWPOS_CENTERED,
+        SDL_WINDOWPOS_CENTERED,
+        WINDOW_WIDTH,
+        WINDOW_HEIGHT,
+        SDL_WINDOW_SHOWN);
+    
+    SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+    
+    Stage stage;
+    stage.x = STAGE_X;
+    stage.y = STAGE_Y;
+    stage.width = STAGE_WIDTH;
+    stage.height = STAGE_HEIGHT;
+    stage.border_color.r = 100;
+    stage.border_color.g = 100;
+    stage.border_color.b = 100;
+    stage.border_color.a = 255;
+    stage.background_color.r = 255;
+    stage.background_color.g = 255;
+    stage.background_color.b = 255;
+    stage.background_color.a = 255;
+    
+    Sprite cat;
+    cat.x = STAGE_WIDTH / 2;
+    cat.y = STAGE_HEIGHT / 2;
+    cat.width = 80;
+    cat.height = 80;
+    cat.angle = 0;
+    cat.visible = 1;
+    cat.texture = load_texture(renderer, "assets/sprite.png");
+    
+    int running = 1;
     SDL_Event event;
-
-    while (running) {
+    
+    while (running == 1) {
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT) {
-                running = false;
+                running = 0;
             }
-            else if (event.type == SDL_MOUSEBUTTONDOWN) {
-                handle_mouse_down(event.button.x, event.button.y);
-            }
-            else if (event.type == SDL_MOUSEMOTION) {
-                handle_mouse_motion(event.motion.x, event.motion.y);
-            }
-            else if (event.type == SDL_MOUSEBUTTONUP) {
-                handle_mouse_up(event.button.x, event.button.y);
-            }
-            else if (event.type == SDL_KEYDOWN) {
-                switch (event.key.keysym.sym) {
-                    case SDLK_SPACE:
-                        if (runtime.state == RUNTIME_RUNNING) {
-                            runtime_stop(&runtime);
-                        } else {
-                            runtime_reset(&runtime);
-                            runtime_start(&runtime);
-                        }
-                        break;
-                    case SDLK_p:
-                        if (runtime.state == RUNTIME_RUNNING) {
-                            runtime_pause(&runtime);
-                        } else if (runtime.state == RUNTIME_PAUSED) {
-                            runtime_resume(&runtime);
-                        }
-                        break;
-                    case SDLK_s:
-                        runtime_set_step_mode(&runtime, !runtime.stepMode);
-                        break;
-                    case SDLK_n:
-                        if (runtime.state == RUNTIME_PAUSED || runtime.stepMode) {
-                            runtime_step(&runtime);
-                        }
-                        break;
-                    case SDLK_r:
-                        runtime_reset(&runtime);
-                        playerSprite.x = WINDOW_WIDTH / 2.0f;
-                        playerSprite.y = WINDOW_HEIGHT / 2.0f;
-                        playerSprite.angle = 0;
-                        break;
-                    case SDLK_d:
-                        log_info(runtime_get_status(&runtime));
-                        break;
+            
+            if (event.type == SDL_KEYDOWN) {
+                if (event.key.keysym.sym == SDLK_LEFT) {
+                    cat.angle = cat.angle - 15;
+                }
+                if (event.key.keysym.sym == SDLK_RIGHT) {
+                    cat.angle = cat.angle + 15;
+                }
+                if (event.key.keysym.sym == SDLK_UP) {
+                    cat.y = cat.y - 10;
+                }
+                if (event.key.keysym.sym == SDLK_DOWN) {
+                    cat.y = cat.y + 10;
+                }
+                if (event.key.keysym.sym == SDLK_a) {
+                    cat.x = cat.x - 10;
+                }
+                if (event.key.keysym.sym == SDLK_d) {
+                    cat.x = cat.x + 10;
                 }
             }
         }
-
-        if (runtime.state == RUNTIME_RUNNING) {
-            runtime_tick(&runtime);
-        }
-
-        clear(&ctx, 240, 240, 240);
-
-        for (Block* b : all_blocks) {
-            draw_block(b);
-
-            if (b == runtime.currentBlock && runtime.state == RUNTIME_RUNNING) {
-                SDL_SetRenderDrawColor(ctx.renderer, 0, 255, 0, 255);
-                SDL_Rect highlight = {
-                    (int)b->x - 2, (int)b->y - 2,
-                    BLOCK_WIDTH + 4, BLOCK_HEIGHT + 4
-                };
-                SDL_RenderDrawRect(ctx.renderer, &highlight);
-            }
-        }
-
-        SDL_SetRenderDrawColor(ctx.renderer, 255, 100, 100, 255);
-        SDL_Rect spriteRect = {
-            (int)playerSprite.x - 15, (int)playerSprite.y - 15,
-            30, 30
-        };
-        SDL_RenderFillRect(ctx.renderer, &spriteRect);
-
-        SDL_SetRenderDrawColor(ctx.renderer, 255, 255, 255, 255);
-        float rad = playerSprite.angle * 3.14159265f / 180.0f;
-        int endX = (int)(playerSprite.x + 20 * std::cos(rad));
-        int endY = (int)(playerSprite.y + 20 * std::sin(rad));
-        SDL_RenderDrawLine(ctx.renderer,
-                          (int)playerSprite.x, (int)playerSprite.y,
-                          endX, endY);
-
-        SDL_RenderPresent(ctx.renderer);
+        
+        SDL_SetRenderDrawColor(renderer, 240, 240, 240, 255);
+        SDL_RenderClear(renderer);
+        
+        draw_stage_background(renderer, &stage);
+        draw_stage_border(renderer, &stage);
+        draw_sprite(renderer, &cat, &stage);
+        
+        SDL_RenderPresent(renderer);
         SDL_Delay(16);
     }
-
-    for (Block* b : all_blocks) {
-        delete b;
-    }
-
-    shutdown_graphics(&ctx);
-    close_logger();
+    
+    SDL_DestroyTexture(cat.texture);
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(window);
+    IMG_Quit();
+    SDL_Quit();
+    
     return 0;
 }
