@@ -1,9 +1,12 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
+#include "frontend/palette.h"
 #include "common/definitions.h"
 #include "common/globals.h"
 #include "frontend/draw.h"
 
+using namespace BlockCoding;
+std::vector<Block*> all_blocks;
 int main(int argc, char* argv[]) {
     SDL_Init(SDL_INIT_VIDEO);
     IMG_Init(IMG_INIT_PNG);

@@ -1,4 +1,5 @@
 #include "input.h"
+#include "palette.h"
 #include <cmath>
 
 namespace BlockCoding {
@@ -77,3 +78,21 @@ namespace BlockCoding {
     }
 
 }
+extern std::vector<Block*> all_blocks;
+static int next_block_id = 100;
+
+Block* spawn_block_from_palette(BlockType type, int x, int y) {
+    Block* newBlock = new Block;
+    newBlock->id = next_block_id++;
+    newBlock->type = type;
+    newBlock->x = x;
+    newBlock->y = y;
+    newBlock->width = 120;
+    newBlock->height = 50;
+    newBlock->next = nullptr;
+    newBlock->inner = nullptr;
+    
+    all_blocks.push_back(newBlock);
+    return newBlock;
+}
+
