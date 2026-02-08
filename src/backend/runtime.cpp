@@ -17,6 +17,9 @@ void runtime_init(Runtime* rt, Block* head, Sprite* sprite) {
     rt->maxTicksAllowed = DEFAULT_MAX_TICKS;
     rt->stepMode = false;
     rt->breakpointHit = false;
+    rt->ticksSinceLastWait = 0;
+    rt->watchdogThreshold = DEFAULT_WATCHDOG_THRESHOLD;
+    rt->watchdogTriggered = false;
 }
 
 void runtime_reset(Runtime* rt) {
@@ -26,6 +29,8 @@ void runtime_reset(Runtime* rt) {
     rt->waitTicksRemaining = 0;
     rt->totalTicksExecuted = 0;
     rt->breakpointHit = false;
+    rt->ticksSinceLastWait = 0;
+    rt->watchdogTriggered = false;
 }
 
 void runtime_start(Runtime* rt) {
@@ -33,6 +38,8 @@ void runtime_start(Runtime* rt) {
         rt->currentBlock = rt->programHead;
         rt->totalTicksExecuted = 0;
         rt->loopStack.clear();
+        rt->ticksSinceLastWait = 0;
+        rt->watchdogTriggered = false;
     }
     rt->state = RUNTIME_RUNNING;
     log_info("Runtime started");
@@ -40,6 +47,7 @@ void runtime_start(Runtime* rt) {
 
 void runtime_stop(Runtime* rt) {
     rt->state = RUNTIME_STOPPED;
+    rt->watchdogTriggered = false;
     log_info("Runtime stopped");
 }
 
@@ -73,12 +81,59 @@ void runtime_set_step_mode(Runtime* rt, bool enabled) {
     log_info(enabled ? "Step mode ON" : "Step mode OFF");
 }
 
+void runtime_tick(Runtime* rt) {
+    if (rt->state != RUNTIME_RUNNING) return;
+
+    if (rt->waitTicksRemaining > 0) {
+        rt->waitTicksRemaining--;
+        rt->ticksSinceLastWait = 0;
+        return;
+    }
+
+    if (!rt->currentBlock) {
+        rt->state = RUNTIME_FINISHED;
+        log_info("Program finished");
+        return;
+    }
+
+    if (runtime_check_watchdog(rt)) {
+        rt->state = RUNTIME_STOPPED;
+        rt->watchdogTriggered = true;
+        log_error("Watchdog triggered - possible infinite loop detected");
+        return;
+    }
+
+    if (rt->currentBlock->hasBreakpoint) {
+        rt->breakpointHit = true;
+        rt->state = RUNTIME_PAUSED;
+        log_info("Breakpoint hit");
+        return;
+    }
+
+    execute_block(rt, rt->currentBlock);
+    advance_to_next_block(rt);
+    rt->totalTicksExecuted++;
+    rt->ticksSinceLastWait++;
+}
+
 bool runtime_check_watchdog(Runtime* rt) {
     if (rt->totalTicksExecuted >= rt->maxTicksAllowed) {
-        log_error("Watchdog triggered - possible infinite loop");
-        rt->state = RUNTIME_STOPPED;
+        log_error("Max ticks exceeded");
         return true;
     }
+
+    if (rt->ticksSinceLastWait >= rt->watchdogThreshold) {
+        log_error("Too many ticks without wait");
+        return true;
+    }
+
+    for (size_t i = 0; i < rt->loopStack.size(); i++) {
+        if (rt->loopStack[i].ticksWithoutWait >= LOOP_WATCHDOG_LIMIT) {
+            log_error("Loop running too long without wait");
+            return true;
+        }
+    }
+
     return false;
 }
 
@@ -86,82 +141,110 @@ void runtime_set_max_ticks(Runtime* rt, int maxTicks) {
     rt->maxTicksAllowed = maxTicks;
 }
 
-const char* runtime_get_status(Runtime* rt) {
-    static char buffer[256];
-    const char* stateStr = "UNKNOWN";
-
-    switch (rt->state) {
-        case RUNTIME_STOPPED: stateStr = "STOPPED"; break;
-        case RUNTIME_RUNNING: stateStr = "RUNNING"; break;
-        case RUNTIME_PAUSED: stateStr = "PAUSED"; break;
-        case RUNTIME_FINISHED: stateStr = "FINISHED"; break;
-    }
-
-    int blockId = rt->currentBlock ? rt->currentBlock->id : -1;
-    snprintf(buffer, sizeof(buffer),
-             "State: %s | Block: %d | Ticks: %d | LoopDepth: %d",
-             stateStr, blockId, rt->totalTicksExecuted, (int)rt->loopStack.size());
-
-    return buffer;
+void runtime_set_watchdog_threshold(Runtime* rt, int threshold) {
+    rt->watchdogThreshold = threshold;
 }
 
-void runtime_tick(Runtime* rt) {
-    if (rt->state != RUNTIME_RUNNING) return;
-    if (!rt->currentBlock) {
-        rt->state = RUNTIME_FINISHED;
-        log_info("Program finished");
-        return;
+void runtime_reset_watchdog(Runtime* rt) {
+    rt->ticksSinceLastWait = 0;
+    for (size_t i = 0; i < rt->loopStack.size(); i++) {
+        rt->loopStack[i].ticksWithoutWait = 0;
     }
+}
 
-    if (runtime_check_watchdog(rt)) return;
-
-    if (rt->waitTicksRemaining > 0) {
-        rt->waitTicksRemaining--;
-        return;
+const char* runtime_get_status(Runtime* rt) {
+    if (rt->watchdogTriggered) return "WATCHDOG_TRIGGERED";
+    
+    switch (rt->state) {
+        case RUNTIME_STOPPED: return "STOPPED";
+        case RUNTIME_RUNNING: return "RUNNING";
+        case RUNTIME_PAUSED: return "PAUSED";
+        case RUNTIME_FINISHED: return "FINISHED";
+        default: return "UNKNOWN";
     }
+}
 
-    execute_block(rt, rt->currentBlock);
-    advance_to_next_block(rt);
-    rt->totalTicksExecuted++;
-
-    if (rt->stepMode) {
-        rt->state = RUNTIME_PAUSED;
+bool evaluate_condition(Runtime* rt, Block* b) {
+    if (b->args.empty()) return true;
+    
+    std::string conditionStr = b->args[0];
+    
+    if (conditionStr == "true" || conditionStr == "1") return true;
+    if (conditionStr == "false" || conditionStr == "0") return false;
+    
+    if (b->args.size() >= 3) {
+        float left = 0.0f;
+        float right = 0.0f;
+        std::string op = b->args[1];
+        
+        if (b->args[0] == "x" && rt->targetSprite) {
+            left = rt->targetSprite->x;
+        } else if (b->args[0] == "y" && rt->targetSprite) {
+            left = rt->targetSprite->y;
+        } else {
+            left = (float)std::atof(b->args[0].c_str());
+        }
+        
+        if (b->args[2] == "x" && rt->targetSprite) {
+            right = rt->targetSprite->x;
+        } else if (b->args[2] == "y" && rt->targetSprite) {
+            right = rt->targetSprite->y;
+        } else {
+            right = (float)std::atof(b->args[2].c_str());
+        }
+        
+        if (op == ">" || op == "gt") return left > right;
+        if (op == "<" || op == "lt") return left < right;
+        if (op == ">=" || op == "gte") return left >= right;
+        if (op == "<=" || op == "lte") return left <= right;
+        if (op == "==" || op == "eq") return std::fabs(left - right) < 0.0001f;
+        if (op == "!=" || op == "neq") return std::fabs(left - right) >= 0.0001f;
     }
+    
+    return true;
 }
 
 void execute_block(Runtime* rt, Block* b) {
     if (!b || !rt->targetSprite) return;
 
-    Sprite* s = rt->targetSprite;
+    for (size_t i = 0; i < rt->loopStack.size(); i++) {
+        rt->loopStack[i].ticksWithoutWait++;
+    }
+
+    std::stringstream ss;
+    ss << "Executing block #" << b->id << " type=" << b->type;
+    log_debug(ss.str());
 
     switch (b->type) {
         case CMD_MOVE: {
             float steps = 10.0f;
             if (!b->args.empty()) steps = (float)std::atof(b->args[0].c_str());
-
-            float rad = s->angle * (3.14159265f / 180.0f);
-            float newX = s->x + steps * std::cos(rad);
-            float newY = s->y + steps * std::sin(rad);
-
-            if (newX >= 0 && newX <= WINDOW_WIDTH) s->x = newX;
-            if (newY >= 0 && newY <= WINDOW_HEIGHT) s->y = newY;
+            
+            float rad = rt->targetSprite->angle * 3.14159265f / 180.0f;
+            rt->targetSprite->x += steps * std::cos(rad);
+            rt->targetSprite->y += steps * std::sin(rad);
             break;
         }
 
         case CMD_TURN: {
             float degrees = 15.0f;
             if (!b->args.empty()) degrees = (float)std::atof(b->args[0].c_str());
-            s->angle += degrees;
-            while (s->angle >= 360.0f) s->angle -= 360.0f;
-            while (s->angle < 0.0f) s->angle += 360.0f;
+            rt->targetSprite->angle += degrees;
+            
+            while (rt->targetSprite->angle >= 360.0f) rt->targetSprite->angle -= 360.0f;
+            while (rt->targetSprite->angle < 0.0f) rt->targetSprite->angle += 360.0f;
             break;
         }
 
         case CMD_GOTO: {
+            float gotoX = 0.0f;
+            float gotoY = 0.0f;
             if (b->args.size() >= 2) {
-                s->x = (float)std::atof(b->args[0].c_str());
-                s->y = (float)std::atof(b->args[1].c_str());
+                gotoX = (float)std::atof(b->args[0].c_str());
+                gotoY = (float)std::atof(b->args[1].c_str());
             }
+            rt->targetSprite->x = gotoX;
+            rt->targetSprite->y = gotoY;
             break;
         }
 
@@ -169,6 +252,11 @@ void execute_block(Runtime* rt, Block* b) {
             float seconds = 1.0f;
             if (!b->args.empty()) seconds = (float)std::atof(b->args[0].c_str());
             rt->waitTicksRemaining = (int)(seconds * rt->tickRate);
+            
+            rt->ticksSinceLastWait = 0;
+            for (size_t i = 0; i < rt->loopStack.size(); i++) {
+                rt->loopStack[i].ticksWithoutWait = 0;
+            }
             break;
         }
 
@@ -182,26 +270,48 @@ void execute_block(Runtime* rt, Block* b) {
         case CMD_REPEAT: {
             int times = 10;
             if (!b->args.empty()) times = std::atoi(b->args[0].c_str());
+            
+            if (times <= 0) {
+                log_warning("REPEAT with zero or negative count, skipping");
+                break;
+            }
+            
+            if (times > 100000) {
+                log_warning("REPEAT count too high, capping at 100000");
+                times = 100000;
+            }
 
             LoopContext ctx;
             ctx.loopBlock = b;
             ctx.remainingIterations = times;
+            ctx.ticksWithoutWait = 0;
             rt->loopStack.push_back(ctx);
             break;
         }
 
         case CMD_IF: {
-            bool condition = true;
+            bool condition = evaluate_condition(rt, b);
+            
+            std::stringstream condLog;
+            condLog << "IF condition evaluated to: " << (condition ? "true" : "false");
+            log_debug(condLog.str());
+            
             if (condition && b->inner) {
                 LoopContext ctx;
                 ctx.loopBlock = b;
                 ctx.remainingIterations = 1;
+                ctx.ticksWithoutWait = 0;
                 rt->loopStack.push_back(ctx);
             }
             break;
         }
 
+        case CMD_EVENT_CLICK: {
+            break;
+        }
+
         default:
+            log_warning("Unknown block type encountered");
             break;
     }
 }
@@ -212,7 +322,7 @@ void advance_to_next_block(Runtime* rt) {
     Block* current = rt->currentBlock;
 
     if ((current->type == CMD_REPEAT || current->type == CMD_IF) && current->inner) {
-        if (!rt->loopStack.empty()) {
+        if (!rt->loopStack.empty() && rt->loopStack.back().loopBlock == current) {
             rt->currentBlock = current->inner;
             return;
         }
@@ -228,14 +338,22 @@ void advance_to_next_block(Runtime* rt) {
         ctx.remainingIterations--;
 
         if (ctx.remainingIterations > 0 && ctx.loopBlock->type == CMD_REPEAT) {
+            if (ctx.ticksWithoutWait >= LOOP_WATCHDOG_LIMIT) {
+                log_error("Loop watchdog: forcing break");
+                rt->loopStack.pop_back();
+                rt->watchdogTriggered = true;
+                rt->state = RUNTIME_STOPPED;
+                return;
+            }
             rt->currentBlock = ctx.loopBlock->inner;
             return;
         }
 
+        Block* parentBlock = ctx.loopBlock;
         rt->loopStack.pop_back();
 
-        if (ctx.loopBlock->next) {
-            rt->currentBlock = ctx.loopBlock->next;
+        if (parentBlock->next) {
+            rt->currentBlock = parentBlock->next;
             return;
         }
     }

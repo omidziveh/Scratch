@@ -12,6 +12,7 @@ enum RuntimeState {
 struct LoopContext {
     Block* loopBlock;
     int remainingIterations;
+    int ticksWithoutWait;
 };
 
 struct Runtime {
@@ -26,6 +27,9 @@ struct Runtime {
     int maxTicksAllowed;
     bool stepMode;
     bool breakpointHit;
+    int ticksSinceLastWait;
+    int watchdogThreshold;
+    bool watchdogTriggered;
 };
 
 void runtime_init(Runtime* rt, Block* head, Sprite* sprite);
@@ -40,6 +44,10 @@ void runtime_set_step_mode(Runtime* rt, bool enabled);
 const char* runtime_get_status(Runtime* rt);
 bool runtime_check_watchdog(Runtime* rt);
 void runtime_set_max_ticks(Runtime* rt, int maxTicks);
+void runtime_set_watchdog_threshold(Runtime* rt, int threshold);
+void runtime_reset_watchdog(Runtime* rt);
 
 void execute_block(Runtime* rt, Block* b);
 void advance_to_next_block(Runtime* rt);
+
+bool evaluate_condition(Runtime* rt, Block* b);
