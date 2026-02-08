@@ -45,6 +45,11 @@ Block* create_block(BlockType t) {
     return b;
 }
 
+void delete_block(Block* b) {
+    if (!b) return;
+    delete b;
+}
+
 void delete_chain(Block* b) {
     if (!b) return;
 
@@ -53,24 +58,11 @@ void delete_chain(Block* b) {
         b->inner = nullptr;
     }
 
-    Block* nextBlock = b->next;
-    b->args.clear();
-    delete b;
-
-    if (nextBlock) {
-        delete_chain(nextBlock);
-    }
-}
-
-void delete_block(Block* b) {
-    if (!b) return;
-
-    if (b->inner) {
-        delete_chain(b->inner);
-        b->inner = nullptr;
+    if (b->next) {
+        delete_chain(b->next);
+        b->next = nullptr;
     }
 
-    b->args.clear();
     delete b;
 }
 
