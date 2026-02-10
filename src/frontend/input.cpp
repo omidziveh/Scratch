@@ -1,15 +1,22 @@
 #include "input.h"
+#include "../common/definitions.h"
 #include "palette.h"
+#include <SDL2/SDL.h>
+#include <vector>
 #include <cmath>
+
+// دسترسی به vector اصلی که در main.cpp تعریف شده
+extern std::vector<Block*> all_blocks;
 
 namespace BlockCoding {
 
-    static std::vector<Block*> all_blocks;
+    // حذف شد: static std::vector<Block*> all_blocks; ❌
 
     static Block* dragging_block = nullptr;
     static int drag_offset_x = 0;
     static int drag_offset_y = 0;
     static const int SNAP_DISTANCE = 20;
+    static int next_block_id = 100;
 
     Block* get_block_at(int x, int y) {
         for (int i = (int)all_blocks.size() - 1; i >= 0; i--) {
@@ -49,6 +56,15 @@ namespace BlockCoding {
     }
 
     void handle_mouse_down(int x, int y) {
+        int palette_index = get_clicked_palette_item(x, y);
+        if (palette_index >= 0) {
+            // بلاک جدید از palette اسپاون کن
+            BlockType type = get_palette_block_type(palette_index);
+            spawn_block_from_palette(type, WORKSPACE_X + 50, 100);
+            return;
+        }
+
+        // اگه نه، چک کن روی بلاک موجود کلیک شده
         Block* clicked = get_block_at(x, y);
         if (clicked) {
             dragging_block = clicked;
@@ -77,22 +93,19 @@ namespace BlockCoding {
         }
     }
 
-}
-extern std::vector<Block*> all_blocks;
-static int next_block_id = 100;
+    Block* spawn_block_from_palette(BlockType type, int x, int y) {
+        Block* newBlock = new Block;
+        newBlock->id = next_block_id++;
+        newBlock->type = type;
+        newBlock->x = (float)x;
+        newBlock->y = (float)y;
+        newBlock->width = BLOCK_WIDTH;
+        newBlock->height = BLOCK_HEIGHT;
+        newBlock->next = nullptr;
+        newBlock->inner = nullptr;
+        
+        all_blocks.push_back(newBlock);
+        return newBlock;
+    }
 
-Block* spawn_block_from_palette(BlockType type, int x, int y) {
-    Block* newBlock = new Block;
-    newBlock->id = next_block_id++;
-    newBlock->type = type;
-    newBlock->x = x;
-    newBlock->y = y;
-    newBlock->width = 120;
-    newBlock->height = 50;
-    newBlock->next = nullptr;
-    newBlock->inner = nullptr;
-    
-    all_blocks.push_back(newBlock);
-    return newBlock;
 }
-
