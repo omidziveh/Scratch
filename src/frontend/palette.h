@@ -9,4 +9,4 @@ void draw_palette(SDL_Renderer* renderer);
 int get_clicked_palette_item(int x, int y);
 BlockType get_palette_block_type(int index);
 
-#endif 
+#endif

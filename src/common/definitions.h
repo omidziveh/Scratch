@@ -7,30 +7,27 @@
 
 const int WINDOW_WIDTH = 1200;
 const int WINDOW_HEIGHT = 800;
-
 const int STAGE_X = 800;
 const int STAGE_Y = 50;
 const int STAGE_WIDTH = 380;
 const int STAGE_HEIGHT = 300;
 const int STAGE_BORDER_SIZE = 3;
-
 const int BLOCK_WIDTH = 120;
 const int BLOCK_HEIGHT = 50;
-
 const int PALETTE_WIDTH = 150;
 const int PALETTE_X = 0;
 const int PALETTE_Y = 50;
 const int PALETTE_BLOCK_SPACING = 70;
 const int WORKSPACE_X = PALETTE_WIDTH + 10;
-
 const int DEFAULT_TICK_RATE = 30;
 const int DEFAULT_MAX_TICKS = 10000;
-
 const int MIN_BLOCK_DATA_COUNT = 9;
 const int MIN_SPRITE_DATA_COUNT = 5;
+const int BLOCK_CORNER_RADIUS = 8;
+const int DEFAULT_WATCHDOG_THRESHOLD = 10000;
+const int LOOP_WATCHDOG_LIMIT = 1000;
 
 struct Block;
-
 extern std::vector<Block*> all_blocks;
 
 enum BlockType {
@@ -60,8 +57,8 @@ struct Block {
     Block* inner;
     std::vector<std::string> args;
     bool hasBreakpoint;
-    
-    Block() : id(0), type(BLOCK_NONE), x(0), y(0), 
+
+    Block() : id(0), type(BLOCK_NONE), x(0), y(0),
               width(BLOCK_WIDTH), height(BLOCK_HEIGHT),
               next(nullptr), inner(nullptr), hasBreakpoint(false) {}
 };
@@ -77,9 +74,9 @@ struct Sprite {
     bool isPenDown;
     int currentCostumeIndex;
     std::vector<std::string> costumes;
-    
+
     Sprite() : x(0), y(0), width(100), height(100), angle(0),
-               texture(nullptr), visible(true), isPenDown(false),
+               texture(nullptr), visible(1), isPenDown(false),
                currentCostumeIndex(0) {}
 };
 
@@ -90,6 +87,7 @@ struct Stage {
     int height;
     SDL_Color border_color;
     SDL_Color background_color;
+
     Stage() : x(STAGE_X), y(STAGE_Y), width(STAGE_WIDTH), height(STAGE_HEIGHT) {
         border_color = {100, 100, 100, 255};
         background_color = {255, 255, 255, 255};
@@ -106,20 +104,9 @@ struct PaletteItem {
     Uint8 g;
     Uint8 b;
     const char* label;
-    
+
     PaletteItem() : type(BLOCK_NONE), x(0), y(0), width(0), height(0),
                     r(0), g(0), b(0), label("") {}
 };
 
-struct GraphicsContext {
-    SDL_Window* window;
-    SDL_Renderer* renderer;
-    
-    GraphicsContext() : window(nullptr), renderer(nullptr) {}
-};
-
-void init_graphics(GraphicsContext* ctx);
-void shutdown_graphics(GraphicsContext* ctx);
-void clear(GraphicsContext* ctx, Uint8 r, Uint8 g, Uint8 b);
-
-#endif // DEFINITIONS_H
+#endif
