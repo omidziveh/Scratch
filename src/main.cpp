@@ -4,6 +4,10 @@
 #include "common/definitions.h"
 #include "common/globals.h"
 #include "frontend/draw.h"
+#include "backend/sensing.h"
+#include "backend/operators.h"
+#include "backend/block_executor_sensing.h"
+#include "backend/logger.h"
 
 using namespace BlockCoding;
 std::vector<Block*> all_blocks;
@@ -73,7 +77,23 @@ int main(int argc, char* argv[]) {
                     cat.x = cat.x + 10;
                 }
             }
+
+            if (event.type == SDL_MOUSEMOTION) {
+                int mx = event.motion.x;
+                int my = event.motion.y;
+
+                bool touching = is_sprite_touching_mouse(cat, stage, mx, my);
+                if (touching) {
+                    log_info("Mouse is touching the sprite at (" + std::to_string(mx) + ", " + std::to_string(my) + ")");
+                }
+            }
+
         }
+
+        if (is_sprite_touching_edge(cat, stage)) {
+            bounce_off_edge(cat, stage);
+        }
+
         
         SDL_SetRenderDrawColor(renderer, 240, 240, 240, 255);
         SDL_RenderClear(renderer);

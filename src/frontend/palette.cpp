@@ -62,6 +62,46 @@ void init_palette() {
     eventItem.width = PALETTE_WIDTH - 20;
     eventItem.height = itemHeight;
     palette_items.push_back(eventItem);
+
+        PaletteItem senseMouseItem;
+    senseMouseItem.type = SENSE_TOUCHING_MOUSE;
+    senseMouseItem.x = PALETTE_X + 10;
+    senseMouseItem.y = startY + itemHeight * palette_items.size();
+    senseMouseItem.width = PALETTE_WIDTH - 20;
+    senseMouseItem.height = itemHeight;
+    palette_items.push_back(senseMouseItem);
+
+    PaletteItem senseEdgeItem;
+    senseEdgeItem.type = SENSE_TOUCHING_EDGE;
+    senseEdgeItem.x = PALETTE_X + 10;
+    senseEdgeItem.y = startY + itemHeight * palette_items.size();
+    senseEdgeItem.width = PALETTE_WIDTH - 20;
+    senseEdgeItem.height = itemHeight;
+    palette_items.push_back(senseEdgeItem);
+
+    PaletteItem addItem;
+    addItem.type = OP_ADD;
+    addItem.x = PALETTE_X + 10;
+    addItem.y = startY + itemHeight * palette_items.size();
+    addItem.width = PALETTE_WIDTH - 20;
+    addItem.height = itemHeight;
+    palette_items.push_back(addItem);
+
+    PaletteItem subItem;
+    subItem.type = OP_SUB;
+    subItem.x = PALETTE_X + 10;
+    subItem.y = startY + itemHeight * palette_items.size();
+    subItem.width = PALETTE_WIDTH - 20;
+    subItem.height = itemHeight;
+    palette_items.push_back(subItem);
+
+    PaletteItem divItem;
+    divItem.type = OP_DIV;
+    divItem.x = PALETTE_X + 10;
+    divItem.y = startY + itemHeight * palette_items.size();
+    divItem.width = PALETTE_WIDTH - 20;
+    divItem.height = itemHeight;
+    palette_items.push_back(divItem);
 }
 
 void draw_palette(SDL_Renderer* renderer) {
