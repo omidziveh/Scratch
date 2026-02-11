@@ -14,6 +14,11 @@ std::string blocktype_to_string(BlockType type) {
         case CMD_WAIT: return "WAIT";
         case CMD_SAY: return "SAY";
         case CMD_EVENT_CLICK: return "EVENT_CLICK";
+        case SENSE_TOUCHING_MOUSE: return "SENSE_MOUSE";
+        case SENSE_TOUCHING_EDGE: return "SENSE_EDGE";
+        case OP_ADD: return "OP_ADD";
+        case OP_SUB: return "OP_SUB";
+        case OP_DIV: return "OP_DIV";
     }
     return "UNKNOWN";
 }
@@ -27,6 +32,11 @@ BlockType string_to_blocktype(const std::string& str) {
     if (str == "WAIT") return CMD_WAIT;
     if (str == "SAY") return CMD_SAY;
     if (str == "EVENT_CLICK") return CMD_EVENT_CLICK;
+    if (str == "SENSE_MOUSE") return SENSE_TOUCHING_MOUSE;
+    if (str == "SENSE_EDGE") return SENSE_TOUCHING_EDGE;
+    if (str == "OP_ADD") return OP_ADD;
+    if (str == "OP_SUB") return OP_SUB;
+    if (str == "OP_DIV") return OP_DIV;
     return CMD_MOVE;
 }
 

@@ -1,108 +1,56 @@
 #include "palette.h"
-#include "../gfx/SDL2_gfxPrimitives.h"
+#include "draw.h"
+#include "block_utils.h"
+#include "../common/globals.h"
 
-static PaletteItem palette_items[6];
-static int palette_count = 0;
+void init_palette(std::vector<PaletteItem>& items) {
+    items.clear();
 
-void init_palette() {
-    palette_count = 6;
-    int y_start = 20;
-    int spacing = 60;
+    float startX = (float)(PALETTE_X + 20);
+    float startY = (float)(PALETTE_Y + 20);
+    float gap    = 50.0f;
+    float w      = (float)(PALETTE_WIDTH - 40);
+    float h      = (float)BLOCK_HEIGHT;
 
-    palette_items[0] = PaletteItem();
-    palette_items[0].type = BLOCK_MOVE;
-    palette_items[0].x = 10;
-    palette_items[0].y = y_start;
-    palette_items[0].width = 130;
-    palette_items[0].height = 50;
-    palette_items[0].r = 66;
-    palette_items[0].g = 133;
-    palette_items[0].b = 244;
-    palette_items[0].label = "Move";
+    struct PaletteDef {
+        BlockType type;
+        std::string label;
+    };
 
-    palette_items[1] = PaletteItem();
-    palette_items[1].type = BLOCK_TURN;
-    palette_items[1].x = 10;
-    palette_items[1].y = y_start + spacing;
-    palette_items[1].width = 130;
-    palette_items[1].height = 50;
-    palette_items[1].r = 33;
-    palette_items[1].g = 100;
-    palette_items[1].b = 200;
-    palette_items[1].label = "Turn";
+    PaletteDef defs[] = {
+        {CMD_START,    "When START clicked"},
+        {CMD_MOVE,     "Move (10) steps"},
+        {CMD_TURN,     "Turn (15) degrees"},
+        {CMD_GOTO,     "Go to x:(0) y:(0)"},
+        {CMD_SET_X,    "Set x to (0)"},
+        {CMD_SET_Y,    "Set y to (0)"},
+        {CMD_CHANGE_X, "Change x by (10)"},
+        {CMD_CHANGE_Y, "Change y by (10)"},
+        {CMD_REPEAT,   "Repeat (10)"},
+        {CMD_IF,       "If <> then"},
+        {CMD_WAIT,     "Wait (1) secs"},
+        {CMD_SAY,      "Say [Hello!]"},
+    };
 
-    palette_items[2] = PaletteItem();
-    palette_items[2].type = BLOCK_REPEAT;
-    palette_items[2].x = 10;
-    palette_items[2].y = y_start + spacing * 2;
-    palette_items[2].width = 130;
-    palette_items[2].height = 50;
-    palette_items[2].r = 255;
-    palette_items[2].g = 152;
-    palette_items[2].b = 0;
-    palette_items[2].label = "Repeat";
-
-    palette_items[3] = PaletteItem();
-    palette_items[3].type = BLOCK_IF;
-    palette_items[3].x = 10;
-    palette_items[3].y = y_start + spacing * 3;
-    palette_items[3].width = 130;
-    palette_items[3].height = 50;
-    palette_items[3].r = 255;
-    palette_items[3].g = 193;
-    palette_items[3].b = 7;
-    palette_items[3].label = "If";
-
-    palette_items[4] = PaletteItem();
-    palette_items[4].type = BLOCK_WAIT;
-    palette_items[4].x = 10;
-    palette_items[4].y = y_start + spacing * 4;
-    palette_items[4].width = 130;
-    palette_items[4].height = 50;
-    palette_items[4].r = 156;
-    palette_items[4].g = 39;
-    palette_items[4].b = 176;
-    palette_items[4].label = "Wait";
-
-    palette_items[5] = PaletteItem();
-    palette_items[5].type = BLOCK_START;
-    palette_items[5].x = 10;
-    palette_items[5].y = y_start + spacing * 5;
-    palette_items[5].width = 130;
-    palette_items[5].height = 50;
-    palette_items[5].r = 76;
-    palette_items[5].g = 175;
-    palette_items[5].b = 80;
-    palette_items[5].label = "Start";
-}
-
-void draw_palette(SDL_Renderer* renderer) {
-    boxRGBA(renderer, 0, 0, PALETTE_WIDTH, WINDOW_HEIGHT, 50, 50, 50, 255);
-    lineRGBA(renderer, PALETTE_WIDTH, 0, PALETTE_WIDTH, WINDOW_HEIGHT, 100, 100, 100, 255);
-    for (int i = 0; i < palette_count; i++) {
-        PaletteItem& item = palette_items[i];
-        roundedBoxRGBA(renderer,
-            item.x, item.y,
-            item.x + item.width, item.y + item.height,
-            8, item.r, item.g, item.b, 255);
-        stringRGBA(renderer, item.x + 10, item.y + 18, item.label, 255, 255, 255, 255);
+    int count = sizeof(defs) / sizeof(defs[0]);
+    for (int i = 0; i < count; i++) {
+        SDL_Color color = block_get_color(defs[i].type);
+        PaletteItem item(defs[i].type, defs[i].label, color,
+                         startX, startY + i * gap, w, h);
+        items.push_back(item);
     }
 }
 
-int get_clicked_palette_item(int x, int y) {
-    for (int i = 0; i < palette_count; i++) {
-        PaletteItem& item = palette_items[i];
-        if (x >= item.x && x <= item.x + item.width &&
-            y >= item.y && y <= item.y + item.height) {
-            return i;
-        }
-    }
-    return -1;
-}
+void draw_palette(SDL_Renderer* renderer, const std::vector<PaletteItem>& items) {
+    draw_filled_rect(renderer, PALETTE_X, PALETTE_Y, PALETTE_WIDTH, PALETTE_HEIGHT, COLOR_PALETTE_BG);
 
-BlockType get_palette_block_type(int index) {
-    if (index >= 0 && index < palette_count) {
-        return palette_items[index].type;
+    for (const auto& item : items) {
+        Block temp;
+        temp.x = item.x;
+        temp.y = item.y;
+        temp.width = item.width;
+        temp.height = item.height;
+        temp.color = item.color;
+        draw_block(renderer, temp, item.label);
     }
-    return BLOCK_NONE;
 }
