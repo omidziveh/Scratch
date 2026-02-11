@@ -2,11 +2,25 @@
 #define DRAW_H
 
 #include <SDL2/SDL.h>
+#include <string>
+#include <vector>
 #include "../common/definitions.h"
 
-SDL_Texture* load_texture(SDL_Renderer* renderer, const char* path);
-void draw_stage_background(SDL_Renderer* renderer, Stage* stage);
-void draw_stage_border(SDL_Renderer* renderer, Stage* stage);
-void draw_sprite(SDL_Renderer* renderer, Sprite* sprite, Stage* stage);
+SDL_Texture* load_texture(SDL_Renderer* renderer, const std::string& path);
+
+void draw_filled_rect(SDL_Renderer* renderer, int x, int y, int w, int h, SDL_Color color);
+void draw_rect_outline(SDL_Renderer* renderer, int x, int y, int w, int h, SDL_Color color);
+
+void draw_block(SDL_Renderer* renderer, const Block& block, const std::string& label);
+void draw_all_blocks(SDL_Renderer* renderer, const std::vector<Block>& blocks);
+
+void draw_toolbar(SDL_Renderer* renderer);
+void draw_coding_area(SDL_Renderer* renderer);
+void draw_stage(SDL_Renderer* renderer, Sprite& sprite);
+void draw_stage_border(SDL_Renderer* renderer);
+
+void draw_sprite(SDL_Renderer* renderer, Sprite& sprite);
+
+void draw_text(SDL_Renderer* renderer, int x, int y, const std::string& text, SDL_Color color);
 
 #endif

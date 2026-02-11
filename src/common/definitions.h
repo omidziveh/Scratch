@@ -1,123 +1,39 @@
 #ifndef DEFINITIONS_H
 #define DEFINITIONS_H
 
-#include <SDL2/SDL.h>
-#include <vector>
-#include <string>
-#include <SDL2/SDL.h>
 #include <string>
 #include <vector>
+#include <SDL2/SDL.h>
 
-const int WINDOW_WIDTH = 1200;
-const int WINDOW_HEIGHT = 800;
+const int WINDOW_WIDTH  = 1280;
+const int WINDOW_HEIGHT = 720;
 
-const int STAGE_X = 800;
-const int STAGE_Y = 50;
-const int STAGE_WIDTH = 380;
-const int STAGE_HEIGHT = 300;
-const int STAGE_BORDER_SIZE = 3; 
-const int BLOCK_WIDTH = 120;
-const int BLOCK_HEIGHT = 50;
+const int STAGE_X      = 800;
+const int STAGE_Y      = 40;
+const int STAGE_WIDTH  = 460;
+const int STAGE_HEIGHT = 340;
 
-const int PALETTE_WIDTH = 150;
-const int PALETTE_X = 0;
-const int PALETTE_Y = 50;
-const int PALETTE_BLOCK_SPACING = 70;
-const int WORKSPACE_X = PALETTE_WIDTH + 10;
+const int PALETTE_X      = 0;
+const int PALETTE_Y      = 40;
+const int PALETTE_WIDTH  = 200;
+const int PALETTE_HEIGHT = 680;
 
-const int DEFAULT_TICK_RATE = 30;      
-const int DEFAULT_MAX_TICKS = 10000;   
+const int CODING_AREA_X      = 200;
+const int CODING_AREA_Y      = 40;
+const int CODING_AREA_WIDTH  = 600;
+const int CODING_AREA_HEIGHT = 680;
 
-const int MIN_BLOCK_DATA_COUNT = 9;    
-const int MIN_SPRITE_DATA_COUNT = 5;   
-struct Block;
-extern std::vector<Block*> all_blocks;
+const int TOOLBAR_X      = 0;
+const int TOOLBAR_Y      = 0;
+const int TOOLBAR_WIDTH  = 1280;
+const int TOOLBAR_HEIGHT = 40;
 
-enum BlockType {
-    BLOCK_NONE = 0,
-    CMD_MOVE,
-    CMD_TURN,
-    CMD_GOTO,
-    CMD_REPEAT,
-    CMD_IF,
-    CMD_WAIT,
-    CMD_SAY,
-    CMD_EVENT_CLICK,
-    BLOCK_MOVE = CMD_MOVE,
-    BLOCK_TURN = CMD_TURN,
-    BLOCK_GOTO = CMD_GOTO,
-    BLOCK_REPEAT = CMD_REPEAT,
-    BLOCK_IF = CMD_IF,
-    BLOCK_WAIT = CMD_WAIT,
-    BLOCK_SAY = CMD_SAY,
-    BLOCK_EVENT_START = CMD_EVENT_CLICK
-};
+const int BLOCK_WIDTH  = 160;
+const int BLOCK_HEIGHT = 40;
+const int SNAP_DISTANCE = 20;
 
-struct Block {
-    int id;
-    BlockType type;
-    float x;
-    float y;
-    float width;
-    float height;
-    Block* next;
-    Block* inner;
-    std::vector<std::string> args;
-};
-
-#define BLOCK_WIDTH 120
-#define BLOCK_HEIGHT 40
-
-enum BlockType {
-    CMD_MOVE,
-    CMD_TURN,
-    CMD_GOTO,
-    CMD_REPEAT,
-    CMD_IF,
-    CMD_WAIT,
-    CMD_SAY,
-    CMD_EVENT_CLICK
-};
-
-struct Block {
-    int id;
-    BlockType type;
-
-    float x, y;
-    float width, height;
-
-    std::vector<std::string> args;
-
-    Block* next = nullptr;
-    Block* inner = nullptr;
-
-    bool hasBreakpoint = false;
-};
-
-struct Sprite {
-<<<<<<< HEAD
-    float x;
-    float y;
-    float width;
-    float height;
-    double angle;
-    SDL_Texture* texture;
-    int visible;
-    bool isPenDown;
-    int currentCostumeIndex;
-    std::vector<std::string> costumes;
-=======
-    float x = 0;
-    float y = 0;
-    float width = 100;
-    float height = 100;
-    SDL_Texture* texture = nullptr;
-    int visible = true;
-    float angle = 0;
-    bool isPenDown = false;
-    std::vector<std::string> costumes;
-    int currentCostumeIndex = 0;
->>>>>>> 265a5b0407adbbe5c738e96251f11c7ede8ea6a0
+struct Color {
+    Uint8 r, g, b, a;
 };
 
 struct Stage {
@@ -125,16 +41,135 @@ struct Stage {
     int y;
     int width;
     int height;
-    SDL_Color border_color;
-    SDL_Color background_color;
+    Color border_color;
+    Color background_color;
+
+    Stage()
+        : x(STAGE_X)
+        , y(STAGE_Y)
+        , width(STAGE_WIDTH)
+        , height(STAGE_HEIGHT)
+        , border_color({100, 100, 100, 255})
+        , background_color({255, 255, 255, 255})
+    {}
+};
+
+struct Sprite {
+    float x;
+    float y;
+    int width;
+    int height;
+    float angle;
+    float direction;
+    int visible;
+    int isPenDown;
+    int currentCostumeIndex;
+    SDL_Texture* texture;
+    std::string name;
+    float scale;
+
+    Sprite()
+        : x(STAGE_X + STAGE_WIDTH / 2.0f)
+        , y(STAGE_Y + STAGE_HEIGHT / 2.0f)
+        , width(80)
+        , height(80)
+        , angle(0.0f)
+        , direction(0.0f)
+        , texture(nullptr)
+        , name("Cat")
+        , scale(1.0f)
+        , visible(1)
+        , isPenDown(0)
+        , currentCostumeIndex(0)
+    {}
+};
+
+enum BlockType {
+    CMD_NONE = 0,
+    CMD_MOVE,
+    CMD_TURN,
+    CMD_GOTO,
+    CMD_SET_X,
+    CMD_SET_Y,
+    CMD_CHANGE_X,
+    CMD_CHANGE_Y,
+    CMD_REPEAT,
+    CMD_IF,
+    CMD_WAIT,
+    CMD_SAY,
+    CMD_START,
+    CMD_EVENT_CLICK,
+    SENSE_TOUCHING_MOUSE,
+    SENSE_TOUCHING_EDGE,
+    OP_ADD,
+    OP_SUB,
+    OP_DIV
+};
+
+struct Block {
+    int id;
+    BlockType type;
+    float x, y;
+    float width, height;
+    bool dragging;
+    float drag_offset_x;
+    float drag_offset_y;
+    std::vector<std::string> args;
+    SDL_Color color;
+
+    Block* parent;
+    Block* child;
+    bool is_snapped;
+
+    Block* next;
+    Block* inner;
+
+    Block()
+        : id(0)
+        , type(CMD_NONE)
+        , x(0), y(0)
+        , width(BLOCK_WIDTH), height(BLOCK_HEIGHT)
+        , dragging(false)
+        , drag_offset_x(0), drag_offset_y(0)
+        , color({100, 100, 255, 255})
+        , parent(nullptr)
+        , child(nullptr)
+        , is_snapped(false)
+        , next(nullptr)
+        , inner(nullptr)
+    {}
 };
 
 struct PaletteItem {
     BlockType type;
-    int x;
-    int y;
-    int width;
-    int height;
+    std::string label;
+    SDL_Color color;
+    float x, y;
+    float width, height;
+
+    PaletteItem()
+        : type(CMD_NONE)
+        , label("")
+        , color({100, 100, 255, 255})
+        , x(0), y(0)
+        , width(BLOCK_WIDTH), height(BLOCK_HEIGHT)
+    {}
+
+    PaletteItem(BlockType t, const std::string& lbl, SDL_Color c, float px, float py, float w, float h)
+        : type(t)
+        , label(lbl)
+        , color(c)
+        , x(px), y(py)
+        , width(w), height(h)
+    {}
+};
+
+enum LogLevel {
+    LOG_DEBUG = 0,
+    LOG_INFO,
+    LOG_WARNING,
+    LOG_ERROR,
+    LOG_SUCCESS
 };
 
 #endif

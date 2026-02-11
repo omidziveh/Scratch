@@ -1,89 +1,107 @@
 #include "draw.h"
+#include "block_utils.h"
 #include "../common/globals.h"
-#include <SDL2/SDL_image.h>
+#include "../gfx/SDL2_gfxPrimitives.h"
+#include <SDL_image.h>
+#include <iostream>
 
-SDL_Texture* load_texture(SDL_Renderer* renderer, const char* path) {
-    SDL_Surface* surface = IMG_Load(path);
-    if (surface == NULL) {
-        return NULL;
+SDL_Texture* load_texture(SDL_Renderer* renderer, const std::string& path) {
+    SDL_Surface* surface = IMG_Load(path.c_str());
+    if (!surface) {
+        std::cerr << "Failed to load image: " << path << " - " << IMG_GetError() << std::endl;
+        return nullptr;
     }
     SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
     SDL_FreeSurface(surface);
+    if (!texture) {
+        std::cerr << "Failed to create texture: " << SDL_GetError() << std::endl;
+    }
     return texture;
 }
 
-void draw_stage_background(SDL_Renderer* renderer, Stage* stage) {
-    SDL_SetRenderDrawColor(renderer,
-        stage->background_color.r,
-        stage->background_color.g,
-        stage->background_color.b,
-        stage->background_color.a);
-    SDL_Rect bg_rect;
-    bg_rect.x = stage->x;
-    bg_rect.y = stage->y;
-    bg_rect.w = stage->width;
-    bg_rect.h = stage->height;
-    SDL_RenderFillRect(renderer, &bg_rect);
+void draw_filled_rect(SDL_Renderer* renderer, int x, int y, int w, int h, SDL_Color color) {
+    SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
+    SDL_Rect rect = {x, y, w, h};
+    SDL_RenderFillRect(renderer, &rect);
 }
 
-void draw_stage_border(SDL_Renderer* renderer, Stage* stage) {
-    SDL_SetRenderDrawColor(renderer,
-        stage->border_color.r,
-        stage->border_color.g,
-        stage->border_color.b,
-        stage->border_color.a);
-
-    SDL_Rect top;
-    top.x = stage->x - STAGE_BORDER_SIZE;
-    top.y = stage->y - STAGE_BORDER_SIZE;
-    top.w = stage->width + STAGE_BORDER_SIZE * 2;
-    top.h = STAGE_BORDER_SIZE;
-    SDL_RenderFillRect(renderer, &top);
-
-    SDL_Rect bottom;
-    bottom.x = stage->x - STAGE_BORDER_SIZE;
-    bottom.y = stage->y + stage->height;
-    bottom.w = stage->width + STAGE_BORDER_SIZE * 2;
-    bottom.h = STAGE_BORDER_SIZE;
-    SDL_RenderFillRect(renderer, &bottom);
-
-    SDL_Rect left;
-    left.x = stage->x - STAGE_BORDER_SIZE;
-    left.y = stage->y;
-    left.w = STAGE_BORDER_SIZE;
-    left.h = stage->height;
-    SDL_RenderFillRect(renderer, &left);
-
-    SDL_Rect right_side;
-    right_side.x = stage->x + stage->width;
-    right_side.y = stage->y;
-    right_side.w = STAGE_BORDER_SIZE;
-    right_side.h = stage->height;
-    SDL_RenderFillRect(renderer, &right_side);
+void draw_rect_outline(SDL_Renderer* renderer, int x, int y, int w, int h, SDL_Color color) {
+    SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
+    SDL_Rect rect = {x, y, w, h};
+    SDL_RenderDrawRect(renderer, &rect);
 }
 
-void draw_sprite(SDL_Renderer* renderer, Sprite* sprite, Stage* stage) {
-    if (sprite->visible == 0) {
-        return;
-    }
-    if (sprite->texture == NULL) {
-        return;
-    }
-    SDL_Rect dest_rect;
-    dest_rect.x = stage->x + (int)sprite->x - (int)(sprite->width / 2);
-    dest_rect.y = stage->y + (int)sprite->y - (int)(sprite->height / 2);
-    dest_rect.w = (int)sprite->width;
-    dest_rect.h = (int)sprite->height;
+void draw_block(SDL_Renderer* renderer, const Block& block, const std::string& label) {
+    int bx = (int)block.x;
+    int by = (int)block.y;
+    int bw = (int)block.width;
+    int bh = (int)block.height;
 
-    SDL_Point center;
-    center.x = (int)(sprite->width / 2);
-    center.y = (int)(sprite->height / 2);
+    roundedBoxRGBA(renderer,
+        bx, by, bx + bw, by + bh,
+        6,
+        block.color.r, block.color.g, block.color.b, block.color.a);
 
-    SDL_RenderCopyEx(renderer,
-        sprite->texture,
-        NULL,
-        &dest_rect,
-        sprite->angle,
-        &center,
-        SDL_FLIP_NONE);
+    Uint8 dr = (Uint8)(block.color.r * 0.7f);
+    Uint8 dg = (Uint8)(block.color.g * 0.7f);
+    Uint8 db = (Uint8)(block.color.b * 0.7f);
+    roundedRectangleRGBA(renderer,
+        bx, by, bx + bw, by + bh,
+        6,
+        dr, dg, db, 255);
+
+    draw_text(renderer, bx + 8, by + 12, label, COLOR_WHITE);
+}
+
+void draw_all_blocks(SDL_Renderer* renderer, const std::vector<Block>& blocks) {
+    for (const auto& block : blocks) {
+        std::string label = block_get_label(block.type);
+        draw_block(renderer, block, label);
+    }
+}
+
+void draw_toolbar(SDL_Renderer* renderer) {
+    draw_filled_rect(renderer, TOOLBAR_X, TOOLBAR_Y, TOOLBAR_WIDTH, TOOLBAR_HEIGHT, COLOR_TOOLBAR_BG);
+    draw_filled_rect(renderer, TOOLBAR_WIDTH - 90, 5, 30, 30, COLOR_GREEN);
+    draw_filled_rect(renderer, TOOLBAR_WIDTH - 50, 5, 30, 30, COLOR_RED);
+}
+
+void draw_coding_area(SDL_Renderer* renderer) {
+    draw_filled_rect(renderer, CODING_AREA_X, CODING_AREA_Y, CODING_AREA_WIDTH, CODING_AREA_HEIGHT, COLOR_CODING_BG);
+    draw_rect_outline(renderer, CODING_AREA_X, CODING_AREA_Y, CODING_AREA_WIDTH, CODING_AREA_HEIGHT, COLOR_DARK_GRAY);
+}
+
+void draw_stage(SDL_Renderer* renderer, Sprite& sprite) {
+    draw_filled_rect(renderer, STAGE_X, STAGE_Y, STAGE_WIDTH, STAGE_HEIGHT, COLOR_STAGE_BG);
+    draw_stage_border(renderer);
+    draw_sprite(renderer, sprite);
+}
+
+void draw_stage_border(SDL_Renderer* renderer) {
+    draw_rect_outline(renderer, STAGE_X, STAGE_Y, STAGE_WIDTH, STAGE_HEIGHT, COLOR_STAGE_BORDER);
+}
+
+void draw_sprite(SDL_Renderer* renderer, Sprite& sprite) {
+    if (!sprite.visible || !sprite.texture) return;
+
+    int w, h;
+    SDL_QueryTexture(sprite.texture, nullptr, nullptr, &w, &h);
+
+    int draw_w = (int)(w * sprite.scale);
+    int draw_h = (int)(h * sprite.scale);
+
+    SDL_Rect dest;
+    dest.x = (int)(sprite.x - draw_w / 2.0f);
+    dest.y = (int)(sprite.y - draw_h / 2.0f);
+    dest.w = draw_w;
+    dest.h = draw_h;
+
+    SDL_Rect stageClip = {STAGE_X, STAGE_Y, STAGE_WIDTH, STAGE_HEIGHT};
+    SDL_RenderSetClipRect(renderer, &stageClip);
+    SDL_RenderCopyEx(renderer, sprite.texture, nullptr, &dest, sprite.direction, nullptr, SDL_FLIP_NONE);
+    SDL_RenderSetClipRect(renderer, nullptr);
+}
+
+void draw_text(SDL_Renderer* renderer, int x, int y, const std::string& text, SDL_Color color) {
+    stringRGBA(renderer, x, y, text.c_str(), color.r, color.g, color.b, color.a);
 }

@@ -1,94 +1,150 @@
 #include "input.h"
-#include "palette.h"
-#include "../common/definitions.h"
-#include <SDL2/SDL.h>
-#include <vector>
+#include "block_utils.h"
+#include "logger.h"
+#include "../common/globals.h"
 #include <cmath>
+#include <iostream>
 
-extern std::vector<Block*> all_blocks;
-
-static Block* dragging_block = nullptr;
-static int drag_offset_x = 0;
-static int drag_offset_y = 0;
-static const int SNAP_DISTANCE = 20;
-static int next_block_id = 100;
-
-Block* get_block_at(int x, int y) {
-    for (int i = (int)all_blocks.size() - 1; i >= 0; i--) {
-        Block* b = all_blocks[i];
-        if (x >= b->x && x <= b->x + BLOCK_WIDTH &&
-            y >= b->y && y <= b->y + BLOCK_HEIGHT) {
-            return b;
-        }
-    }
-    return nullptr;
+bool is_point_in_rect(int px, int py, float rx, float ry, float rw, float rh) {
+    return (px >= rx && px <= rx + rw && py >= ry && py <= ry + rh);
 }
 
-void try_snap(Block* dragged) {
-    if (!dragged) return;
-    Block* closest = nullptr;
-    float min_dist = (float)(SNAP_DISTANCE + 1);
-    for (Block* b : all_blocks) {
-        if (b == dragged) continue;
-        float dx = std::abs(b->x - dragged->x);
-        if (dx > SNAP_DISTANCE) continue;
-        float dy = dragged->y - (b->y + BLOCK_HEIGHT);
-        if (dy >= 0 && dy < min_dist) {
-            min_dist = dy;
-            closest = b;
+void handle_mouse_down(SDL_Event& event, std::vector<Block>& blocks,
+                       std::vector<PaletteItem>& palette_items,
+                       int& next_block_id)
+{
+    int mx = event.button.x;
+    int my = event.button.y;
+
+    for (auto& item : palette_items) {
+        if (is_point_in_rect(mx, my, item.x, item.y, item.width, item.height)) {
+            Block new_block;
+            new_block.id = next_block_id++;
+            new_block.type = item.type;
+            new_block.x = (float)mx;
+            new_block.y = (float)my;
+            new_block.width = item.width;
+            new_block.height = item.height;
+            new_block.color = item.color;
+            new_block.dragging = true;
+            new_block.drag_offset_x = mx - item.x;
+            new_block.drag_offset_y = my - item.y;
+            new_block.parent = nullptr;
+            new_block.child = nullptr;
+            new_block.is_snapped = false;
+
+            if (item.type == CMD_MOVE)     new_block.args.push_back("10");
+            if (item.type == CMD_TURN)     new_block.args.push_back("15");
+            if (item.type == CMD_WAIT)     new_block.args.push_back("1");
+            if (item.type == CMD_SAY)      new_block.args.push_back("Hello!");
+            if (item.type == CMD_REPEAT)   new_block.args.push_back("10");
+            if (item.type == CMD_GOTO)     { new_block.args.push_back("0"); new_block.args.push_back("0"); }
+            if (item.type == CMD_SET_X)    new_block.args.push_back("0");
+            if (item.type == CMD_SET_Y)    new_block.args.push_back("0");
+            if (item.type == CMD_CHANGE_X) new_block.args.push_back("10");
+            if (item.type == CMD_CHANGE_Y) new_block.args.push_back("10");
+
+            blocks.push_back(new_block);
+
+            log_info("Created block #" + std::to_string(new_block.id) +
+                     " [" + blocktype_to_string(new_block.type) + "]");
+            return;
         }
     }
-    if (closest) {
-        dragged->x = closest->x;
-        dragged->y = closest->y + BLOCK_HEIGHT;
-        closest->next = dragged;
-    }
-}
 
-void handle_mouse_down(int x, int y) {
-    int palette_index = get_clicked_palette_item(x, y);
-    if (palette_index >= 0) {
-        BlockType type = get_palette_block_type(palette_index);
-        spawn_block_from_palette(type, WORKSPACE_X + 50, 100);
-        return;
-    }
-    Block* clicked = get_block_at(x, y);
-    if (clicked) {
-        dragging_block = clicked;
-        drag_offset_x = x - (int)clicked->x;
-        drag_offset_y = y - (int)clicked->y;
-        for (Block* b : all_blocks) {
-            if (b->next == clicked) {
-                b->next = nullptr;
+    for (int i = (int)blocks.size() - 1; i >= 0; i--) {
+        if (is_point_in_rect(mx, my, blocks[i].x, blocks[i].y, blocks[i].width, blocks[i].height)) {
+            if (blocks[i].is_snapped) {
+                unsnap_block(blocks[i]);
             }
+
+            blocks[i].dragging = true;
+            blocks[i].drag_offset_x = mx - blocks[i].x;
+            blocks[i].drag_offset_y = my - blocks[i].y;
+
+            Block temp = blocks[i];
+            blocks.erase(blocks.begin() + i);
+            blocks.push_back(temp);
+
+            log_debug("Started dragging block #" + std::to_string(temp.id));
+            return;
         }
     }
 }
 
-void handle_mouse_motion(int x, int y) {
-    if (dragging_block) {
-        dragging_block->x = (float)(x - drag_offset_x);
-        dragging_block->y = (float)(y - drag_offset_y);
+void handle_mouse_up(SDL_Event& event, std::vector<Block>& blocks) {
+    for (auto& block : blocks) {
+        if (block.dragging) {
+            block.dragging = false;
+
+            if (block.x < PALETTE_WIDTH) {
+                log_info("Block #" + std::to_string(block.id) + " returned to palette — deleting");
+                for (auto it = blocks.begin(); it != blocks.end(); ++it) {
+                    if (it->id == block.id) {
+                        blocks.erase(it);
+                        break;
+                    }
+                }
+                return;
+            }
+
+            try_snap_blocks(blocks, block);
+
+            log_debug("Dropped block #" + std::to_string(block.id) +
+                      " at (" + std::to_string((int)block.x) + ", " + std::to_string((int)block.y) + ")");
+        }
     }
 }
 
-void handle_mouse_up(int x, int y) {
-    if (dragging_block) {
-        try_snap(dragging_block);
-        dragging_block = nullptr;
+void handle_mouse_motion(SDL_Event& event, std::vector<Block>& blocks) {
+    int mx = event.motion.x;
+    int my = event.motion.y;
+
+    for (auto& block : blocks) {
+        if (block.dragging) {
+            block.x = mx - block.drag_offset_x;
+            block.y = my - block.drag_offset_y;
+
+            Block* child = block.child;
+            float offset_y = block.height;
+            while (child) {
+                child->x = block.x;
+                child->y = block.y + offset_y;
+                offset_y += child->height;
+                child = child->child;
+            }
+            break;
+        }
     }
 }
 
-Block* spawn_block_from_palette(BlockType type, int x, int y) {
-    Block* newBlock = new Block;
-    newBlock->id = next_block_id++;
-    newBlock->type = type;
-    newBlock->x = (float)x;
-    newBlock->y = (float)y;
-    newBlock->width = BLOCK_WIDTH;
-    newBlock->height = BLOCK_HEIGHT;
-    newBlock->next = nullptr;
-    newBlock->inner = nullptr;
-    all_blocks.push_back(newBlock);
-    return newBlock;
+void try_snap_blocks(std::vector<Block>& blocks, Block& dropped_block) {
+    for (auto& target : blocks) {
+        if (target.id == dropped_block.id) continue;
+        if (target.child != nullptr) continue;
+
+        float dx = std::abs(dropped_block.x - target.x);
+        float dy = std::abs(dropped_block.y - (target.y + target.height));
+
+        if (dx < SNAP_DISTANCE && dy < SNAP_DISTANCE) {
+            dropped_block.x = target.x;
+            dropped_block.y = target.y + target.height;
+            dropped_block.is_snapped = true;
+            dropped_block.parent = &target;
+            target.child = &dropped_block;
+
+            log_info("Snapped block #" + std::to_string(dropped_block.id) +
+                     " to block #" + std::to_string(target.id));
+            return;
+        }
+    }
+}
+
+void unsnap_block(Block& block) {
+    if (block.parent) {
+        block.parent->child = nullptr;
+        block.parent = nullptr;
+    }
+    block.is_snapped = false;
+    log_debug("Unsnapped block #" + std::to_string(block.id));
 }
