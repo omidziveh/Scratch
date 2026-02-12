@@ -1,6 +1,6 @@
 #include "file_io.h"
 #include "memory.h"
-#include "logger.h"
+#include "../utils/logger.h"
 #include <fstream>
 #include <sstream>
 
@@ -19,6 +19,12 @@ std::string blocktype_to_string(BlockType type) {
         case OP_ADD: return "OP_ADD";
         case OP_SUB: return "OP_SUB";
         case OP_DIV: return "OP_DIV";
+        case CMD_SET_X:    return "SET_X";
+        case CMD_SET_Y:    return "SET_Y";
+        case CMD_CHANGE_X: return "CHANGE_X";
+        case CMD_CHANGE_Y: return "CHANGE_Y";
+        case CMD_START:    return "START";
+        case CMD_NONE:     return "NONE";
     }
     return "UNKNOWN";
 }
@@ -37,6 +43,18 @@ BlockType string_to_blocktype(const std::string& str) {
     if (str == "OP_ADD") return OP_ADD;
     if (str == "OP_SUB") return OP_SUB;
     if (str == "OP_DIV") return OP_DIV;
+    if (str == "MOVE")     return CMD_MOVE;
+    if (str == "TURN")     return CMD_TURN;
+    if (str == "GOTO")     return CMD_GOTO;
+    if (str == "SET_X")    return CMD_SET_X;
+    if (str == "SET_Y")    return CMD_SET_Y;
+    if (str == "CHANGE_X") return CMD_CHANGE_X;
+    if (str == "CHANGE_Y") return CMD_CHANGE_Y;
+    if (str == "REPEAT")   return CMD_REPEAT;
+    if (str == "IF")       return CMD_IF;
+    if (str == "WAIT")     return CMD_WAIT;
+    if (str == "SAY")      return CMD_SAY;
+    if (str == "START")    return CMD_START;
     return CMD_MOVE;
 }
 

@@ -1,10 +1,11 @@
 #include "logger.h"
 #include "../common/definitions.h"
+#include "../backend/file_io.h"
 #include <iostream>
 #include <fstream>
 #include <ctime>
 #include <sstream>
-#include "file_io.h"  
+
 static std::ofstream logFile;
 static bool consoleEnabled = true;
 static bool fileEnabled = true;
@@ -45,10 +46,13 @@ static std::string level_to_string(LogLevel level) {
 
 void log_message(LogLevel level, const std::string& message) {
     if (level < minLogLevel) return;
+
     std::string line = "[" + get_timestamp() + "] [" + level_to_string(level) + "] " + message;
+
     if (consoleEnabled) {
         std::cout << line << std::endl;
     }
+
     if (fileEnabled && logFile.is_open()) {
         logFile << line << std::endl;
         logFile.flush();
@@ -82,9 +86,21 @@ void log_block_info(const Block* block, const std::string& prefix) {
         log_warning(prefix + "Block is NULL");
         return;
     }
+
     std::stringstream ss;
     ss << prefix << "Block #" << block->id
        << " [" << blocktype_to_string(block->type) << "]"
        << " at (" << block->x << ", " << block->y << ")";
     log_info(ss.str());
+
+    if (!block->args.empty()) {
+        ss.str("");
+        ss << prefix << "  Args: [";
+        for (size_t i = 0; i < block->args.size(); i++) {
+            ss << block->args[i];
+            if (i < block->args.size() - 1) ss << ", ";
+        }
+        ss << "]";
+        log_debug(ss.str());
+    }
 }
