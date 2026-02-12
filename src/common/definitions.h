@@ -32,6 +32,13 @@ const int BLOCK_WIDTH  = 160;
 const int BLOCK_HEIGHT = 40;
 const int SNAP_DISTANCE = 20;
 
+const int ARG_BOX_WIDTH    = 45;
+const int ARG_BOX_HEIGHT   = 20;
+const int ARG_BOX_MARGIN_X = 8;
+const int ARG_BOX_Y_OFFSET = 10;
+const Uint32 CURSOR_BLINK_MS = 500;
+
+
 struct Color {
     Uint8 r, g, b, a;
 };
@@ -163,7 +170,25 @@ struct PaletteItem {
         , width(w), height(h)
     {}
 };
+struct TextInputState {
+    bool active;
+    int block_id;
+    int arg_index;
+    std::string buffer;
+    int cursor_pos;
+    Uint32 blink_timer;
+    bool cursor_visible;
 
+    TextInputState()
+        : active(false)
+        , block_id(-1)
+        , arg_index(0)
+        , buffer("")
+        , cursor_pos(0)
+        , blink_timer(0)
+        , cursor_visible(true)
+    {}
+};
 enum LogLevel {
     LOG_DEBUG = 0,
     LOG_INFO,

@@ -3,23 +3,7 @@ project(Scratch)
 include_directories(${CMAKE_SOURCE_DIR}/gfx)
 
 set(CMAKE_CXX_STANDARD 17)
-find_package(SDL2_ttf REQUIRED)
 
-add_executable(Scratch
-    main.cpp
-    core/draw.cpp
-    core/memory.cpp
-    core/logic.cpp
-    core/logger.cpp
-    core/file_io.cpp
-    frontend/text_input.cpp
-    gfx/SDL2_gfxPrimitives.c
-    gfx/SDL2_rotozoom.c
-    gfx/SDL2_imageFilter.c
-    gfx/SDL2_framerate.c
-)
-
-target_link_libraries(Scratch SDL2 SDL2_image SDL2_ttf)
 
 if(WIN32)
     set(SDL2_PATH "C:/SDL2/SDL2-2.32.10/x86_64-w64-mingw32")

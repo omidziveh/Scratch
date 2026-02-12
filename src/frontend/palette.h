@@ -3,10 +3,9 @@
 
 #include "../common/definitions.h"
 #include <SDL2/SDL.h>
+#include <vector>
 
-void init_palette();
-void draw_palette(SDL_Renderer* renderer);
-int get_clicked_palette_item(int x, int y);
-BlockType get_palette_block_type(int index);
+void init_palette(std::vector<PaletteItem>& items);
+void draw_palette(SDL_Renderer* renderer, const std::vector<PaletteItem>& items);
 
 #endif

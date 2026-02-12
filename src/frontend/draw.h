@@ -4,6 +4,7 @@
 #include <SDL2/SDL.h>
 #include <string>
 #include <vector>
+#include "text_input.h"
 #include "../common/definitions.h"
 
 SDL_Texture* load_texture(SDL_Renderer* renderer, const std::string& path);
@@ -22,5 +23,8 @@ void draw_stage_border(SDL_Renderer* renderer);
 void draw_sprite(SDL_Renderer* renderer, Sprite& sprite);
 
 void draw_text(SDL_Renderer* renderer, int x, int y, const std::string& text, SDL_Color color);
+
+void draw_arg_boxes(SDL_Renderer* renderer, const Block& block, const TextInputState& state);
+void draw_cursor(SDL_Renderer* renderer, int x, int y, int height, SDL_Color color);
 
 #endif
