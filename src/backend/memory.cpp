@@ -20,7 +20,8 @@ Block* create_block(BlockType t) {
     b->height = 40.0f;
     b->next = nullptr;
     b->inner = nullptr;
-
+    b->is_running = false;
+    b->glow_start_time = 0;
     switch (t) {
         case CMD_MOVE:
             b->args.push_back("10");

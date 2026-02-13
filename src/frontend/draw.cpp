@@ -5,6 +5,9 @@
 #include "../gfx/SDL2_gfxPrimitives.h"
 #include <SDL2/SDL_image.h>
 #include <iostream>
+#include <cmath>
+#include <algorithm>
+
 
 SDL_Texture* load_texture(SDL_Renderer* renderer, const std::string& path) {
     SDL_Surface* surface = IMG_Load(path.c_str());
@@ -31,20 +34,52 @@ void draw_rect_outline(SDL_Renderer* renderer, int x, int y, int w, int h, SDL_C
     SDL_Rect rect = {x, y, w, h};
     SDL_RenderDrawRect(renderer, &rect);
 }
+void draw_block_glow(SDL_Renderer* renderer, const Block& block) {
+    if (!block.is_running)
+        return;
+
+    int bx = (int)block.x;
+    int by = (int)block.y;
+    int bw = (int)block.width;
+    int bh = (int)block.height;
+
+    Uint32 elapsed = SDL_GetTicks() - block.glow_start_time;
+    float pulse = 0.5f + 0.5f * sinf(elapsed * 0.005f);
+    Uint8 alpha = (Uint8)(80 + pulse * 120);
+
+    for (int i = 4; i >= 1; i--) {
+        Uint8 layer_alpha = (Uint8)(alpha * (1.0f - (float)i / 5.0f));
+        roundedRectangleRGBA(renderer,
+            bx - i, by - i, bx + bw + i, by + bh + i,
+            6 + i,
+            255, 255, 100, layer_alpha);
+    }
+}
+
 
 void draw_block(SDL_Renderer* renderer, const Block& block, const std::string& label) {
     int bx = (int)block.x;
     int by = (int)block.y;
     int bw = (int)block.width;
     int bh = (int)block.height;
+
+    Uint8 r = block.color.r;
+    Uint8 g = block.color.g;
+    Uint8 b = block.color.b;
+    if (block.is_running) {
+        r = (Uint8)std::min(255, (int)r + 60);
+        g = (Uint8)std::min(255, (int)g + 60);
+        b = (Uint8)std::min(255, (int)b + 60);
+    }
+
     roundedBoxRGBA(renderer,
         bx, by, bx + bw, by + bh,
         6,
-        block.color.r, block.color.g, block.color.b, block.color.a);
+        r, g, b, block.color.a);
 
-    Uint8 dr = (Uint8)(block.color.r * 0.7f);
-    Uint8 dg = (Uint8)(block.color.g * 0.7f);
-    Uint8 db = (Uint8)(block.color.b * 0.7f);
+    Uint8 dr = (Uint8)(r * 0.7f);
+    Uint8 dg = (Uint8)(g * 0.7f);
+    Uint8 db = (Uint8)(b * 0.7f);
     roundedRectangleRGBA(renderer,
         bx, by, bx + bw, by + bh,
         6,
@@ -52,7 +87,6 @@ void draw_block(SDL_Renderer* renderer, const Block& block, const std::string& l
 
     draw_text(renderer, bx + 8, by + 12, label, COLOR_WHITE);
 }
-
 
 void draw_all_blocks(SDL_Renderer* renderer, const std::vector<Block>& blocks, const TextInputState& state) {
     for (const auto& block : blocks) {

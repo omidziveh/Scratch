@@ -126,7 +126,6 @@ struct Block {
     bool dragging;
     float drag_offset_x;
     float drag_offset_y;
-    bool hasBreakpoint;
     std::vector<std::string> args;
     SDL_Color color;
 
@@ -136,6 +135,9 @@ struct Block {
 
     Block* next;
     Block* inner;
+
+    bool is_running;
+    Uint32 glow_start_time;
 
     Block()
         : id(0)
@@ -150,7 +152,8 @@ struct Block {
         , is_snapped(false)
         , next(nullptr)
         , inner(nullptr)
-        , hasBreakpoint(false)
+        , is_running(false)
+        , glow_start_time(0)
     {}
 };
 

@@ -14,6 +14,7 @@ void draw_rect_outline(SDL_Renderer* renderer, int x, int y, int w, int h, SDL_C
 
 void draw_block(SDL_Renderer* renderer, const Block& block, const std::string& label);
 void draw_all_blocks(SDL_Renderer* renderer, const std::vector<Block>& blocks);
+void draw_block_glow(SDL_Renderer* renderer, const Block& block);
 
 void draw_toolbar(SDL_Renderer* renderer);
 void draw_coding_area(SDL_Renderer* renderer);

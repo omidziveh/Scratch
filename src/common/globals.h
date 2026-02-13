@@ -26,5 +26,10 @@ const SDL_Color COLOR_PALETTE_BG    = {45,  45,  45,  255};
 const SDL_Color COLOR_CODING_BG     = {30,  30,  30,  255};
 const SDL_Color COLOR_STAGE_BG      = {255, 255, 255, 255};
 const SDL_Color COLOR_STAGE_BORDER  = {180, 180, 180, 255};
+int g_execution_index = -1;
+bool g_is_executing = false;
+
+extern int g_execution_index;
+extern bool g_is_executing;
 
 #endif
