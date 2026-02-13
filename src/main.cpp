@@ -2,21 +2,22 @@
 #include <SDL_image.h>
 #include <iostream>
 #include <vector>
-
 #include "common/definitions.h"
 #include "common/globals.h"
 #include "frontend/draw.h"
 #include "frontend/input.h"
 #include "frontend/palette.h"
 #include "frontend/block_utils.h"
-#include "frontend/logger.h"
+#include "utils/logger.h"
 #include "frontend/text_input.h"
+#include "utils/system_logger.h"
 
 int main(int argc, char* argv[]) {
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         std::cerr << "SDL_Init Error: " << SDL_GetError() << std::endl;
         return 1;
     }
+    syslog_init();
 
     if (IMG_Init(IMG_INIT_PNG) == 0) {
         std::cerr << "IMG_Init Error: " << IMG_GetError() << std::endl;
@@ -123,6 +124,10 @@ int main(int argc, char* argv[]) {
                         on_key_input(text_state, event.key.keysym.sym, blocks);
                     }
                     break;
+                case SDLK_l:
+                    syslog_toggle();
+                    break;
+
             }
         }
 

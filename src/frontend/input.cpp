@@ -1,6 +1,6 @@
 #include "input.h"
 #include "block_utils.h"
-#include "logger.h"
+#include "../utils/logger.h"
 #include "../common/globals.h"
 #include <cmath>
 #include <iostream>

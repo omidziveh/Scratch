@@ -4,7 +4,8 @@
 #include <fstream>
 #include <ctime>
 #include <sstream>
-#include "file_io.h"  
+#include "file_io.h"
+#include "../frontend/block_utils.h"
 static std::ofstream logFile;
 static bool consoleEnabled = true;
 static bool fileEnabled = true;
@@ -82,9 +83,28 @@ void log_block_info(const Block* block, const std::string& prefix) {
         log_warning(prefix + "Block is NULL");
         return;
     }
+
     std::stringstream ss;
     ss << prefix << "Block #" << block->id
        << " [" << blocktype_to_string(block->type) << "]"
        << " at (" << block->x << ", " << block->y << ")";
     log_info(ss.str());
+
+    if (!block->args.empty()) {
+        ss.str("");
+        ss << prefix << "  Args: [";
+        for (size_t i = 0; i < block->args.size(); i++) {
+            ss << block->args[i];
+            if (i < block->args.size() - 1) ss << ", ";
+        }
+        ss << "]";
+        log_debug(ss.str());
+    }
+
+    if (block->parent) {
+        log_debug(prefix + "  Parent: #" + std::to_string(block->parent->id));
+    }
+    if (block->child) {
+        log_debug(prefix + "  Child: #" + std::to_string(block->child->id));
+    }
 }
