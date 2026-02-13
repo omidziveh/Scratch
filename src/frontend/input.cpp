@@ -133,6 +133,9 @@ void try_snap_blocks(std::vector<Block>& blocks, Block& dropped_block) {
             dropped_block.parent = &target;
             target.child = &dropped_block;
 
+            target.next = &dropped_block;
+            dropped_block.next = nullptr;
+
             log_info("Snapped block #" + std::to_string(dropped_block.id) +
                      " to block #" + std::to_string(target.id));
             return;
@@ -143,6 +146,7 @@ void try_snap_blocks(std::vector<Block>& blocks, Block& dropped_block) {
 void unsnap_block(Block& block) {
     if (block.parent) {
         block.parent->child = nullptr;
+        block.parent->next = nullptr;
         block.parent = nullptr;
     }
     block.is_snapped = false;

@@ -87,12 +87,12 @@ struct Sprite {
         , height(80)
         , angle(0.0f)
         , direction(0.0f)
-        , texture(nullptr)
-        , name("Cat")
-        , scale(1.0f)
         , visible(1)
         , isPenDown(0)
         , currentCostumeIndex(0)
+        , texture(nullptr)
+        , name("Cat")
+        , scale(0.05f)
     {}
 };
 
@@ -124,6 +124,7 @@ struct Block {
     float x, y;
     float width, height;
     bool dragging;
+    bool hasBreakpoint;
     float drag_offset_x;
     float drag_offset_y;
     std::vector<std::string> args;
@@ -145,6 +146,7 @@ struct Block {
         , x(0), y(0)
         , width(BLOCK_WIDTH), height(BLOCK_HEIGHT)
         , dragging(false)
+        , hasBreakpoint(false)
         , drag_offset_x(0), drag_offset_y(0)
         , color({100, 100, 255, 255})
         , parent(nullptr)

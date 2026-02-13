@@ -1,5 +1,9 @@
 #include <SDL2/SDL.h>
+#ifdef __linux__
+#include <SDL2/SDL_image.h>
+#else
 #include <SDL_image.h>
+#endif
 #include <iostream>
 #include <vector>
 #include <cmath>
@@ -14,6 +18,11 @@
 #include "utils/system_logger.h"
 
 int main(int argc, char* argv[]) {
+    int g_execution_index = -1;
+    bool g_is_executing = false;
+    bool g_step_mode = false;
+    bool g_waiting_for_step = false;
+
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         std::cerr << "SDL_Init Error: " << SDL_GetError() << std::endl;
         return 1;
@@ -53,7 +62,7 @@ int main(int argc, char* argv[]) {
     log_info("Application started");
 
     Sprite sprite;
-    sprite.texture = load_texture(renderer, "assets/cat.png");
+    sprite.texture = load_texture(renderer, "../assets/cat.png");
     if (!sprite.texture) {
         log_warning("Failed to load cat.png — sprite will be invisible");
     }
@@ -131,6 +140,16 @@ int main(int argc, char* argv[]) {
                 case SDL_KEYDOWN:
                     if (text_state.active) {
                         on_key_input(text_state, event.key.keysym.sym, blocks);
+                    } else {
+                        if (event.key.keysym.sym == SDLK_SPACE) {
+                            if (g_step_mode && g_waiting_for_step) {
+                                g_waiting_for_step = false;
+                            }
+                        }
+                        if (event.key.keysym.sym == SDLK_F12) {
+                            g_step_mode = !g_step_mode;
+                            g_waiting_for_step = g_step_mode;
+                        }
                     }
                     break;
                 case SDLK_l:
@@ -144,19 +163,27 @@ int main(int argc, char* argv[]) {
 
         // ===== STEP-BY-STEP EXECUTION =====
         if (g_is_executing && g_execution_index >= 0 && g_execution_index < (int)blocks.size()) {
-            for (auto& b : blocks) {
-                b.is_running = false;
-            }
+            if (g_step_mode && g_waiting_for_step) {
+                // Wait for Space key press
+            } else {
+                for (auto& b : blocks) {
+                    b.is_running = false;
+                }
 
-            blocks[g_execution_index].is_running = true;
-            blocks[g_execution_index].glow_start_time = SDL_GetTicks();
+                blocks[g_execution_index].is_running = true;
+                blocks[g_execution_index].glow_start_time = SDL_GetTicks();
 
-            g_execution_index++;
+                g_execution_index++;
 
-            if (g_execution_index >= (int)blocks.size()) {
-                blocks[g_execution_index - 1].is_running = false;
-                g_execution_index = -1;
-                g_is_executing = false;
+                if (g_execution_index >= (int)blocks.size()) {
+                    blocks[g_execution_index - 1].is_running = false;
+                    g_execution_index = -1;
+                    g_is_executing = false;
+                }
+
+                if (g_step_mode) {
+                    g_waiting_for_step = true;
+                }
             }
         }
 
