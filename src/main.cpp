@@ -1,7 +1,8 @@
 #include <SDL2/SDL.h>
-#include <SDL2/SDL_image.h>
+#include <SDL_image.h>
 #include <iostream>
 #include <vector>
+#include <cmath>
 #include "common/definitions.h"
 #include "common/globals.h"
 #include "frontend/draw.h"
@@ -10,14 +11,7 @@
 #include "frontend/block_utils.h"
 #include "utils/logger.h"
 #include "frontend/text_input.h"
-<<<<<<< HEAD
 #include "utils/system_logger.h"
-=======
-#include "backend/runtime.h"
-#include "backend/memory.h"
-#include "backend/logic.h"
-#include "backend/sensing.h"
->>>>>>> e1b803f1475ad4fab4b9179b581883d88bab4ffd
 
 int main(int argc, char* argv[]) {
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
@@ -64,41 +58,6 @@ int main(int argc, char* argv[]) {
         log_warning("Failed to load cat.png — sprite will be invisible");
     }
 
-    // === RUNTIME TEST ============================================
-    Stage stage;   // uses defaults from definitions.h
-    Sprite testSprite = sprite;   // copy main sprite (or create new)
-
-    // Build a simple program: repeat 4 times { move 50, turn 90 }
-    Block* head = create_block(CMD_REPEAT);
-    head->args[0] = "4";
-    Block* moveBlock = create_block(CMD_MOVE);
-    moveBlock->args[0] = "50";
-    Block* turnBlock = create_block(CMD_TURN);
-    turnBlock->args[0] = "90";
-
-    connect_blocks(moveBlock, turnBlock);
-    head->inner = moveBlock;   // repeat inner chain
-
-    Runtime rt;
-    runtime_init(&rt, head, &testSprite);
-    runtime_start(&rt);
-
-    log_separator();
-    log_info("=== BEGIN RUNTIME TEST ===");
-    for (int i = 0; i < 100 && rt.state == RUNTIME_RUNNING; ++i) {
-        runtime_tick(&rt, &stage);
-        log_debug("Tick " + std::to_string(i) +
-                " | pos: (" + std::to_string(testSprite.x) + ", " +
-                std::to_string(testSprite.y) + ") angle: " +
-                std::to_string(testSprite.angle));
-        if (rt.watchdogTriggered) break;
-    }
-    log_info("=== RUNTIME TEST FINISHED ===");
-    log_separator();
-
-    delete_chain(head);
-    // =============================================================
-
     std::vector<PaletteItem> palette_items;
     init_palette(palette_items);
 
@@ -122,6 +81,14 @@ int main(int argc, char* argv[]) {
                     if (event.button.button == SDL_BUTTON_LEFT) {
                         int mx = event.button.x;
                         int my = event.button.y;
+
+                        // --- Green Flag (Run) button ---
+                        if (mx >= TOOLBAR_WIDTH - 90 && mx <= TOOLBAR_WIDTH - 90 + 30 &&
+                            my >= 5 && my <= 5 + 30) {
+                            g_execution_index = 0;
+                            g_is_executing = true;
+                            break;
+                        }
 
                         bool clicked_arg = false;
                         for (auto& block : blocks) {
@@ -175,6 +142,24 @@ int main(int argc, char* argv[]) {
 
         tick_cursor(text_state);
 
+        // ===== STEP-BY-STEP EXECUTION =====
+        if (g_is_executing && g_execution_index >= 0 && g_execution_index < (int)blocks.size()) {
+            for (auto& b : blocks) {
+                b.is_running = false;
+            }
+
+            blocks[g_execution_index].is_running = true;
+            blocks[g_execution_index].glow_start_time = SDL_GetTicks();
+
+            g_execution_index++;
+
+            if (g_execution_index >= (int)blocks.size()) {
+                blocks[g_execution_index - 1].is_running = false;
+                g_execution_index = -1;
+                g_is_executing = false;
+            }
+        }
+
         SDL_SetRenderDrawColor(renderer, 30, 30, 30, 255);
         SDL_RenderClear(renderer);
 
@@ -185,6 +170,7 @@ int main(int argc, char* argv[]) {
 
         for (const auto& block : blocks) {
             std::string label = block_get_label(block.type);
+            draw_block_glow(renderer, block);
             draw_block(renderer, block, label);
             draw_arg_boxes(renderer, block, text_state);
         }
