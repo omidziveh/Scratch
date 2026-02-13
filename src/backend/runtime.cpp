@@ -1,9 +1,10 @@
 #include "runtime.h"
-#include "logger.h"
+#include "../utils/logger.h"
 #include "../common/globals.h"
 #include <cmath>
 #include <cstdlib>
 #include <sstream>
+#include "sensing.h"
 
 void runtime_init(Runtime* rt, Block* head, Sprite* sprite) {
     rt->programHead = head;
@@ -65,9 +66,9 @@ void runtime_resume(Runtime* rt) {
     }
 }
 
-void runtime_step(Runtime* rt) {
+void runtime_step(Runtime* rt, Stage* stage) {
     if (rt->currentBlock && (rt->state == RUNTIME_PAUSED || rt->stepMode)) {
-        execute_block(rt, rt->currentBlock);
+        execute_block(rt, rt->currentBlock, stage);
         advance_to_next_block(rt);
         rt->totalTicksExecuted++;
     }
@@ -81,7 +82,7 @@ void runtime_set_step_mode(Runtime* rt, bool enabled) {
     log_info(enabled ? "Step mode ON" : "Step mode OFF");
 }
 
-void runtime_tick(Runtime* rt) {
+void runtime_tick(Runtime* rt, Stage* stage) {
     if (rt->state != RUNTIME_RUNNING) return;
 
     if (rt->waitTicksRemaining > 0) {
@@ -110,7 +111,7 @@ void runtime_tick(Runtime* rt) {
         return;
     }
 
-    execute_block(rt, rt->currentBlock);
+    execute_block(rt, rt->currentBlock, stage);
     advance_to_next_block(rt);
     rt->totalTicksExecuted++;
     rt->ticksSinceLastWait++;
@@ -204,7 +205,7 @@ bool evaluate_condition(Runtime* rt, Block* b) {
     return true;
 }
 
-void execute_block(Runtime* rt, Block* b) {
+void execute_block(Runtime* rt, Block* b, Stage* stage) {
     if (!b || !rt->targetSprite) return;
 
     for (size_t i = 0; i < rt->loopStack.size(); i++) {
@@ -215,14 +216,16 @@ void execute_block(Runtime* rt, Block* b) {
     ss << "Executing block #" << b->id << " type=" << b->type;
     log_debug(ss.str());
 
+    bool hasChanged = false;
+
     switch (b->type) {
         case CMD_MOVE: {
             float steps = 10.0f;
             if (!b->args.empty()) steps = (float)std::atof(b->args[0].c_str());
-            
             float rad = rt->targetSprite->angle * 3.14159265f / 180.0f;
             rt->targetSprite->x += steps * std::cos(rad);
             rt->targetSprite->y += steps * std::sin(rad);
+            hasChanged = true;
             break;
         }
 
@@ -245,6 +248,7 @@ void execute_block(Runtime* rt, Block* b) {
             }
             rt->targetSprite->x = gotoX;
             rt->targetSprite->y = gotoY;
+            hasChanged = true;
             break;
         }
 
@@ -313,6 +317,9 @@ void execute_block(Runtime* rt, Block* b) {
         default:
             log_warning("Unknown block type encountered");
             break;
+    }
+    if (hasChanged) {
+        clamp_sprite_to_stage(*rt->targetSprite, *stage);
     }
 }
 

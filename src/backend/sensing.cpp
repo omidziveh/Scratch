@@ -1,57 +1,86 @@
 #include "sensing.h"
+#include "../utils/logger.h"
+#include <cmath>
 
 bool is_sprite_touching_mouse(const Sprite& sprite, const Stage& stage, int mouseX, int mouseY) {
-    float left = stage.x + sprite.x - sprite.width / 2.0f;
-    float top = stage.y + sprite.y - sprite.height / 2.0f;
+    float halfW = (sprite.width * sprite.scale) / 2.0f;
+    float halfH = (sprite.height * sprite.scale) / 2.0f;
 
-    return mouseX >= left && mouseX <= left + sprite.width &&
-           mouseY >= top && mouseY <= top + sprite.height;
-}
+    float left   = sprite.x - halfW;
+    float right  = sprite.x + halfW;
+    float top    = sprite.y - halfH;
+    float bottom = sprite.y + halfH;
 
-bool is_sprite_touching_left_edge(const Sprite& sprite, const Stage& stage) {
-    return (sprite.x - sprite.width / 2.0f) <= 0;
-}
-
-bool is_sprite_touching_right_edge(const Sprite& sprite, const Stage& stage) {
-    return (sprite.x + sprite.width / 2.0f) >= stage.width;
-}
-
-bool is_sprite_touching_top_edge(const Sprite& sprite, const Stage& stage) {
-    return (sprite.y - sprite.height / 2.0f) <= 0;
-}
-
-bool is_sprite_touching_bottom_edge(const Sprite& sprite, const Stage& stage) {
-    return (sprite.y + sprite.height / 2.0f) >= stage.height;
+    return (mouseX >= left && mouseX <= right && mouseY >= top && mouseY <= bottom);
 }
 
 bool is_sprite_touching_edge(const Sprite& sprite, const Stage& stage) {
-    return is_sprite_touching_left_edge(sprite, stage) ||
-           is_sprite_touching_right_edge(sprite, stage) ||
-           is_sprite_touching_top_edge(sprite, stage) ||
-           is_sprite_touching_bottom_edge(sprite, stage);
+    return is_sprite_touching_left_edge(sprite, stage)
+        || is_sprite_touching_right_edge(sprite, stage)
+        || is_sprite_touching_top_edge(sprite, stage)
+        || is_sprite_touching_bottom_edge(sprite, stage);
+}
+
+bool is_sprite_touching_left_edge(const Sprite& sprite, const Stage& stage) {
+    float halfW = (sprite.width * sprite.scale) / 2.0f;
+    return (sprite.x - halfW) <= stage.x;
+}
+
+bool is_sprite_touching_right_edge(const Sprite& sprite, const Stage& stage) {
+    float halfW = (sprite.width * sprite.scale) / 2.0f;
+    return (sprite.x + halfW) >= (stage.x + stage.width);
+}
+
+bool is_sprite_touching_top_edge(const Sprite& sprite, const Stage& stage) {
+    float halfH = (sprite.height * sprite.scale) / 2.0f;
+    return (sprite.y - halfH) <= stage.y;
+}
+
+bool is_sprite_touching_bottom_edge(const Sprite& sprite, const Stage& stage) {
+    float halfH = (sprite.height * sprite.scale) / 2.0f;
+    return (sprite.y + halfH) >= (stage.y + stage.height);
 }
 
 void bounce_off_edge(Sprite& sprite, const Stage& stage) {
-    float halfW = sprite.width / 2.0f;
-    float halfH = sprite.height / 2.0f;
+    float halfW = (sprite.width * sprite.scale) / 2.0f;
+    float halfH = (sprite.height * sprite.scale) / 2.0f;
 
-    if (sprite.x - halfW < 0) {
-        sprite.x = halfW;
-        sprite.angle = 360.0f - sprite.angle;
+    if (sprite.x - halfW < stage.x) {
+        sprite.x = stage.x + halfW;
+        sprite.direction = 180.0f - sprite.direction;
     }
-    if (sprite.x + halfW > stage.width) {
-        sprite.x = stage.width - halfW;
-        sprite.angle = 360.0f - sprite.angle;
+    if (sprite.x + halfW > stage.x + stage.width) {
+        sprite.x = stage.x + stage.width - halfW;
+        sprite.direction = 180.0f - sprite.direction;
     }
-    if (sprite.y - halfH < 0) {
-        sprite.y = halfH;
-        sprite.angle = 180.0f - sprite.angle;
+    if (sprite.y - halfH < stage.y) {
+        sprite.y = stage.y + halfH;
+        sprite.direction = -sprite.direction;
     }
-    if (sprite.y + halfH > stage.height) {
-        sprite.y = stage.height - halfH;
-        sprite.angle = 180.0f - sprite.angle;
+    if (sprite.y + halfH > stage.y + stage.height) {
+        sprite.y = stage.y + stage.height - halfH;
+        sprite.direction = -sprite.direction;
     }
 
+    while (sprite.direction < 0) sprite.direction += 360.0f;
+    while (sprite.direction >= 360.0f) sprite.direction -= 360.0f;
+
+    sprite.angle = sprite.direction;
     while (sprite.angle < 0) sprite.angle += 360.0f;
     while (sprite.angle >= 360.0f) sprite.angle -= 360.0f;
+}
+
+void clamp_sprite_to_stage(Sprite& sprite, const Stage& stage) {
+    float halfW = (sprite.width * sprite.scale) / 2.0f;
+    float halfH = (sprite.height * sprite.scale) / 2.0f;
+
+    float minX = stage.x + halfW;
+    float maxX = stage.x + stage.width - halfW;
+    float minY = stage.y + halfH;
+    float maxY = stage.y + stage.height - halfH;
+
+    if (sprite.x < minX) sprite.x = minX;
+    if (sprite.x > maxX) sprite.x = maxX;
+    if (sprite.y < minY) sprite.y = minY;
+    if (sprite.y > maxY) sprite.y = maxY;
 }

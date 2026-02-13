@@ -3,7 +3,7 @@
 #include "text_input.h"
 #include "../common/globals.h"
 #include "../gfx/SDL2_gfxPrimitives.h"
-#include <SDL_image.h>
+#include <SDL2/SDL_image.h>
 #include <iostream>
 
 SDL_Texture* load_texture(SDL_Renderer* renderer, const std::string& path) {

@@ -5,6 +5,11 @@
 #include <vector>
 #include <SDL2/SDL.h>
 
+const int DEFAULT_TICK_RATE = 60;
+const int DEFAULT_MAX_TICKS = 60;
+const int DEFAULT_WATCHDOG_THRESHOLD = 1000;
+const int LOOP_WATCHDOG_LIMIT = 1000;
+
 const int WINDOW_WIDTH  = 1280;
 const int WINDOW_HEIGHT = 720;
 
@@ -121,6 +126,7 @@ struct Block {
     bool dragging;
     float drag_offset_x;
     float drag_offset_y;
+    bool hasBreakpoint;
     std::vector<std::string> args;
     SDL_Color color;
 
@@ -144,6 +150,7 @@ struct Block {
         , is_snapped(false)
         , next(nullptr)
         , inner(nullptr)
+        , hasBreakpoint(false)
     {}
 };
 
@@ -189,12 +196,4 @@ struct TextInputState {
         , cursor_visible(true)
     {}
 };
-enum LogLevel {
-    LOG_DEBUG = 0,
-    LOG_INFO,
-    LOG_WARNING,
-    LOG_ERROR,
-    LOG_SUCCESS
-};
-
 #endif

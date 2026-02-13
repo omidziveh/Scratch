@@ -1,11 +1,16 @@
 #include "logger.h"
 #include "../common/definitions.h"
+#include "../backend/file_io.h"
 #include <iostream>
 #include <fstream>
 #include <ctime>
 #include <sstream>
+<<<<<<< HEAD
 #include "file_io.h"
 #include "../frontend/block_utils.h"
+=======
+
+>>>>>>> e1b803f1475ad4fab4b9179b581883d88bab4ffd
 static std::ofstream logFile;
 static bool consoleEnabled = true;
 static bool fileEnabled = true;
@@ -46,10 +51,13 @@ static std::string level_to_string(LogLevel level) {
 
 void log_message(LogLevel level, const std::string& message) {
     if (level < minLogLevel) return;
+
     std::string line = "[" + get_timestamp() + "] [" + level_to_string(level) + "] " + message;
+
     if (consoleEnabled) {
         std::cout << line << std::endl;
     }
+
     if (fileEnabled && logFile.is_open()) {
         logFile << line << std::endl;
         logFile.flush();
@@ -100,6 +108,7 @@ void log_block_info(const Block* block, const std::string& prefix) {
         ss << "]";
         log_debug(ss.str());
     }
+<<<<<<< HEAD
 
     if (block->parent) {
         log_debug(prefix + "  Parent: #" + std::to_string(block->parent->id));
@@ -107,4 +116,6 @@ void log_block_info(const Block* block, const std::string& prefix) {
     if (block->child) {
         log_debug(prefix + "  Child: #" + std::to_string(block->child->id));
     }
+=======
+>>>>>>> e1b803f1475ad4fab4b9179b581883d88bab4ffd
 }

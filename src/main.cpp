@@ -1,5 +1,5 @@
 #include <SDL2/SDL.h>
-#include <SDL_image.h>
+#include <SDL2/SDL_image.h>
 #include <iostream>
 #include <vector>
 #include "common/definitions.h"
@@ -10,7 +10,14 @@
 #include "frontend/block_utils.h"
 #include "utils/logger.h"
 #include "frontend/text_input.h"
+<<<<<<< HEAD
 #include "utils/system_logger.h"
+=======
+#include "backend/runtime.h"
+#include "backend/memory.h"
+#include "backend/logic.h"
+#include "backend/sensing.h"
+>>>>>>> e1b803f1475ad4fab4b9179b581883d88bab4ffd
 
 int main(int argc, char* argv[]) {
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
@@ -56,6 +63,41 @@ int main(int argc, char* argv[]) {
     if (!sprite.texture) {
         log_warning("Failed to load cat.png — sprite will be invisible");
     }
+
+    // === RUNTIME TEST ============================================
+    Stage stage;   // uses defaults from definitions.h
+    Sprite testSprite = sprite;   // copy main sprite (or create new)
+
+    // Build a simple program: repeat 4 times { move 50, turn 90 }
+    Block* head = create_block(CMD_REPEAT);
+    head->args[0] = "4";
+    Block* moveBlock = create_block(CMD_MOVE);
+    moveBlock->args[0] = "50";
+    Block* turnBlock = create_block(CMD_TURN);
+    turnBlock->args[0] = "90";
+
+    connect_blocks(moveBlock, turnBlock);
+    head->inner = moveBlock;   // repeat inner chain
+
+    Runtime rt;
+    runtime_init(&rt, head, &testSprite);
+    runtime_start(&rt);
+
+    log_separator();
+    log_info("=== BEGIN RUNTIME TEST ===");
+    for (int i = 0; i < 100 && rt.state == RUNTIME_RUNNING; ++i) {
+        runtime_tick(&rt, &stage);
+        log_debug("Tick " + std::to_string(i) +
+                " | pos: (" + std::to_string(testSprite.x) + ", " +
+                std::to_string(testSprite.y) + ") angle: " +
+                std::to_string(testSprite.angle));
+        if (rt.watchdogTriggered) break;
+    }
+    log_info("=== RUNTIME TEST FINISHED ===");
+    log_separator();
+
+    delete_chain(head);
+    // =============================================================
 
     std::vector<PaletteItem> palette_items;
     init_palette(palette_items);

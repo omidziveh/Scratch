@@ -1,5 +1,5 @@
 #include "logic.h"
-#include "logger.h"
+#include "../utils/logger.h"
 #include "file_io.h"
 
 void connect_blocks(Block* top, Block* bottom) {
