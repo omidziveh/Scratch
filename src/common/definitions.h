@@ -85,6 +85,8 @@ struct Stage {
     int height;
     Color border_color;
     Color background_color;
+    SDL_Renderer* renderer;
+    SDL_Texture* penCanvas;
 
     Stage()
         : x(STAGE_X)
@@ -93,8 +95,11 @@ struct Stage {
         , height(STAGE_HEIGHT)
         , border_color({100, 100, 100, 255})
         , background_color({255, 255, 255, 255})
+        , renderer(nullptr)
+        , penCanvas(nullptr)
     {}
 };
+
 
 struct Sprite {
     float x;
@@ -114,6 +119,10 @@ struct Sprite {
     float prevPenX;
     float prevPenY;
     bool penMoved;
+    Uint8 penR;
+    Uint8 penG;
+    Uint8 penB;
+    int penSize;
     Sprite()
         : x(STAGE_X + STAGE_WIDTH / 2.0f)
         , y(STAGE_Y + STAGE_HEIGHT / 2.0f)
@@ -128,6 +137,13 @@ struct Sprite {
         , name("Cat")
         , scale(0.05f)
         , volume(100)
+        , prevPenX(STAGE_X + STAGE_WIDTH / 2.0f)
+        , prevPenY(STAGE_Y + STAGE_HEIGHT / 2.0f)
+        , penMoved(false)
+        , penR(0)
+        , penG(0)
+        , penB(255)
+        , penSize(1)
     {}
 };
 
@@ -160,7 +176,14 @@ enum BlockType {
     SENSE_TOUCHING_EDGE,
     OP_ADD,
     OP_SUB,
-    OP_DIV
+    OP_DIV,
+    CMD_PEN_DOWN,
+    CMD_PEN_UP,
+    CMD_PEN_CLEAR,
+    CMD_PEN_SET_COLOR,
+    CMD_PEN_SET_SIZE,
+    CMD_PEN_STAMP
+
 };
 
 struct Block {

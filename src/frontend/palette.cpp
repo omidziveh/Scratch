@@ -39,7 +39,13 @@ void init_palette(std::vector<PaletteItem>& items) {
         {CMD_PLAY_SOUND,    "Play sound"},
         {CMD_STOP_ALL_SOUNDS,"Stop all sounds"},
         {CMD_CHANGE_VOLUME, "Change volume by (10)"},
-        {CMD_SET_VOLUME,    "Set volume to (100)"}
+        {CMD_SET_VOLUME,    "Set volume to (100)"},
+        {CMD_PEN_DOWN,      "Pen down"},
+        {CMD_PEN_UP,        "Pen up"},
+        {CMD_PEN_CLEAR,     "Clear pen"},
+        {CMD_PEN_SET_COLOR, "Set pen color to (0)"},
+        {CMD_PEN_SET_SIZE,  "Set pen size to (1)"},
+        {CMD_PEN_STAMP,     "Stamp"}
     };
 
     int count = sizeof(defs) / sizeof(defs[0]);
@@ -66,7 +72,7 @@ void draw_palette(SDL_Renderer* renderer, const std::vector<PaletteItem>& items,
 
     for (const auto& item : items) {
         float draw_y = item.y - (float)scroll_offset;
-        
+
         if (draw_y + item.height < (float)PALETTE_Y) continue;
         if (draw_y > (float)(PALETTE_Y + PALETTE_HEIGHT)) continue;
 

@@ -1,5 +1,6 @@
 #include "pen.h"
-#include <../gfx/SDL2_gfxPrimitives.h>
+#include "../gfx/SDL2_gfxPrimitives.h"
+
 #include <cmath>
 
 static SDL_Texture* pen_canvas = nullptr;
@@ -68,9 +69,36 @@ void pen_stamp(SDL_Renderer* renderer, Sprite& sprite) {
     int sy = (int)(sprite.y - STAGE_Y - draw_h / 2);
 
     SDL_Rect dst = { sx, sy, draw_w, draw_h };
-    SDL_RenderCopyEx(renderer, sprite.texture, nullptr, &dst, sprite.direction, nullptr, SDL_FLIP_NONE);
+    SDL_RenderCopyEx(renderer, sprite.texture, nullptr, &dst,
+                     sprite.direction, nullptr, SDL_FLIP_NONE);
 
     SDL_SetRenderTarget(renderer, prev);
+}
+
+void pen_draw_line(SDL_Renderer* renderer, float x1, float y1,
+                   float x2, float y2, const Sprite& sprite) {
+    if (!pen_canvas) return;
+
+    int cx1 = (int)(x1 - STAGE_X);
+    int cy1 = (int)(y1 - STAGE_Y);
+    int cx2 = (int)(x2 - STAGE_X);
+    int cy2 = (int)(y2 - STAGE_Y);
+
+    SDL_Texture* prev_target = SDL_GetRenderTarget(renderer);
+    SDL_SetRenderTarget(renderer, pen_canvas);
+
+    Uint8 r = sprite.penR;
+    Uint8 g = sprite.penG;
+    Uint8 b = sprite.penB;
+    int thickness = sprite.penSize;
+
+    if (thickness <= 1) {
+        lineRGBA(renderer, cx1, cy1, cx2, cy2, r, g, b, 255);
+    } else {
+        thickLineRGBA(renderer, cx1, cy1, cx2, cy2, thickness, r, g, b, 255);
+    }
+
+    SDL_SetRenderTarget(renderer, prev_target);
 }
 
 void pen_update(SDL_Renderer* renderer, Sprite& sprite) {
@@ -96,7 +124,8 @@ void pen_update(SDL_Renderer* renderer, Sprite& sprite) {
     if (pen_thickness <= 1) {
         lineRGBA(renderer, x1, y1, x2, y2, pen_r, pen_g, pen_b, pen_a);
     } else {
-        thickLineRGBA(renderer, x1, y1, x2, y2, pen_thickness, pen_r, pen_g, pen_b, pen_a);
+        thickLineRGBA(renderer, x1, y1, x2, y2, pen_thickness,
+                      pen_r, pen_g, pen_b, pen_a);
     }
 
     SDL_SetRenderTarget(renderer, prev_target);

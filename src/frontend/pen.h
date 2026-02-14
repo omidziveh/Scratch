@@ -10,7 +10,8 @@ void pen_clear(SDL_Renderer* renderer);
 void pen_stamp(SDL_Renderer* renderer, Sprite& sprite);
 void pen_update(SDL_Renderer* renderer, Sprite& sprite);
 void pen_render(SDL_Renderer* renderer);
-void pen_set_color(Uint8 r, Uint8 g, Uint8 b, Uint8 a);
+void pen_set_color(Uint8 r, Uint8 g, Uint8 b, Uint8 a = 255);
 void pen_set_size(int size);
+void pen_draw_line(SDL_Renderer* renderer, float x1, float y1, float x2, float y2, const Sprite& sprite);
 
 #endif

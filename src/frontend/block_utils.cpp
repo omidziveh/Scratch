@@ -26,6 +26,12 @@ std::string block_get_label(BlockType type) {
         case CMD_STOP_ALL_SOUNDS:  return "Stop all sounds";
         case CMD_CHANGE_VOLUME:    return "Change volume by";
         case CMD_SET_VOLUME:       return "Set volume to";
+        case CMD_PEN_DOWN: return "pen down";
+        case CMD_PEN_UP: return "pen up";
+        case CMD_PEN_CLEAR: return "clear pen";
+        case CMD_PEN_SET_COLOR: return "set pen color";
+        case CMD_PEN_SET_SIZE: return "set pen size";
+        case CMD_PEN_STAMP: return "stamp";
 
         default:           return "Unknown";
     }

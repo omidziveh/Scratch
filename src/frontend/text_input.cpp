@@ -28,6 +28,10 @@ int get_arg_count(BlockType type) {
         case CMD_START:
         case CMD_EVENT_CLICK:
         case CMD_NONE:
+        case CMD_PEN_SET_COLOR:
+        case CMD_PEN_SET_SIZE:
+            return 1;
+
         default:
             return 0;
     }

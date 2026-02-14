@@ -1591,7 +1591,9 @@ struct Sprite {
     float scale;
     float volume;
     std::vector<Costume> costumes;
-
+    float prevPenX;
+    float prevPenY;
+    bool penMoved;
     Sprite()
         : x(STAGE_X + STAGE_WIDTH / 2.0f)
         , y(STAGE_Y + STAGE_HEIGHT / 2.0f)
@@ -1856,6 +1858,67 @@ std::vector<std::string> get_default_args(BlockType type) {
         default:           return {};
     }
 }
+int get_arg_count(BlockType type) {
+    switch (type) {
+        case CMD_MOVE:
+        case CMD_TURN:
+        case CMD_SET_X:
+        case CMD_SET_Y:
+        case CMD_CHANGE_X:
+        case CMD_CHANGE_Y:
+        case CMD_REPEAT:
+        case CMD_WAIT:
+        case CMD_SAY:
+        case CMD_SWITCH_COSTUME:
+        case CMD_SET_SIZE:
+        case CMD_CHANGE_SIZE:
+        case CMD_PLAY_SOUND:
+        case CMD_CHANGE_VOLUME:
+        case CMD_SET_VOLUME:
+            return 1;
+
+        case CMD_GOTO:
+            return 2;
+
+        case CMD_START:
+        case CMD_NEXT_COSTUME:
+        case CMD_SHOW:
+        case CMD_HIDE:
+        case CMD_STOP_ALL_SOUNDS:
+        case CMD_IF:
+        case CMD_NONE:
+            return 0;
+
+        default:
+            return 0;
+    }
+}
+
+SDL_Rect get_arg_box_rect(const Block& block, int arg_index) {
+    SDL_Rect rect = {0, 0, 0, 0};
+
+    int count = get_arg_count(block.type);
+    if (arg_index < 0 || arg_index >= count)
+        return rect;
+
+    const int ARG_BOX_WIDTH  = 40;
+    const int ARG_BOX_HEIGHT = 16;
+    const int ARG_PADDING_X  = 8;
+    const int ARG_PADDING_Y  = 28;   
+    const int ARG_SPACING    = 6;
+
+    rect.x = (int)block.x + ARG_PADDING_X + arg_index * (ARG_BOX_WIDTH + ARG_SPACING);
+    rect.y = (int)block.y + ARG_PADDING_Y;
+    rect.w = ARG_BOX_WIDTH;
+    rect.h = ARG_BOX_HEIGHT;
+    int max_right = (int)(block.x + block.width) - 4;
+    if (rect.x + rect.w > max_right) {
+        rect.w = max_right - rect.x;
+        if (rect.w < 8) rect.w = 0;
+    }
+
+    return rect;
+}
 
 
 ===== C:\Users\Roham\Scratch\src\frontend\block_utils.h =====
@@ -1871,6 +1934,8 @@ BlockType string_to_blocktype(const std::string& str);
 std::string block_get_label(BlockType type);
 SDL_Color block_get_color(BlockType type);
 std::vector<std::string> get_default_args(BlockType type);
+int get_arg_count(BlockType type);
+SDL_Rect get_arg_box_rect(const Block& block, int arg_index);
 
 #endif
 
@@ -2966,6 +3031,142 @@ void draw_palette(SDL_Renderer* renderer, const std::vector<PaletteItem>& items,
 void init_palette(std::vector<PaletteItem>& items);
 void draw_palette(SDL_Renderer* renderer, const std::vector<PaletteItem>& items, int scroll_offset);
 int get_palette_total_height(const std::vector<PaletteItem>& items);
+
+#endif
+
+
+===== C:\Users\Roham\Scratch\src\frontend\pen.cpp =====
+
+#include "pen.h"
+#include <../gfx/SDL2_gfxPrimitives.h>
+#include <cmath>
+
+static SDL_Texture* pen_canvas = nullptr;
+static Uint8 pen_r = 0, pen_g = 0, pen_b = 200, pen_a = 255;
+static int pen_thickness = 2;
+static bool initialized = false;
+
+void pen_init(SDL_Renderer* renderer) {
+    if (pen_canvas) {
+        SDL_DestroyTexture(pen_canvas);
+    }
+    pen_canvas = SDL_CreateTexture(renderer,
+        SDL_PIXELFORMAT_RGBA8888,
+        SDL_TEXTUREACCESS_TARGET,
+        STAGE_WIDTH, STAGE_HEIGHT);
+    SDL_SetTextureBlendMode(pen_canvas, SDL_BLENDMODE_BLEND);
+
+    SDL_Texture* prev = SDL_GetRenderTarget(renderer);
+    SDL_SetRenderTarget(renderer, pen_canvas);
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+    SDL_RenderClear(renderer);
+    SDL_SetRenderTarget(renderer, prev);
+
+    initialized = true;
+}
+
+void pen_shutdown() {
+    if (pen_canvas) {
+        SDL_DestroyTexture(pen_canvas);
+        pen_canvas = nullptr;
+    }
+    initialized = false;
+}
+
+void pen_clear(SDL_Renderer* renderer) {
+    if (!pen_canvas) return;
+    SDL_Texture* prev = SDL_GetRenderTarget(renderer);
+    SDL_SetRenderTarget(renderer, pen_canvas);
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+    SDL_RenderClear(renderer);
+    SDL_SetRenderTarget(renderer, prev);
+}
+
+void pen_set_color(Uint8 r, Uint8 g, Uint8 b, Uint8 a) {
+    pen_r = r;
+    pen_g = g;
+    pen_b = b;
+    pen_a = a;
+}
+
+void pen_set_size(int size) {
+    if (size < 1) size = 1;
+    if (size > 50) size = 50;
+    pen_thickness = size;
+}
+
+void pen_stamp(SDL_Renderer* renderer, Sprite& sprite) {
+    if (!pen_canvas || !sprite.texture) return;
+
+    SDL_Texture* prev = SDL_GetRenderTarget(renderer);
+    SDL_SetRenderTarget(renderer, pen_canvas);
+
+    int draw_w = (int)(sprite.width * sprite.scale);
+    int draw_h = (int)(sprite.height * sprite.scale);
+    int sx = (int)(sprite.x - STAGE_X - draw_w / 2);
+    int sy = (int)(sprite.y - STAGE_Y - draw_h / 2);
+
+    SDL_Rect dst = { sx, sy, draw_w, draw_h };
+    SDL_RenderCopyEx(renderer, sprite.texture, nullptr, &dst, sprite.direction, nullptr, SDL_FLIP_NONE);
+
+    SDL_SetRenderTarget(renderer, prev);
+}
+
+void pen_update(SDL_Renderer* renderer, Sprite& sprite) {
+    if (!pen_canvas || !sprite.isPenDown) return;
+
+    float cx = sprite.x;
+    float cy = sprite.y;
+    float px = sprite.prevPenX;
+    float py = sprite.prevPenY;
+
+    float dx = cx - px;
+    float dy = cy - py;
+    if (dx * dx + dy * dy < 0.5f) return;
+
+    SDL_Texture* prev_target = SDL_GetRenderTarget(renderer);
+    SDL_SetRenderTarget(renderer, pen_canvas);
+
+    int x1 = (int)(px - STAGE_X);
+    int y1 = (int)(py - STAGE_Y);
+    int x2 = (int)(cx - STAGE_X);
+    int y2 = (int)(cy - STAGE_Y);
+
+    if (pen_thickness <= 1) {
+        lineRGBA(renderer, x1, y1, x2, y2, pen_r, pen_g, pen_b, pen_a);
+    } else {
+        thickLineRGBA(renderer, x1, y1, x2, y2, pen_thickness, pen_r, pen_g, pen_b, pen_a);
+    }
+
+    SDL_SetRenderTarget(renderer, prev_target);
+
+    sprite.prevPenX = cx;
+    sprite.prevPenY = cy;
+}
+
+void pen_render(SDL_Renderer* renderer) {
+    if (!pen_canvas) return;
+    SDL_Rect dst = { STAGE_X, STAGE_Y, STAGE_WIDTH, STAGE_HEIGHT };
+    SDL_RenderCopy(renderer, pen_canvas, nullptr, &dst);
+}
+
+
+===== C:\Users\Roham\Scratch\src\frontend\pen.h =====
+
+#ifndef PEN_H
+#define PEN_H
+
+#include <SDL2/SDL.h>
+#include "../common/definitions.h"
+
+void pen_init(SDL_Renderer* renderer);
+void pen_shutdown();
+void pen_clear(SDL_Renderer* renderer);
+void pen_stamp(SDL_Renderer* renderer, Sprite& sprite);
+void pen_update(SDL_Renderer* renderer, Sprite& sprite);
+void pen_render(SDL_Renderer* renderer);
+void pen_set_color(Uint8 r, Uint8 g, Uint8 b, Uint8 a);
+void pen_set_size(int size);
 
 #endif
 
@@ -20010,10 +20211,45 @@ extern "C" {
 #include <fstream>
 #include <ctime>
 #include <sstream>
+#include <SDL2/SDL.h>
+#include <cstring>
+
 static std::ofstream logFile;
 static bool consoleEnabled = true;
 static bool fileEnabled = true;
 static LogLevel minLogLevel = LOG_DEBUG;
+static char write_buffer[8192];
+static int buffer_pos = 0;
+static Uint32 last_flush_time = 0;
+static const int FLUSH_INTERVAL_MS = 2000;
+static const int BUFFER_THRESHOLD = 6144;  
+static void flush_buffer() {
+    if (buffer_pos > 0 && logFile.is_open()) {
+        logFile.write(write_buffer, buffer_pos);
+        logFile.flush();
+        buffer_pos = 0;
+    }
+    last_flush_time = SDL_GetTicks();
+}
+
+static void buffer_write(const char* data, int len) {
+    if (buffer_pos + len >= (int)sizeof(write_buffer))
+        flush_buffer();
+
+    if (len >= (int)sizeof(write_buffer)) {
+        if (logFile.is_open()) {
+            logFile.write(data, len);
+            logFile.flush();
+        }
+        return;
+    }
+
+    memcpy(write_buffer + buffer_pos, data, len);
+    buffer_pos += len;
+
+    if (buffer_pos >= BUFFER_THRESHOLD)
+        flush_buffer();
+}
 
 void init_logger(const std::string& filename) {
     logFile.open(filename, std::ios::out | std::ios::app);
@@ -20026,6 +20262,7 @@ void init_logger(const std::string& filename) {
 void close_logger() {
     if (logFile.is_open()) {
         log_info("Logger closing");
+        flush_buffer();
         logFile.close();
     }
 }
@@ -20047,21 +20284,22 @@ static std::string level_to_string(LogLevel level) {
     }
     return "???";
 }
-
 void log_message(LogLevel level, const std::string& message) {
     if (level < minLogLevel) return;
 
-    std::string line = "[" + get_timestamp() + "] [" + level_to_string(level) + "] " + message;
+    std::string line = "[" + get_timestamp() + "] [" + level_to_string(level) + "] " + message + "\n";
 
     if (consoleEnabled) {
-        std::cout << line << std::endl;
+        std::cout << line;
     }
 
     if (fileEnabled && logFile.is_open()) {
-        logFile << line << std::endl;
-        logFile.flush();
+        buffer_write(line.c_str(), (int)line.size());
+        if (level >= LOG_ERROR)
+            flush_buffer();
     }
 }
+
 
 void log_debug(const std::string& message)   { log_message(LOG_DEBUG, message); }
 void log_info(const std::string& message)    { log_message(LOG_INFO, message); }
@@ -20114,6 +20352,11 @@ void log_block_info(const Block* block, const std::string& prefix) {
         log_debug(prefix + "  Child: #" + std::to_string(block->child->id));
     }
 }
+void logger_tick() {
+    Uint32 now = SDL_GetTicks();
+    if (now - last_flush_time >= (Uint32)FLUSH_INTERVAL_MS)
+        flush_buffer();
+}
 
 
 ===== C:\Users\Roham\Scratch\src\utils\logger.h =====
@@ -20151,6 +20394,7 @@ void set_log_level(LogLevel level);
 void clear_log();
 void log_separator();
 void log_block_info(const Block* block, const std::string& prefix = "");
+void logger_tick();
 
 #endif
 
@@ -20312,7 +20556,11 @@ int  syslog_get_count();
 ===== C:\Users\Roham\Scratch\src\main.cpp =====
 
 #include <SDL2/SDL.h>
+#ifdef __linux__
+#include <SDL2/SDL_image.h>
+#else
 #include <SDL_image.h>
+#endif
 #include <iostream>
 #include <vector>
 #include <cmath>
@@ -20328,9 +20576,16 @@ int  syslog_get_count();
 #include "frontend/text_input.h"
 #include "utils/system_logger.h"
 #include "backend/block_executor_looks.h"
+#include "backend/sound.h"
+#include "frontend/pen.h"
 
 int main(int argc, char* argv[]) {
-    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+    int g_execution_index = -1;
+    bool g_is_executing = false;
+    bool g_step_mode = false;
+    bool g_waiting_for_step = false;
+
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0) {
         std::cerr << "SDL_Init Error: " << SDL_GetError() << std::endl;
         return 1;
     }
@@ -20341,6 +20596,10 @@ int main(int argc, char* argv[]) {
         std::cerr << "IMG_Init Error: " << IMG_GetError() << std::endl;
         SDL_Quit();
         return 1;
+    }
+
+    if (!sound_init()) {
+        log_warning("Sound engine failed to initialize");
     }
 
     SDL_Window* window = SDL_CreateWindow(
@@ -20368,17 +20627,21 @@ int main(int argc, char* argv[]) {
 
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 
+    pen_init(renderer);
+
     init_logger("debug.log");
     log_info("Application started");
 
+    sound_load("meow", "../assets/meow.wav");
+
     Sprite sprite;
-    sprite.texture = load_texture(renderer, "assets/cat.png");
+    sprite.texture = load_texture(renderer, "../assets/cat.png");
     if (!sprite.texture) {
         log_warning("Failed to load cat.png - sprite will be invisible");
     }
 
     {
-        const char* costume_files[] = {"assets/cat.png", "assets/cat2.png"};
+        const char* costume_files[] = {"../assets/cat.png", "../assets/cat2.png"};
         const char* costume_names[] = {"costume1", "costume2"};
         int num_costumes = 2;
 
@@ -20402,6 +20665,10 @@ int main(int argc, char* argv[]) {
     std::vector<PaletteItem> palette_items;
     init_palette(palette_items);
 
+    int palette_scroll_offset = 0;
+    int palette_max_scroll = get_palette_total_height(palette_items) - PALETTE_HEIGHT + 20;
+    if (palette_max_scroll < 0) palette_max_scroll = 0;
+
     std::vector<Block> blocks;
     int next_block_id = 1;
 
@@ -20421,6 +20688,21 @@ int main(int argc, char* argv[]) {
                 case SDL_QUIT:
                     running = false;
                     break;
+
+                case SDL_MOUSEWHEEL: {
+                    int mx, my;
+                    SDL_GetMouseState(&mx, &my);
+
+                    if (mx >= PALETTE_X && mx < PALETTE_X + PALETTE_WIDTH &&
+                        my >= PALETTE_Y && my < PALETTE_Y + PALETTE_HEIGHT) {
+
+                        palette_scroll_offset -= event.wheel.y * 30;
+
+                        if (palette_scroll_offset < 0) palette_scroll_offset = 0;
+                        if (palette_scroll_offset > palette_max_scroll) palette_scroll_offset = palette_max_scroll;
+                    }
+                    break;
+                }
 
                 case SDL_MOUSEBUTTONDOWN:
                     if (event.button.button == SDL_BUTTON_LEFT) {
@@ -20456,12 +20738,7 @@ int main(int argc, char* argv[]) {
 
                         bool clicked_arg = false;
                         for (auto& block : blocks) {
-                            int arg_idx = try_click_arg(block, mx, my);
-                            if (arg_idx >= 0) {
-                                if (text_state.active) {
-                                    commit_editing(text_state, blocks);
-                                }
-                                begin_editing(text_state, block, arg_idx);
+                            if (try_click_arg(block, mx, my, text_state)) {
                                 clicked_arg = true;
                                 break;
                             }
@@ -20471,7 +20748,7 @@ int main(int argc, char* argv[]) {
                             if (text_state.active) {
                                 commit_editing(text_state, blocks);
                             }
-                            handle_mouse_down(event, blocks, palette_items, next_block_id);
+                            handle_mouse_down(event, blocks, palette_items, next_block_id, palette_scroll_offset);
                         }
                     }
                     break;
@@ -20521,38 +20798,57 @@ int main(int argc, char* argv[]) {
         }
 
         tick_cursor(text_state);
+        logger_tick();
 
         if (g_is_executing && g_execution_index >= 0 && g_execution_index < (int)blocks.size()) {
-            for (auto& b : blocks) {
-                b.is_running = false;
-            }
+            if (g_step_mode && g_waiting_for_step) {
 
-            Block& current = blocks[g_execution_index];
-            current.is_running = true;
-            current.glow_start_time = SDL_GetTicks();
+            } else {
+                for (auto& b : blocks) {
+                    b.is_running = false;
+                }
 
-            ExecutionContext exec_ctx;
-            exec_ctx.sprite = &sprite;
+                blocks[g_execution_index].is_running = true;
+                blocks[g_execution_index].glow_start_time = SDL_GetTicks();
+                Block& current = blocks[g_execution_index];
+                current.is_running = true;
+                current.glow_start_time = SDL_GetTicks();
 
-            switch (current.type) {
-                case CMD_SWITCH_COSTUME:
-                case CMD_NEXT_COSTUME:
-                case CMD_SET_SIZE:
-                case CMD_CHANGE_SIZE:
-                case CMD_SHOW:
-                case CMD_HIDE:
-                    execute_looks_block(&current, exec_ctx);
-                    break;
-                default:
-                    break;
-            }
+                ExecutionContext exec_ctx;
+                exec_ctx.sprite = &sprite;
 
-            g_execution_index++;
+                pen_update(renderer, sprite);
 
-            if (g_execution_index >= (int)blocks.size()) {
-                current.is_running = false;
-                g_execution_index = -1;
-                g_is_executing = false;
+                switch (current.type) {
+                    case CMD_SWITCH_COSTUME:
+                    case CMD_NEXT_COSTUME:
+                    case CMD_SET_SIZE:
+                    case CMD_CHANGE_SIZE:
+                    case CMD_SHOW:
+                    case CMD_HIDE:
+                        execute_looks_block(&current, exec_ctx);
+                        break;
+                    case CMD_PLAY_SOUND:
+                        play_sound(current.args[0], exec_ctx.sprite->volume);
+                        break;
+                    default:
+                        break;
+                }
+
+                sprite.prevPenX = sprite.x;
+                sprite.prevPenY = sprite.y;
+
+                g_execution_index++;
+
+                if (g_execution_index >= (int)blocks.size()) {
+                    blocks[g_execution_index - 1].is_running = false;
+                    g_execution_index = -1;
+                    g_is_executing = false;
+                }
+
+                if (g_step_mode) {
+                    g_waiting_for_step = true;
+                }
             }
         }
 
@@ -20560,9 +20856,11 @@ int main(int argc, char* argv[]) {
         SDL_RenderClear(renderer);
 
         draw_toolbar(renderer);
-        draw_palette(renderer, palette_items);
+        draw_palette(renderer, palette_items, palette_scroll_offset);
         draw_coding_area(renderer);
         draw_stage(renderer, sprite);
+
+        pen_render(renderer);
 
         for (const auto& block : blocks) {
             std::string label = block_get_label(block.type);
@@ -20594,16 +20892,20 @@ int main(int argc, char* argv[]) {
         SDL_RenderPresent(renderer);
     }
 
+    pen_shutdown();
+
     for (auto& c : sprite.costumes) {
         if (c.texture) {
             SDL_DestroyTexture(c.texture);
         }
     }
+
     close_logger();
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     IMG_Quit();
     SDL_Quit();
+    sound_cleanup();
 
     return 0;
 }

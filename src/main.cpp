@@ -260,9 +260,66 @@ int main(int argc, char* argv[]) {
                 ExecutionContext exec_ctx;
                 exec_ctx.sprite = &sprite;
 
-                pen_update(renderer, sprite);
+                float oldX = sprite.x;
+                float oldY = sprite.y;
 
                 switch (current.type) {
+
+                    case CMD_MOVE: {
+                        float steps = 10.0f;
+                        if (!current.args.empty())
+                            steps = (float)std::atof(current.args[0].c_str());
+                        float rad = sprite.angle * (float)M_PI / 180.0f;
+                        sprite.x += steps * std::cos(rad);
+                        sprite.y += steps * std::sin(rad);
+                        break;
+                    }
+
+                    case CMD_TURN: {
+                        float deg = 15.0f;
+                        if (!current.args.empty())
+                            deg = (float)std::atof(current.args[0].c_str());
+                        sprite.angle += deg;
+                        break;
+                    }
+
+                    case CMD_GOTO: {
+                        float gx = 0.0f, gy = 0.0f;
+                        if (current.args.size() >= 1) gx = (float)std::atof(current.args[0].c_str());
+                        if (current.args.size() >= 2) gy = (float)std::atof(current.args[1].c_str());
+                        sprite.x = STAGE_X + STAGE_WIDTH / 2.0f + gx;
+                        sprite.y = STAGE_Y + STAGE_HEIGHT / 2.0f - gy;
+                        break;
+                    }
+
+                    case CMD_SET_X: {
+                        float nx = 0.0f;
+                        if (!current.args.empty()) nx = (float)std::atof(current.args[0].c_str());
+                        sprite.x = STAGE_X + STAGE_WIDTH / 2.0f + nx;
+                        break;
+                    }
+
+                    case CMD_SET_Y: {
+                        float ny = 0.0f;
+                        if (!current.args.empty()) ny = (float)std::atof(current.args[0].c_str());
+                        sprite.y = STAGE_Y + STAGE_HEIGHT / 2.0f - ny;
+                        break;
+                    }
+
+                    case CMD_CHANGE_X: {
+                        float dx = 0.0f;
+                        if (!current.args.empty()) dx = (float)std::atof(current.args[0].c_str());
+                        sprite.x += dx;
+                        break;
+                    }
+
+                    case CMD_CHANGE_Y: {
+                        float dy = 0.0f;
+                        if (!current.args.empty()) dy = (float)std::atof(current.args[0].c_str());
+                        sprite.y -= dy;
+                        break;
+                    }
+
                     case CMD_SWITCH_COSTUME:
                     case CMD_NEXT_COSTUME:
                     case CMD_SET_SIZE:
@@ -271,12 +328,61 @@ int main(int argc, char* argv[]) {
                     case CMD_HIDE:
                         execute_looks_block(&current, exec_ctx);
                         break;
+
                     case CMD_PLAY_SOUND:
-                        play_sound(current.args[0], exec_ctx.sprite->volume);
+                        if (!current.args.empty())
+                            play_sound(current.args[0], exec_ctx.sprite->volume);
                         break;
+
+                
+                    case CMD_PEN_DOWN:
+                        sprite.isPenDown = 1;
+                        sprite.prevPenX = sprite.x;
+                        sprite.prevPenY = sprite.y;
+                        break;
+
+                    case CMD_PEN_UP:
+                        sprite.isPenDown = 0;
+                        break;
+
+                    case CMD_PEN_CLEAR:
+                        pen_clear(renderer);
+                        break;
+
+                    case CMD_PEN_SET_COLOR: {
+                        if (current.args.size() >= 3) {
+                            sprite.penR = (Uint8)std::atoi(current.args[0].c_str());
+                            sprite.penG = (Uint8)std::atoi(current.args[1].c_str());
+                            sprite.penB = (Uint8)std::atoi(current.args[2].c_str());
+                            pen_set_color(sprite.penR, sprite.penG, sprite.penB);
+                        }
+                        break;
+                    }
+
+                    case CMD_PEN_SET_SIZE: {
+                        if (!current.args.empty()) {
+                            sprite.penSize = std::atoi(current.args[0].c_str());
+                            if (sprite.penSize < 1) sprite.penSize = 1;
+                            pen_set_size(sprite.penSize);
+                        }
+                        break;
+                    }
+
+                    case CMD_PEN_STAMP:
+                        pen_stamp(renderer, sprite);
+                        break;
+
+
                     default:
                         break;
                 }
+
+                // --- CHANGED: رسم خط Pen بعد از حرکت ---
+                if (sprite.isPenDown && (sprite.x != oldX || sprite.y != oldY)) {
+                    pen_draw_line(renderer, oldX, oldY, sprite.x, sprite.y, sprite);
+                }
+
+                pen_update(renderer, sprite);
 
                 sprite.prevPenX = sprite.x;
                 sprite.prevPenY = sprite.y;
