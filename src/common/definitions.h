@@ -99,6 +99,7 @@ struct Sprite {
     SDL_Texture* texture;
     std::string name;
     float scale;
+    float volume;
     std::vector<Costume> costumes;
 
     Sprite()
@@ -114,6 +115,7 @@ struct Sprite {
         , texture(nullptr)
         , name("Cat")
         , scale(0.05f)
+        , volume(100)
     {}
 };
 
@@ -139,6 +141,9 @@ enum BlockType {
     CMD_SHOW,
     CMD_HIDE,
     CMD_PLAY_SOUND,
+    CMD_STOP_ALL_SOUNDS,
+    CMD_CHANGE_VOLUME,
+    CMD_SET_VOLUME,
     SENSE_TOUCHING_MOUSE,
     SENSE_TOUCHING_EDGE,
     OP_ADD,

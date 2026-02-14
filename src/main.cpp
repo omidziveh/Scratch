@@ -25,6 +25,7 @@ int main(int argc, char* argv[]) {
     bool g_step_mode = false;
     bool g_waiting_for_step = false;
 
+
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0) {
         std::cerr << "SDL_Init Error: " << SDL_GetError() << std::endl;
         return 1;
@@ -66,6 +67,9 @@ int main(int argc, char* argv[]) {
 
     init_logger("debug.log");
     log_info("Application started");
+
+    sound_load("meow", "../assets/meow.wav");
+
 
     Sprite sprite;
     sprite.texture = load_texture(renderer, "../assets/cat.png");
@@ -232,6 +236,8 @@ int main(int argc, char* argv[]) {
                 case CMD_HIDE:
                     execute_looks_block(&current, exec_ctx);
                     break;
+                case CMD_PLAY_SOUND:
+                    play_sound(current.args[0], exec_ctx.sprite->volume);
                 default:
                     break;
             }

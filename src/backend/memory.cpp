@@ -39,6 +39,17 @@ Block* create_block(BlockType t) {
         case CMD_REPEAT:
             b->args.push_back("10");
             break;
+        case CMD_PLAY_SOUND:
+            b->args.push_back("pop");
+            break;
+        case CMD_STOP_ALL_SOUNDS:
+            break;
+        case CMD_CHANGE_VOLUME:
+            b->args.push_back("10");
+            break;
+        case CMD_SET_VOLUME:
+            b->args.push_back("100");
+            break;
         default:
             break;
     }

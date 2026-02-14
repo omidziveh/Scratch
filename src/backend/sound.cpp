@@ -42,7 +42,7 @@ bool sound_load(const std::string& name, const std::string& path) {
     return true;
 }
 
-void play_sound(const std::string& name) {
+void play_sound(const std::string& name, int volume) {
     auto it = g_sounds.find(name);
     if (it == g_sounds.end()) {
         log_warning("Sound not found: " + name);
@@ -50,7 +50,7 @@ void play_sound(const std::string& name) {
     }
 
     if (it->second) {
-        Mix_VolumeChunk(it->second, g_sound_volume);
+        Mix_VolumeChunk(it->second, volume);
         int channel = Mix_PlayChannel(-1, it->second, 0);
         if (channel == -1) {
             log_error("Failed to play sound: " + name + " - " + Mix_GetError());
@@ -68,5 +68,9 @@ void stop_all_sounds() {
 void set_sound_volume(int volume) {
     g_sound_volume = volume;
     if (g_sound_volume < 0) g_sound_volume = 0;
-    if (g_sound_volume > 128) g_sound_volume = 128;
+    if (g_sound_volume > 100) g_sound_volume = 100;
+}
+
+int get_sound_volume() {
+    return g_sound_volume;
 }

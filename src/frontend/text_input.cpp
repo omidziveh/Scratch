@@ -14,6 +14,9 @@ int get_arg_count(BlockType type) {
         case CMD_REPEAT:
         case CMD_WAIT:
         case CMD_SAY:
+        case CMD_PLAY_SOUND:
+        case CMD_CHANGE_VOLUME:
+        case CMD_SET_VOLUME:
             return 1;
         case CMD_GOTO:
             return 2;

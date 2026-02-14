@@ -21,7 +21,12 @@ std::string block_get_label(BlockType type) {
         case CMD_CHANGE_SIZE:    return "Change size by (10)";
         case CMD_SHOW:           return "Show";
         case CMD_HIDE:           return "Hide";
-        case CMD_NONE:     return "---";
+        case CMD_NONE:             return "---";
+        case CMD_PLAY_SOUND:       return "Play sound";
+        case CMD_STOP_ALL_SOUNDS:  return "Stop all sounds";
+        case CMD_CHANGE_VOLUME:    return "Change volume by";
+        case CMD_SET_VOLUME:       return "Set volume to";
+
         default:           return "Unknown";
     }
 }
@@ -50,6 +55,12 @@ SDL_Color block_get_color(BlockType type) {
             return COLOR_LOOKS;
         case CMD_START:
             return COLOR_EVENTS;
+        case CMD_PLAY_SOUND:
+        case CMD_STOP_ALL_SOUNDS:
+        case CMD_CHANGE_VOLUME:
+        case CMD_SET_VOLUME:
+            return COLOR_SOUND;
+        
         default:
             return COLOR_GRAY;
     }
