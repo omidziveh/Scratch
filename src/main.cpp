@@ -9,6 +9,8 @@
 #include "frontend/input.h"
 #include "frontend/palette.h"
 #include "frontend/block_utils.h"
+#include "frontend/menu.h"
+#include "frontend/hover.h"
 #include "utils/logger.h"
 #include "frontend/text_input.h"
 #include "utils/system_logger.h"
@@ -20,6 +22,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     syslog_init();
+    menu_init();
 
     if (IMG_Init(IMG_INIT_PNG) == 0) {
         std::cerr << "IMG_Init Error: " << IMG_GetError() << std::endl;
@@ -49,6 +52,8 @@ int main(int argc, char* argv[]) {
         SDL_Quit();
         return 1;
     }
+
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 
     init_logger("debug.log");
     log_info("Application started");
@@ -89,6 +94,10 @@ int main(int argc, char* argv[]) {
 
     TextInputState text_state;
 
+    int mouse_x = 0, mouse_y = 0;
+    bool hover_run = false;
+    bool hover_stop = false;
+
     bool running = true;
     SDL_Event event;
 
@@ -105,10 +114,30 @@ int main(int argc, char* argv[]) {
                         int mx = event.button.x;
                         int my = event.button.y;
 
+                        if (my < MENU_BAR_OFFSET) {
+                            menu_handle_mouse_down(mx, my);
+                            break;
+                        }
+
+                        if (menu_is_any_open()) {
+                            menu_handle_mouse_down(mx, my);
+                            break;
+                        }
+
                         if (mx >= TOOLBAR_WIDTH - 90 && mx <= TOOLBAR_WIDTH - 90 + 30 &&
                             my >= 5 && my <= 5 + 30) {
                             g_execution_index = 0;
                             g_is_executing = true;
+                            break;
+                        }
+
+                        if (mx >= TOOLBAR_WIDTH - 50 && mx <= TOOLBAR_WIDTH - 50 + 30 &&
+                            my >= 5 && my <= 5 + 30) {
+                            g_is_executing = false;
+                            g_execution_index = -1;
+                            for (auto& b : blocks) {
+                                b.is_running = false;
+                            }
                             break;
                         }
 
@@ -136,12 +165,28 @@ int main(int argc, char* argv[]) {
 
                 case SDL_MOUSEBUTTONUP:
                     if (event.button.button == SDL_BUTTON_LEFT) {
+                        menu_handle_mouse_up(event.button.x, event.button.y);
                         handle_mouse_up(event, blocks);
                     }
                     break;
 
                 case SDL_MOUSEMOTION:
+                {
+                    int mx = event.motion.x;
+                    int my = event.motion.y;
+                    mouse_x = mx;
+                    mouse_y = my;
+
+                    menu_handle_mouse_move(mx, my);
+
+                    hover_run = (mx >= TOOLBAR_WIDTH - 90 && mx <= TOOLBAR_WIDTH - 90 + 30 &&
+                                 my >= 5 && my <= 5 + 30);
+
+                    hover_stop = (mx >= TOOLBAR_WIDTH - 50 && mx <= TOOLBAR_WIDTH - 50 + 30 &&
+                                  my >= 5 && my <= 5 + 30);
+
                     handle_mouse_motion(event, blocks);
+                }
                     break;
 
                 case SDL_TEXTINPUT:
@@ -153,12 +198,12 @@ int main(int argc, char* argv[]) {
                 case SDL_KEYDOWN:
                     if (text_state.active) {
                         on_key_input(text_state, event.key.keysym.sym, blocks);
+                    } else {
+                        if (event.key.keysym.sym == SDLK_l) {
+                            syslog_toggle();
+                        }
                     }
                     break;
-                case SDLK_l:
-                    syslog_toggle();
-                    break;
-
             }
         }
 
@@ -212,6 +257,26 @@ int main(int argc, char* argv[]) {
             draw_block(renderer, block, label);
             draw_arg_boxes(renderer, block, text_state);
         }
+
+        render_palette_hover(renderer, palette_items, mouse_x, mouse_y);
+
+        if (hover_run) {
+            SDL_SetRenderDrawColor(renderer, 255, 255, 255, 50);
+            SDL_Rect run_rect = { TOOLBAR_WIDTH - 90, 5, 30, 30 };
+            SDL_RenderFillRect(renderer, &run_rect);
+        }
+
+        if (hover_stop) {
+            SDL_SetRenderDrawColor(renderer, 255, 255, 255, 50);
+            SDL_Rect stop_rect = { TOOLBAR_WIDTH - 50, 5, 30, 30 };
+            SDL_RenderFillRect(renderer, &stop_rect);
+        }
+
+        if (syslog_is_visible()) {
+            syslog_render(renderer);
+        }
+
+        menu_render(renderer);
 
         SDL_RenderPresent(renderer);
     }

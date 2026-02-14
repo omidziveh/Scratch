@@ -1,4 +1,128 @@
 ﻿
+===== C:\Users\Roham\Scratch\src\backend\block_executor_looks.cpp =====
+
+#include "block_executor_looks.h"
+#include "../utils/logger.h"
+#include <cstdlib>
+#include <algorithm>
+#include <string>
+
+bool execute_looks_block(Block* block, ExecutionContext& ctx) {
+    if (!block || !ctx.sprite) return false;
+
+    Sprite& sp = *ctx.sprite;
+
+    switch (block->type) {
+
+        case CMD_SWITCH_COSTUME: {
+            if (sp.costumes.empty()) return false;
+
+            int idx = 0;
+            if (!block->args.empty())
+                idx = std::atoi(block->args[0].c_str()) - 1;
+
+            if (idx < 0) idx = 0;
+            idx = idx % (int)sp.costumes.size();
+
+            sp.currentCostumeIndex = idx;
+            sp.texture = sp.costumes[idx].texture;
+            sp.width   = sp.costumes[idx].width;
+            sp.height  = sp.costumes[idx].height;
+
+            log_info("Looks: switched to costume " + std::to_string(idx + 1)
+                     + " (" + sp.costumes[idx].name + ")");
+            return true;
+        }
+
+        case CMD_NEXT_COSTUME: {
+            if (sp.costumes.empty()) return false;
+
+            sp.currentCostumeIndex = (sp.currentCostumeIndex + 1) % (int)sp.costumes.size();
+            int idx = sp.currentCostumeIndex;
+
+            sp.texture = sp.costumes[idx].texture;
+            sp.width   = sp.costumes[idx].width;
+            sp.height  = sp.costumes[idx].height;
+
+            log_info("Looks: next costume -> " + std::to_string(idx + 1)
+                     + " (" + sp.costumes[idx].name + ")");
+            return true;
+        }
+
+        case CMD_SET_SIZE: {
+            float pct = 100.0f;
+            if (!block->args.empty())
+                pct = (float)std::atof(block->args[0].c_str());
+
+            pct = std::max(5.0f, std::min(500.0f, pct));
+            sp.scale = pct / 100.0f;
+
+            log_info("Looks: set size to " + std::to_string((int)pct) + "%");
+            return true;
+        }
+
+        case CMD_CHANGE_SIZE: {
+            float delta = 10.0f;
+            if (!block->args.empty())
+                delta = (float)std::atof(block->args[0].c_str());
+
+            float newPct = (sp.scale * 100.0f) + delta;
+            newPct = std::max(5.0f, std::min(500.0f, newPct));
+            sp.scale = newPct / 100.0f;
+
+            log_info("Looks: change size by " + std::to_string((int)delta)
+                     + " -> " + std::to_string((int)newPct) + "%");
+            return true;
+        }
+
+        case CMD_SHOW: {
+            sp.visible = 1;
+            log_info("Looks: show sprite");
+            return true;
+        }
+
+        case CMD_HIDE: {
+            sp.visible = 0;
+            log_info("Looks: hide sprite");
+            return true;
+        }
+
+        default:
+            return false;
+    }
+}
+
+
+===== C:\Users\Roham\Scratch\src\backend\block_executor_looks.h =====
+
+#ifndef BLOCK_EXECUTOR_LOOKS_H
+#define BLOCK_EXECUTOR_LOOKS_H
+
+#include "../common/definitions.h"
+
+struct ExecutionContext {
+    Sprite* sprite;
+    Stage*  stage;
+    int     mouseX;
+    int     mouseY;
+    float   lastResult;
+    bool    lastCondition;
+
+    ExecutionContext()
+        : sprite(nullptr)
+        , stage(nullptr)
+        , mouseX(0)
+        , mouseY(0)
+        , lastResult(0.0f)
+        , lastCondition(false)
+    {}
+};
+
+bool execute_looks_block(Block* block, ExecutionContext& ctx);
+
+#endif
+
+
 ===== C:\Users\Roham\Scratch\src\backend\block_executor_sensing.cpp =====
 
 #include "block_executor_sensing.h"
@@ -1110,6 +1234,26 @@ const Uint32 CURSOR_BLINK_MS = 500;
 struct Color {
     Uint8 r, g, b, a;
 };
+struct Costume {
+    std::string name;
+    SDL_Texture* texture;
+    int width;
+    int height;
+
+    Costume()
+        : name("")
+        , texture(nullptr)
+        , width(0)
+        , height(0)
+    {}
+
+    Costume(const std::string& n, SDL_Texture* tex, int w, int h)
+        : name(n)
+        , texture(tex)
+        , width(w)
+        , height(h)
+    {}
+};
 
 struct Stage {
     int x;
@@ -1142,6 +1286,7 @@ struct Sprite {
     SDL_Texture* texture;
     std::string name;
     float scale;
+    std::vector<Costume> costumes;
 
     Sprite()
         : x(STAGE_X + STAGE_WIDTH / 2.0f)
@@ -1174,6 +1319,12 @@ enum BlockType {
     CMD_SAY,
     CMD_START,
     CMD_EVENT_CLICK,
+    CMD_SWITCH_COSTUME,
+    CMD_NEXT_COSTUME,
+    CMD_SET_SIZE,
+    CMD_CHANGE_SIZE,
+    CMD_SHOW,
+    CMD_HIDE,
     SENSE_TOUCHING_MOUSE,
     SENSE_TOUCHING_EDGE,
     OP_ADD,
@@ -1358,6 +1509,12 @@ std::string block_get_label(BlockType type) {
         case CMD_WAIT:     return "Wait (1) secs";
         case CMD_SAY:      return "Say [Hello!]";
         case CMD_START:    return "When START clicked";
+        case CMD_SWITCH_COSTUME: return "Switch costume to (1)";
+        case CMD_NEXT_COSTUME:   return "Next costume";
+        case CMD_SET_SIZE:       return "Set size to (100)%";
+        case CMD_CHANGE_SIZE:    return "Change size by (10)";
+        case CMD_SHOW:           return "Show";
+        case CMD_HIDE:           return "Hide";
         case CMD_NONE:     return "---";
         default:           return "Unknown";
     }
@@ -1378,6 +1535,12 @@ SDL_Color block_get_color(BlockType type) {
         case CMD_WAIT:
             return COLOR_CONTROL;
         case CMD_SAY:
+        case CMD_SWITCH_COSTUME:
+        case CMD_NEXT_COSTUME:
+        case CMD_SET_SIZE:
+        case CMD_CHANGE_SIZE:
+        case CMD_SHOW:
+        case CMD_HIDE:
             return COLOR_LOOKS;
         case CMD_START:
             return COLOR_EVENTS;
@@ -1847,18 +2010,24 @@ void init_palette(std::vector<PaletteItem>& items) {
     };
 
     PaletteDef defs[] = {
-        {CMD_START,    "When START clicked"},
-        {CMD_MOVE,     "Move (10) steps"},
-        {CMD_TURN,     "Turn (15) degrees"},
-        {CMD_GOTO,     "Go to x:(0) y:(0)"},
-        {CMD_SET_X,    "Set x to (0)"},
-        {CMD_SET_Y,    "Set y to (0)"},
-        {CMD_CHANGE_X, "Change x by (10)"},
-        {CMD_CHANGE_Y, "Change y by (10)"},
-        {CMD_REPEAT,   "Repeat (10)"},
-        {CMD_IF,       "If <> then"},
-        {CMD_WAIT,     "Wait (1) secs"},
-        {CMD_SAY,      "Say [Hello!]"},
+        {CMD_START,          "When START clicked"},
+        {CMD_MOVE,           "Move (10) steps"},
+        {CMD_TURN,           "Turn (15) degrees"},
+        {CMD_GOTO,           "Go to x:(0) y:(0)"},
+        {CMD_SET_X,          "Set x to (0)"},
+        {CMD_SET_Y,          "Set y to (0)"},
+        {CMD_CHANGE_X,       "Change x by (10)"},
+        {CMD_CHANGE_Y,       "Change y by (10)"},
+        {CMD_REPEAT,         "Repeat (10)"},
+        {CMD_IF,             "If <> then"},
+        {CMD_WAIT,           "Wait (1) secs"},
+        {CMD_SAY,            "Say [Hello!]"},
+        {CMD_SWITCH_COSTUME, "Switch costume to (1)"},
+        {CMD_NEXT_COSTUME,   "Next costume"},
+        {CMD_SET_SIZE,       "Set size to (100)%"},
+        {CMD_CHANGE_SIZE,    "Change size by (10)"},
+        {CMD_SHOW,           "Show"},
+        {CMD_HIDE,           "Hide"},
     };
 
     int count = sizeof(defs) / sizeof(defs[0]);
@@ -1918,11 +2087,17 @@ int get_arg_count(BlockType type) {
         case CMD_REPEAT:
         case CMD_WAIT:
         case CMD_SAY:
+        case CMD_SWITCH_COSTUME:
+        case CMD_SET_SIZE:
+        case CMD_CHANGE_SIZE:
             return 1;
         case CMD_GOTO:
             return 2;
         case CMD_IF:
             return 1;
+        case CMD_NEXT_COSTUME:
+        case CMD_SHOW:
+        case CMD_HIDE:
         case CMD_START:
         case CMD_EVENT_CLICK:
         case CMD_NONE:
@@ -19257,6 +19432,7 @@ int  syslog_get_count();
 #include "utils/logger.h"
 #include "frontend/text_input.h"
 #include "utils/system_logger.h"
+#include "backend/block_executor_looks.h"
 
 int main(int argc, char* argv[]) {
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
@@ -19300,7 +19476,29 @@ int main(int argc, char* argv[]) {
     Sprite sprite;
     sprite.texture = load_texture(renderer, "assets/cat.png");
     if (!sprite.texture) {
-        log_warning("Failed to load cat.png â€” sprite will be invisible");
+        log_warning("Failed to load cat.png - sprite will be invisible");
+    }
+
+    {
+        const char* costume_files[] = {"assets/cat.png", "assets/cat2.png"};
+        const char* costume_names[] = {"costume1", "costume2"};
+        int num_costumes = 2;
+
+        for (int i = 0; i < num_costumes; i++) {
+            SDL_Texture* tex = load_texture(renderer, costume_files[i]);
+            if (tex) {
+                int w = 0, h = 0;
+                SDL_QueryTexture(tex, nullptr, nullptr, &w, &h);
+                sprite.costumes.push_back(Costume(costume_names[i], tex, w, h));
+            }
+        }
+
+        if (!sprite.costumes.empty()) {
+            sprite.currentCostumeIndex = 0;
+            sprite.texture = sprite.costumes[0].texture;
+            sprite.width = sprite.costumes[0].width;
+            sprite.height = sprite.costumes[0].height;
+        }
     }
 
     std::vector<PaletteItem> palette_items;
@@ -19327,7 +19525,6 @@ int main(int argc, char* argv[]) {
                         int mx = event.button.x;
                         int my = event.button.y;
 
-                        // --- Green Flag (Run) button ---
                         if (mx >= TOOLBAR_WIDTH - 90 && mx <= TOOLBAR_WIDTH - 90 + 30 &&
                             my >= 5 && my <= 5 + 30) {
                             g_execution_index = 0;
@@ -19387,19 +19584,35 @@ int main(int argc, char* argv[]) {
 
         tick_cursor(text_state);
 
-        // ===== STEP-BY-STEP EXECUTION =====
         if (g_is_executing && g_execution_index >= 0 && g_execution_index < (int)blocks.size()) {
             for (auto& b : blocks) {
                 b.is_running = false;
             }
 
-            blocks[g_execution_index].is_running = true;
-            blocks[g_execution_index].glow_start_time = SDL_GetTicks();
+            Block& current = blocks[g_execution_index];
+            current.is_running = true;
+            current.glow_start_time = SDL_GetTicks();
+
+            ExecutionContext exec_ctx;
+            exec_ctx.sprite = &sprite;
+
+            switch (current.type) {
+                case CMD_SWITCH_COSTUME:
+                case CMD_NEXT_COSTUME:
+                case CMD_SET_SIZE:
+                case CMD_CHANGE_SIZE:
+                case CMD_SHOW:
+                case CMD_HIDE:
+                    execute_looks_block(&current, exec_ctx);
+                    break;
+                default:
+                    break;
+            }
 
             g_execution_index++;
 
             if (g_execution_index >= (int)blocks.size()) {
-                blocks[g_execution_index - 1].is_running = false;
+                current.is_running = false;
                 g_execution_index = -1;
                 g_is_executing = false;
             }
@@ -19423,8 +19636,10 @@ int main(int argc, char* argv[]) {
         SDL_RenderPresent(renderer);
     }
 
-    if (sprite.texture) {
-        SDL_DestroyTexture(sprite.texture);
+    for (auto& c : sprite.costumes) {
+        if (c.texture) {
+            SDL_DestroyTexture(c.texture);
+        }
     }
     close_logger();
     SDL_DestroyRenderer(renderer);

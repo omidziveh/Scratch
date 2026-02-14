@@ -14,11 +14,17 @@ int get_arg_count(BlockType type) {
         case CMD_REPEAT:
         case CMD_WAIT:
         case CMD_SAY:
+        case CMD_SWITCH_COSTUME:
+        case CMD_SET_SIZE:
+        case CMD_CHANGE_SIZE:
             return 1;
         case CMD_GOTO:
             return 2;
         case CMD_IF:
             return 1;
+        case CMD_NEXT_COSTUME:
+        case CMD_SHOW:
+        case CMD_HIDE:
         case CMD_START:
         case CMD_EVENT_CLICK:
         case CMD_NONE:

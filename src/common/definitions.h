@@ -43,10 +43,12 @@ const int ARG_BOX_MARGIN_X = 8;
 const int ARG_BOX_Y_OFFSET = 10;
 const Uint32 CURSOR_BLINK_MS = 500;
 
+const int MENU_BAR_OFFSET = 28;
 
 struct Color {
     Uint8 r, g, b, a;
 };
+
 struct Costume {
     std::string name;
     SDL_Texture* texture;
@@ -207,6 +209,7 @@ struct PaletteItem {
         , width(w), height(h)
     {}
 };
+
 struct TextInputState {
     bool active;
     int block_id;
@@ -226,4 +229,5 @@ struct TextInputState {
         , cursor_visible(true)
     {}
 };
+
 #endif
