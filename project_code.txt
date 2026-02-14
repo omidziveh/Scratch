@@ -215,6 +215,76 @@ bool execute_operator_block(Block* block, ExecutionContext& ctx);
 #endif
 
 
+===== C:\Users\Roham\Scratch\src\backend\block_executor_sound.cpp =====
+
+#include "block_executor_sound.h"
+#include "../utils/logger.h"
+#include "sound.h"
+
+void execute_play_sound(Block* block, Sprite& sprite) {
+    if (!block) return;
+
+    std::string sound_name = "meow";
+    if (!block->args.empty() && !block->args[0].empty()) {
+        sound_name = block->args[0];
+    }
+
+    log_info("Playing sound " + sound_name);
+    play_sound(sound_name, sprite.volume);
+}
+
+void execute_stop_all_sounds(Block* block, Sprite& sprite) {
+    if (!block) return;
+    log_info("Stopping all sounds");
+    sound_cleanup();
+}
+
+void execute_change_volume(Block* block, Sprite& sprite) {
+    if (!block) return;
+
+    int delta = 10;
+    if (!block->args.empty()) {
+        delta = (int)atof(block->args[0].c_str());
+    }
+
+    sprite.volume += delta;
+    if (sprite.volume < 0) sprite.volume = 0;
+    if (sprite.volume > 100) sprite.volume = 100;
+
+    set_sound_volume(sprite.volume);
+    log_info("Volume changed by " + std::to_string((int)delta) + " -> " + std::to_string((int)sprite.volume));
+}
+
+void execute_set_volume(Block* block, Sprite& sprite) {
+    if (!block) return;
+
+    int vol = 100;
+    if (!block->args.empty()) {
+        vol = (int)atof(block->args[0].c_str());
+    }
+
+    if (vol < 0) vol = 0;
+    if (vol > 100) vol = 100;
+
+    sprite.volume = vol;
+    set_sound_volume(sprite.volume);
+    log_info("Volume set to " + std::to_string((int)sprite.volume));
+}
+
+===== C:\Users\Roham\Scratch\src\backend\block_executor_sound.h =====
+
+#ifndef BLOCK_EXECUTOR_SOUND_H
+#define BLOCK_EXECUTOR_SOUND_H
+
+#include "../common/definitions.h"
+
+void execute_play_sound(Block* block, Sprite& sprite);
+void execute_stop_all_sounds(Block* block, Sprite& sprite);
+void execute_change_volume(Block* block, Sprite& sprite);
+void execute_set_volume(Block* block, Sprite& sprite);
+
+#endif // BLOCK_EXECUTOR_SOUND_H
+
 ===== C:\Users\Roham\Scratch\src\backend\file_io.cpp =====
 
 #include "file_io.h"
@@ -534,6 +604,17 @@ Block* create_block(BlockType t) {
         case CMD_REPEAT:
             b->args.push_back("10");
             break;
+        case CMD_PLAY_SOUND:
+            b->args.push_back("pop");
+            break;
+        case CMD_STOP_ALL_SOUNDS:
+            break;
+        case CMD_CHANGE_VOLUME:
+            b->args.push_back("10");
+            break;
+        case CMD_SET_VOLUME:
+            b->args.push_back("100");
+            break;
         default:
             break;
     }
@@ -660,6 +741,7 @@ void runtime_init(Runtime* rt, Block* head, Sprite* sprite) {
     rt->maxTicksAllowed = DEFAULT_MAX_TICKS;
     rt->stepMode = false;
     rt->breakpointHit = false;
+    rt->waitingForStep = false;
     rt->ticksSinceLastWait = 0;
     rt->watchdogThreshold = DEFAULT_WATCHDOG_THRESHOLD;
     rt->watchdogTriggered = false;
@@ -673,6 +755,7 @@ void runtime_reset(Runtime* rt) {
     rt->totalTicksExecuted = 0;
     rt->breakpointHit = false;
     rt->ticksSinceLastWait = 0;
+    rt->waitingForStep = false;
     rt->watchdogTriggered = false;
 }
 
@@ -683,13 +766,18 @@ void runtime_start(Runtime* rt) {
         rt->loopStack.clear();
         rt->ticksSinceLastWait = 0;
         rt->watchdogTriggered = false;
+        rt->waitingForStep = false;
     }
     rt->state = RUNTIME_RUNNING;
+    if (rt->stepMode) {
+        rt->waitingForStep = true;
+    }
     log_info("Runtime started");
 }
 
 void runtime_stop(Runtime* rt) {
     rt->state = RUNTIME_STOPPED;
+    rt->waitingForStep = false;
     rt->watchdogTriggered = false;
     log_info("Runtime stopped");
 }
@@ -697,6 +785,7 @@ void runtime_stop(Runtime* rt) {
 void runtime_pause(Runtime* rt) {
     if (rt->state == RUNTIME_RUNNING) {
         rt->state = RUNTIME_PAUSED;
+        rt->waitingForStep = false;
         log_info("Runtime paused");
     }
 }
@@ -704,6 +793,9 @@ void runtime_pause(Runtime* rt) {
 void runtime_resume(Runtime* rt) {
     if (rt->state == RUNTIME_PAUSED) {
         rt->state = RUNTIME_RUNNING;
+        if (rt->stepMode) {
+            rt->waitingForStep = true;
+        }
         log_info("Runtime resumed");
     }
 }
@@ -716,16 +808,73 @@ void runtime_step(Runtime* rt, Stage* stage) {
     }
 }
 
+void runtime_advance_step(Runtime* rt, Stage* stage) {
+    if (!rt->stepMode || !rt->waitingForStep) return;
+    if (rt->state != RUNTIME_RUNNING) return;
+    if (!rt->currentBlock) {
+        rt->state = RUNTIME_FINISHED;
+        rt->waitingForStep = false;
+        log_info("Program finished");
+        return;
+    }
+
+    if (rt->waitTicksRemaining > 0) {
+        rt->waitTicksRemaining--;
+        rt->ticksSinceLastWait = 0;
+        return;
+    }
+
+    if (runtime_check_watchdog(rt)) {
+        rt->state = RUNTIME_STOPPED;
+        rt->watchdogTriggered = true;
+        rt->waitingForStep = false;
+        log_error("Watchdog triggered - possible infinite loop detected");
+        return;
+    }
+
+    if (rt->currentBlock->hasBreakpoint) {
+        rt->breakpointHit = true;
+        rt->state = RUNTIME_PAUSED;
+        rt->waitingForStep = false;
+        log_info("Breakpoint hit");
+        return;
+    }
+
+    execute_block(rt, rt->currentBlock, stage);
+    advance_to_next_block(rt);
+    rt->totalTicksExecuted++;
+    rt->ticksSinceLastWait++;
+
+    if (!rt->currentBlock) {
+        rt->state = RUNTIME_FINISHED;
+        rt->waitingForStep = false;
+        log_info("Program finished");
+    }
+}
+
 void runtime_set_step_mode(Runtime* rt, bool enabled) {
     rt->stepMode = enabled;
     if (enabled) {
-        rt->state = RUNTIME_PAUSED;
+        rt->waitingForStep = true;
+        if (rt->state == RUNTIME_RUNNING) {
+            rt->state = RUNTIME_RUNNING;
+        }
+    } else {
+        rt->waitingForStep = false;
     }
     log_info(enabled ? "Step mode ON" : "Step mode OFF");
 }
 
+bool runtime_is_waiting_for_step(Runtime* rt) {
+    return rt->stepMode && rt->waitingForStep && rt->state == RUNTIME_RUNNING;
+}
+
 void runtime_tick(Runtime* rt, Stage* stage) {
     if (rt->state != RUNTIME_RUNNING) return;
+
+    if (rt->stepMode && rt->waitingForStep) {
+        return;
+    }
 
     if (rt->waitTicksRemaining > 0) {
         rt->waitTicksRemaining--;
@@ -753,7 +902,11 @@ void runtime_tick(Runtime* rt, Stage* stage) {
         return;
     }
 
+    bool isLastBlock = (rt->currentBlock->next == nullptr && rt->loopStack.empty());
     execute_block(rt, rt->currentBlock, stage);
+    if (isLastBlock) {
+        rt->waitTicksRemaining = 30;
+    }
     advance_to_next_block(rt);
     rt->totalTicksExecuted++;
     rt->ticksSinceLastWait++;
@@ -797,7 +950,8 @@ void runtime_reset_watchdog(Runtime* rt) {
 
 const char* runtime_get_status(Runtime* rt) {
     if (rt->watchdogTriggered) return "WATCHDOG_TRIGGERED";
-    
+    if (rt->stepMode && rt->waitingForStep) return "STEP_WAITING";
+
     switch (rt->state) {
         case RUNTIME_STOPPED: return "STOPPED";
         case RUNTIME_RUNNING: return "RUNNING";
@@ -809,17 +963,17 @@ const char* runtime_get_status(Runtime* rt) {
 
 bool evaluate_condition(Runtime* rt, Block* b) {
     if (b->args.empty()) return true;
-    
+
     std::string conditionStr = b->args[0];
-    
+
     if (conditionStr == "true" || conditionStr == "1") return true;
     if (conditionStr == "false" || conditionStr == "0") return false;
-    
+
     if (b->args.size() >= 3) {
         float left = 0.0f;
         float right = 0.0f;
         std::string op = b->args[1];
-        
+
         if (b->args[0] == "x" && rt->targetSprite) {
             left = rt->targetSprite->x;
         } else if (b->args[0] == "y" && rt->targetSprite) {
@@ -827,7 +981,7 @@ bool evaluate_condition(Runtime* rt, Block* b) {
         } else {
             left = (float)std::atof(b->args[0].c_str());
         }
-        
+
         if (b->args[2] == "x" && rt->targetSprite) {
             right = rt->targetSprite->x;
         } else if (b->args[2] == "y" && rt->targetSprite) {
@@ -835,7 +989,7 @@ bool evaluate_condition(Runtime* rt, Block* b) {
         } else {
             right = (float)std::atof(b->args[2].c_str());
         }
-        
+
         if (op == ">" || op == "gt") return left > right;
         if (op == "<" || op == "lt") return left < right;
         if (op == ">=" || op == "gte") return left >= right;
@@ -843,12 +997,15 @@ bool evaluate_condition(Runtime* rt, Block* b) {
         if (op == "==" || op == "eq") return std::fabs(left - right) < 0.0001f;
         if (op == "!=" || op == "neq") return std::fabs(left - right) >= 0.0001f;
     }
-    
+
     return true;
 }
 
 void execute_block(Runtime* rt, Block* b, Stage* stage) {
     if (!b || !rt->targetSprite) return;
+
+    b->is_running = true;
+    b->glow_start_time = SDL_GetTicks();
 
     for (size_t i = 0; i < rt->loopStack.size(); i++) {
         rt->loopStack[i].ticksWithoutWait++;
@@ -875,7 +1032,7 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
             float degrees = 15.0f;
             if (!b->args.empty()) degrees = (float)std::atof(b->args[0].c_str());
             rt->targetSprite->angle += degrees;
-            
+
             while (rt->targetSprite->angle >= 360.0f) rt->targetSprite->angle -= 360.0f;
             while (rt->targetSprite->angle < 0.0f) rt->targetSprite->angle += 360.0f;
             break;
@@ -898,7 +1055,7 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
             float seconds = 1.0f;
             if (!b->args.empty()) seconds = (float)std::atof(b->args[0].c_str());
             rt->waitTicksRemaining = (int)(seconds * rt->tickRate);
-            
+
             rt->ticksSinceLastWait = 0;
             for (size_t i = 0; i < rt->loopStack.size(); i++) {
                 rt->loopStack[i].ticksWithoutWait = 0;
@@ -916,12 +1073,12 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
         case CMD_REPEAT: {
             int times = 10;
             if (!b->args.empty()) times = std::atoi(b->args[0].c_str());
-            
+
             if (times <= 0) {
                 log_warning("REPEAT with zero or negative count, skipping");
                 break;
             }
-            
+
             if (times > 100000) {
                 log_warning("REPEAT count too high, capping at 100000");
                 times = 100000;
@@ -937,11 +1094,11 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
 
         case CMD_IF: {
             bool condition = evaluate_condition(rt, b);
-            
+
             std::stringstream condLog;
             condLog << "IF condition evaluated to: " << (condition ? "true" : "false");
             log_debug(condLog.str());
-            
+
             if (condition && b->inner) {
                 LoopContext ctx;
                 ctx.loopBlock = b;
@@ -949,6 +1106,37 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
                 ctx.ticksWithoutWait = 0;
                 rt->loopStack.push_back(ctx);
             }
+            break;
+        }
+        case CMD_SET_X: {
+            float newX = 0.0f;
+            if (!b->args.empty()) newX = (float)std::atof(b->args[0].c_str());
+            rt->targetSprite->x = STAGE_X + STAGE_WIDTH / 2.0f + newX;
+            hasChanged = true;
+            break;
+        }
+
+        case CMD_SET_Y: {
+            float newY = 0.0f;
+            if (!b->args.empty()) newY = (float)std::atof(b->args[0].c_str());
+            rt->targetSprite->y = STAGE_Y + STAGE_HEIGHT / 2.0f - newY;
+            hasChanged = true;
+            break;
+        }
+
+        case CMD_CHANGE_X: {
+            float deltaX = 0.0f;
+            if (!b->args.empty()) deltaX = (float)std::atof(b->args[0].c_str());
+            rt->targetSprite->x += deltaX;
+            hasChanged = true;
+            break;
+        }
+
+        case CMD_CHANGE_Y: {
+            float deltaY = 0.0f;
+            if (!b->args.empty()) deltaY = (float)std::atof(b->args[0].c_str());
+            rt->targetSprite->y -= deltaY;
+            hasChanged = true;
             break;
         }
 
@@ -969,6 +1157,8 @@ void advance_to_next_block(Runtime* rt) {
     if (!rt->currentBlock) return;
 
     Block* current = rt->currentBlock;
+
+    current->is_running = false;
 
     if ((current->type == CMD_REPEAT || current->type == CMD_IF) && current->inner) {
         if (!rt->loopStack.empty() && rt->loopStack.back().loopBlock == current) {
@@ -1042,6 +1232,7 @@ struct Runtime {
     int maxTicksAllowed;
     bool stepMode;
     bool breakpointHit;
+    bool waitingForStep;
     int ticksSinceLastWait;
     int watchdogThreshold;
     bool watchdogTriggered;
@@ -1056,7 +1247,9 @@ void runtime_pause(Runtime* rt);
 void runtime_resume(Runtime* rt);
 void runtime_step(Runtime* rt, Stage* stage);
 void runtime_set_step_mode(Runtime* rt, bool enabled);
+void runtime_advance_step(Runtime* rt, Stage* stage);
 const char* runtime_get_status(Runtime* rt);
+bool runtime_is_waiting_for_step(Runtime* rt);
 bool runtime_check_watchdog(Runtime* rt);
 void runtime_set_max_ticks(Runtime* rt, int maxTicks);
 void runtime_set_watchdog_threshold(Runtime* rt, int threshold);
@@ -1179,14 +1372,122 @@ void clamp_sprite_to_stage(Sprite& sprite, const Stage& stage);
 
 ===== C:\Users\Roham\Scratch\src\backend\sound.cpp =====
 
+#include "sound.h"
+#include "../utils/logger.h"
+#include <unordered_map>
+
+std::unordered_map<std::string, Mix_Chunk*> g_sounds;
+static int g_sound_volume = 128;
+
+bool sound_init() {
+    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
+        log_error("SDL_Mixer init failed: " + std::string(Mix_GetError()));
+        return false;
+    }
+    Mix_AllocateChannels(16);
+    log_info("Sound engine initialized");
+    return true;
+}
+
+void sound_cleanup() {
+    for (auto& pair : g_sounds) {
+        if (pair.second) {
+            Mix_FreeChunk(pair.second);
+        }
+    }
+    g_sounds.clear();
+    Mix_Quit();
+    log_info("Sound engine cleaned up");
+}
+
+bool sound_load(const std::string& name, const std::string& path) {
+    if (g_sounds.find(name) != g_sounds.end()) {
+        Mix_FreeChunk(g_sounds[name]);
+    }
+
+    Mix_Chunk* chunk = Mix_LoadWAV(path.c_str());
+    if (!chunk) {
+        log_error("Failed to load sound: " + name + " - " + Mix_GetError());
+        return false;
+    }
+
+    g_sounds[name] = chunk;
+    log_info("Loaded sound: " + name);
+    return true;
+}
+
+void play_sound(const std::string& name, int volume) {
+    auto it = g_sounds.find(name);
+    if (it == g_sounds.end()) {
+        log_warning("Sound not found: " + name);
+        return;
+    }
+
+    if (it->second) {
+        Mix_VolumeChunk(it->second, volume);
+        int channel = Mix_PlayChannel(-1, it->second, 0);
+        if (channel == -1) {
+            log_error("Failed to play sound: " + name + " - " + Mix_GetError());
+        } else {
+            log_info("Playing sound: " + name);
+        }
+    }
+}
+
+void stop_all_sounds() {
+    Mix_HaltChannel(-1);
+    log_info("All sounds stopped");
+}
+
+void set_sound_volume(int volume) {
+    g_sound_volume = volume;
+    if (g_sound_volume < 0) g_sound_volume = 0;
+    if (g_sound_volume > 100) g_sound_volume = 100;
+}
+
+int get_sound_volume() {
+    return g_sound_volume;
+}
+
 
 ===== C:\Users\Roham\Scratch\src\backend\sound.h =====
 
+#ifndef SOUND_H
+#define SOUND_H
+
+#include <string>
+#include <unordered_map>
+
+#ifdef __linux__
+#include <SDL2/SDL_mixer.h>
+#else
+#include <SDL2/SDL_mixer.h>
+#endif
+
+extern std::unordered_map<std::string, Mix_Chunk*> g_sounds;
+
+bool sound_init();
+void sound_cleanup();
+bool sound_load(const std::string& name, const std::string& path);
+void play_sound(const std::string& name, int volume);
+void stop_all_sounds();
+void set_sound_volume(int volume);
+int get_sound_volume();
+
+#endif
 
 ===== C:\Users\Roham\Scratch\src\common\definitions.h =====
 
 #ifndef DEFINITIONS_H
 #define DEFINITIONS_H
+
+#ifndef __has_builtin
+#define __has_builtin(x) 0
+#endif
+
+#ifndef SDL_DISABLE_ANALYZE_MACROS
+#define SDL_DISABLE_ANALYZE_MACROS 1
+#endif
 
 #include <string>
 #include <vector>
@@ -1230,10 +1531,12 @@ const int ARG_BOX_MARGIN_X = 8;
 const int ARG_BOX_Y_OFFSET = 10;
 const Uint32 CURSOR_BLINK_MS = 500;
 
+const int MENU_BAR_OFFSET = 28;
 
 struct Color {
     Uint8 r, g, b, a;
 };
+
 struct Costume {
     std::string name;
     SDL_Texture* texture;
@@ -1286,6 +1589,7 @@ struct Sprite {
     SDL_Texture* texture;
     std::string name;
     float scale;
+    float volume;
     std::vector<Costume> costumes;
 
     Sprite()
@@ -1295,12 +1599,13 @@ struct Sprite {
         , height(80)
         , angle(0.0f)
         , direction(0.0f)
-        , texture(nullptr)
-        , name("Cat")
-        , scale(1.0f)
         , visible(1)
         , isPenDown(0)
         , currentCostumeIndex(0)
+        , texture(nullptr)
+        , name("Cat")
+        , scale(0.05f)
+        , volume(100)
     {}
 };
 
@@ -1325,6 +1630,10 @@ enum BlockType {
     CMD_CHANGE_SIZE,
     CMD_SHOW,
     CMD_HIDE,
+    CMD_PLAY_SOUND,
+    CMD_STOP_ALL_SOUNDS,
+    CMD_CHANGE_VOLUME,
+    CMD_SET_VOLUME,
     SENSE_TOUCHING_MOUSE,
     SENSE_TOUCHING_EDGE,
     OP_ADD,
@@ -1338,6 +1647,7 @@ struct Block {
     float x, y;
     float width, height;
     bool dragging;
+    bool hasBreakpoint;
     float drag_offset_x;
     float drag_offset_y;
     std::vector<std::string> args;
@@ -1346,7 +1656,6 @@ struct Block {
     Block* parent;
     Block* child;
     bool is_snapped;
-
     Block* next;
     Block* inner;
 
@@ -1359,6 +1668,7 @@ struct Block {
         , x(0), y(0)
         , width(BLOCK_WIDTH), height(BLOCK_HEIGHT)
         , dragging(false)
+        , hasBreakpoint(false)
         , drag_offset_x(0), drag_offset_y(0)
         , color({100, 100, 255, 255})
         , parent(nullptr)
@@ -1394,6 +1704,7 @@ struct PaletteItem {
         , width(w), height(h)
     {}
 };
+
 struct TextInputState {
     bool active;
     int block_id;
@@ -1413,6 +1724,7 @@ struct TextInputState {
         , cursor_visible(true)
     {}
 };
+
 #endif
 
 
@@ -1440,17 +1752,18 @@ const SDL_Color COLOR_MOTION     = {76,  151, 255, 255};
 const SDL_Color COLOR_CONTROL    = {255, 171, 25,  255};
 const SDL_Color COLOR_LOOKS      = {153, 102, 255, 255};
 const SDL_Color COLOR_EVENTS     = {255, 213, 0,   255};
+const SDL_Color COLOR_SOUND      = {207, 99, 207, 255};
 
 const SDL_Color COLOR_TOOLBAR_BG    = {60,  60,  60,  255};
 const SDL_Color COLOR_PALETTE_BG    = {45,  45,  45,  255};
 const SDL_Color COLOR_CODING_BG     = {30,  30,  30,  255};
 const SDL_Color COLOR_STAGE_BG      = {255, 255, 255, 255};
 const SDL_Color COLOR_STAGE_BORDER  = {180, 180, 180, 255};
-int g_execution_index = -1;
-bool g_is_executing = false;
 
 extern int g_execution_index;
 extern bool g_is_executing;
+extern bool g_step_mode;
+extern bool g_waiting_for_step;
 
 #endif
 
@@ -1459,41 +1772,6 @@ extern bool g_is_executing;
 
 #include "block_utils.h"
 #include "../common/globals.h"
-
-// std::string blocktype_to_string(BlockType type) {
-//     switch (type) {
-//         case CMD_MOVE:     return "MOVE";
-//         case CMD_TURN:     return "TURN";
-//         case CMD_GOTO:     return "GOTO";
-//         case CMD_SET_X:    return "SET_X";
-//         case CMD_SET_Y:    return "SET_Y";
-//         case CMD_CHANGE_X: return "CHANGE_X";
-//         case CMD_CHANGE_Y: return "CHANGE_Y";
-//         case CMD_REPEAT:   return "REPEAT";
-//         case CMD_IF:       return "IF";
-//         case CMD_WAIT:     return "WAIT";
-//         case CMD_SAY:      return "SAY";
-//         case CMD_START:    return "START";
-//         case CMD_NONE:     return "NONE";
-//         default:           return "UNKNOWN";
-//     }
-// }
-
-// BlockType string_to_blocktype(const std::string& str) {
-//     if (str == "MOVE")     return CMD_MOVE;
-//     if (str == "TURN")     return CMD_TURN;
-//     if (str == "GOTO")     return CMD_GOTO;
-//     if (str == "SET_X")    return CMD_SET_X;
-//     if (str == "SET_Y")    return CMD_SET_Y;
-//     if (str == "CHANGE_X") return CMD_CHANGE_X;
-//     if (str == "CHANGE_Y") return CMD_CHANGE_Y;
-//     if (str == "REPEAT")   return CMD_REPEAT;
-//     if (str == "IF")       return CMD_IF;
-//     if (str == "WAIT")     return CMD_WAIT;
-//     if (str == "SAY")      return CMD_SAY;
-//     if (str == "START")    return CMD_START;
-//     return CMD_NONE;
-// }
 
 std::string block_get_label(BlockType type) {
     switch (type) {
@@ -1515,7 +1793,12 @@ std::string block_get_label(BlockType type) {
         case CMD_CHANGE_SIZE:    return "Change size by (10)";
         case CMD_SHOW:           return "Show";
         case CMD_HIDE:           return "Hide";
-        case CMD_NONE:     return "---";
+        case CMD_NONE:             return "---";
+        case CMD_PLAY_SOUND:       return "Play sound";
+        case CMD_STOP_ALL_SOUNDS:  return "Stop all sounds";
+        case CMD_CHANGE_VOLUME:    return "Change volume by";
+        case CMD_SET_VOLUME:       return "Set volume to";
+
         default:           return "Unknown";
     }
 }
@@ -1544,8 +1827,33 @@ SDL_Color block_get_color(BlockType type) {
             return COLOR_LOOKS;
         case CMD_START:
             return COLOR_EVENTS;
+        case CMD_PLAY_SOUND:
+        case CMD_STOP_ALL_SOUNDS:
+        case CMD_CHANGE_VOLUME:
+        case CMD_SET_VOLUME:
+            return COLOR_SOUND;
+        
         default:
             return COLOR_GRAY;
+    }
+}
+
+std::vector<std::string> get_default_args(BlockType type) {
+    switch (type) {
+        case CMD_MOVE:     return {"10"};
+        case CMD_TURN:     return {"15"};
+        case CMD_GOTO:     return {"0", "0"};
+        case CMD_SET_X:    return {"0"};
+        case CMD_SET_Y:    return {"0"};
+        case CMD_CHANGE_X: return {"10"};
+        case CMD_CHANGE_Y: return {"10"};
+        case CMD_REPEAT:   return {"10"};
+        case CMD_WAIT:     return {"1"};
+        case CMD_SAY:      return {"Hello!"};
+        case CMD_SWITCH_COSTUME: return {"1"};
+        case CMD_SET_SIZE:       return {"100"};
+        case CMD_CHANGE_SIZE:    return {"10"};
+        default:           return {};
     }
 }
 
@@ -1562,6 +1870,7 @@ std::string blocktype_to_string(BlockType type);
 BlockType string_to_blocktype(const std::string& str);
 std::string block_get_label(BlockType type);
 SDL_Color block_get_color(BlockType type);
+std::vector<std::string> get_default_args(BlockType type);
 
 #endif
 
@@ -1809,6 +2118,49 @@ void draw_cursor(SDL_Renderer* renderer, int x, int y, int height, SDL_Color col
 #endif
 
 
+===== C:\Users\Roham\Scratch\src\frontend\hover.cpp =====
+
+#include "hover.h"
+
+void render_palette_hover(SDL_Renderer* renderer,
+                          const std::vector<PaletteItem>& items,
+                          int mouse_x, int mouse_y)
+{
+    for (const auto& item : items) {
+        bool over = (mouse_x >= item.x &&
+                     mouse_x <= item.x + item.width &&
+                     mouse_y >= item.y &&
+                     mouse_y <= item.y + item.height);
+        if (over) {
+            SDL_SetRenderDrawColor(renderer, 255, 255, 255, 40);
+            SDL_Rect r = {
+                (int)item.x,
+                (int)item.y,
+                (int)item.width,
+                (int)item.height
+            };
+            SDL_RenderFillRect(renderer, &r);
+        }
+    }
+}
+
+
+===== C:\Users\Roham\Scratch\src\frontend\hover.h =====
+
+#ifndef HOVER_H
+#define HOVER_H
+
+#include <SDL2/SDL.h>
+#include <vector>
+#include "../common/definitions.h"
+
+void render_palette_hover(SDL_Renderer* renderer,
+                          const std::vector<PaletteItem>& items,
+                          int mouse_x, int mouse_y);
+
+#endif
+
+
 ===== C:\Users\Roham\Scratch\src\frontend\input.cpp =====
 
 #include "input.h"
@@ -1817,20 +2169,68 @@ void draw_cursor(SDL_Renderer* renderer, int x, int y, int height, SDL_Color col
 #include "../common/globals.h"
 #include <cmath>
 #include <iostream>
+#include <algorithm>
+#include "text_input.h"
+
 
 bool is_point_in_rect(int px, int py, float rx, float ry, float rw, float rh) {
     return (px >= rx && px <= rx + rw && py >= ry && py <= ry + rh);
 }
 
+static void reposition_chain(Block& head) {
+    Block* current = &head;
+    while (current->child) {
+        Block* c = current->child;
+        c->x = current->x;
+        c->y = current->y + current->height;
+        current = c;
+    }
+}
+
+static Block* find_block_by_id(std::vector<Block>& blocks, int id) {
+    for (auto& b : blocks) {
+        if (b.id == id) return &b;
+    }
+    return nullptr;
+}
+
+static void unsnap_from_parent(std::vector<Block>& blocks, Block& block) {
+    if (!block.parent) return;
+
+    Block* p = find_block_by_id(blocks, block.parent->id);
+    if (p) {
+        p->child = nullptr;
+        p->next = nullptr;
+    }
+    block.parent = nullptr;
+    block.is_snapped = false;
+    log_debug("Unsnapped block #" + std::to_string(block.id));
+}
+
+static void bring_to_front(std::vector<Block>& blocks, int index) {
+    Block temp = blocks[index];
+    blocks.erase(blocks.begin() + index);
+    blocks.push_back(temp);
+}
+
+static void collect_chain_ids(std::vector<Block>& blocks, Block& head, std::vector<int>& ids) {
+    ids.push_back(head.id);
+    if (head.child) {
+        Block* c = find_block_by_id(blocks, head.child->id);
+        if (c) collect_chain_ids(blocks, *c, ids);
+    }
+}
+
 void handle_mouse_down(SDL_Event& event, std::vector<Block>& blocks,
                        std::vector<PaletteItem>& palette_items,
-                       int& next_block_id)
-{
+                       int& next_block_id, int palette_scroll_offset) {
     int mx = event.button.x;
     int my = event.button.y;
 
     for (auto& item : palette_items) {
-        if (is_point_in_rect(mx, my, item.x, item.y, item.width, item.height)) {
+        float item_y = item.y - (float)palette_scroll_offset;
+
+        if (is_point_in_rect(mx, my, item.x, item_y, item.width, item.height)) {
             Block new_block;
             new_block.id = next_block_id++;
             new_block.type = item.type;
@@ -1840,73 +2240,119 @@ void handle_mouse_down(SDL_Event& event, std::vector<Block>& blocks,
             new_block.height = item.height;
             new_block.color = item.color;
             new_block.dragging = true;
-            new_block.drag_offset_x = mx - item.x;
-            new_block.drag_offset_y = my - item.y;
-            new_block.parent = nullptr;
-            new_block.child = nullptr;
-            new_block.is_snapped = false;
+            new_block.drag_offset_x = item.width / 2.0f;
+            new_block.drag_offset_y = item.height / 2.0f;
 
-            if (item.type == CMD_MOVE)     new_block.args.push_back("10");
-            if (item.type == CMD_TURN)     new_block.args.push_back("15");
-            if (item.type == CMD_WAIT)     new_block.args.push_back("1");
-            if (item.type == CMD_SAY)      new_block.args.push_back("Hello!");
-            if (item.type == CMD_REPEAT)   new_block.args.push_back("10");
-            if (item.type == CMD_GOTO)     { new_block.args.push_back("0"); new_block.args.push_back("0"); }
-            if (item.type == CMD_SET_X)    new_block.args.push_back("0");
-            if (item.type == CMD_SET_Y)    new_block.args.push_back("0");
-            if (item.type == CMD_CHANGE_X) new_block.args.push_back("10");
-            if (item.type == CMD_CHANGE_Y) new_block.args.push_back("10");
+            if (new_block.type == CMD_MOVE || new_block.type == CMD_TURN ||
+                new_block.type == CMD_GOTO || new_block.type == CMD_SET_X ||
+                new_block.type == CMD_SET_Y || new_block.type == CMD_CHANGE_X ||
+                new_block.type == CMD_CHANGE_Y) {
+                new_block.args.push_back("10");
+            } else if (new_block.type == CMD_REPEAT) {
+                new_block.args.push_back("10");
+            } else if (new_block.type == CMD_WAIT) {
+                new_block.args.push_back("1");
+            } else if (new_block.type == CMD_SAY) {
+                new_block.args.push_back("Hello!");
+            } else if (new_block.type == CMD_SET_SIZE || new_block.type == CMD_CHANGE_SIZE) {
+                new_block.args.push_back("10");
+            } else if (new_block.type == CMD_CHANGE_VOLUME || new_block.type == CMD_SET_VOLUME) {
+                new_block.args.push_back("10");
+            } else if (new_block.type == CMD_GOTO) {
+                new_block.args.push_back("0");
+                new_block.args.push_back("0");
+            } else if (new_block.type == OP_ADD || new_block.type == OP_SUB || new_block.type == OP_DIV) {
+                new_block.args.push_back("0");
+                new_block.args.push_back("0");
+            }
 
             blocks.push_back(new_block);
-
-            log_info("Created block #" + std::to_string(new_block.id) +
-                     " [" + blocktype_to_string(new_block.type) + "]");
+            log_info("Created block #" + std::to_string(new_block.id) + " from palette");
             return;
         }
     }
 
     for (int i = (int)blocks.size() - 1; i >= 0; i--) {
-        if (is_point_in_rect(mx, my, blocks[i].x, blocks[i].y, blocks[i].width, blocks[i].height)) {
-            if (blocks[i].is_snapped) {
-                unsnap_block(blocks[i]);
+        if (is_point_in_rect(mx, my, blocks[i].x, blocks[i].y,
+                             blocks[i].width, blocks[i].height)) {
+
+            int target_id = blocks[i].id;
+
+            unsnap_from_parent(blocks, blocks[i]);
+
+            Block* blk = find_block_by_id(blocks, target_id);
+            if (!blk) return;
+
+            blk->dragging = true;
+            blk->drag_offset_x = mx - blk->x;
+            blk->drag_offset_y = my - blk->y;
+
+            std::vector<int> chain_ids;
+            collect_chain_ids(blocks, *blk, chain_ids);
+
+            std::vector<Block> chain_blocks;
+            for (int cid : chain_ids) {
+                for (auto it = blocks.begin(); it != blocks.end(); ++it) {
+                    if (it->id == cid) {
+                        chain_blocks.push_back(*it);
+                        blocks.erase(it);
+                        break;
+                    }
+                }
             }
 
-            blocks[i].dragging = true;
-            blocks[i].drag_offset_x = mx - blocks[i].x;
-            blocks[i].drag_offset_y = my - blocks[i].y;
+            for (auto& cb : chain_blocks) {
+                blocks.push_back(cb);
+            }
 
-            Block temp = blocks[i];
-            blocks.erase(blocks.begin() + i);
-            blocks.push_back(temp);
+            Block* head = find_block_by_id(blocks, target_id);
+            if (head) {
+                head->dragging = true;
+                head->drag_offset_x = mx - head->x;
+                head->drag_offset_y = my - head->y;
+            }
 
-            log_debug("Started dragging block #" + std::to_string(temp.id));
+            log_debug("Started dragging block #" + std::to_string(target_id));
             return;
         }
     }
 }
 
 void handle_mouse_up(SDL_Event& event, std::vector<Block>& blocks) {
+    int dragged_id = -1;
+
     for (auto& block : blocks) {
         if (block.dragging) {
+            dragged_id = block.id;
             block.dragging = false;
-
-            if (block.x < PALETTE_WIDTH) {
-                log_info("Block #" + std::to_string(block.id) + " returned to palette â€” deleting");
-                for (auto it = blocks.begin(); it != blocks.end(); ++it) {
-                    if (it->id == block.id) {
-                        blocks.erase(it);
-                        break;
-                    }
-                }
-                return;
-            }
-
-            try_snap_blocks(blocks, block);
-
-            log_debug("Dropped block #" + std::to_string(block.id) +
-                      " at (" + std::to_string((int)block.x) + ", " + std::to_string((int)block.y) + ")");
+            break;
         }
     }
+
+    if (dragged_id < 0) return;
+
+    Block* dropped = find_block_by_id(blocks, dragged_id);
+    if (!dropped) return;
+
+    if (dropped->x < PALETTE_WIDTH) {
+        log_info("Block #" + std::to_string(dropped->id) + " returned to palette - deleting");
+
+        std::vector<int> to_remove;
+        collect_chain_ids(blocks, *dropped, to_remove);
+
+        blocks.erase(
+            std::remove_if(blocks.begin(), blocks.end(),
+                [&to_remove](const Block& b) {
+                    return std::find(to_remove.begin(), to_remove.end(), b.id) != to_remove.end();
+                }),
+            blocks.end());
+        return;
+    }
+
+    try_snap_blocks(blocks, *dropped);
+
+    log_debug("Dropped block #" + std::to_string(dropped->id) +
+              " at (" + std::to_string((int)dropped->x) + ", " + std::to_string((int)dropped->y) + ")");
 }
 
 void handle_mouse_motion(SDL_Event& event, std::vector<Block>& blocks) {
@@ -1914,52 +2360,106 @@ void handle_mouse_motion(SDL_Event& event, std::vector<Block>& blocks) {
     int my = event.motion.y;
 
     for (auto& block : blocks) {
-        if (block.dragging) {
-            block.x = mx - block.drag_offset_x;
-            block.y = my - block.drag_offset_y;
+        if (!block.dragging) continue;
 
-            Block* child = block.child;
-            float offset_y = block.height;
-            while (child) {
-                child->x = block.x;
-                child->y = block.y + offset_y;
-                offset_y += child->height;
-                child = child->child;
-            }
-            break;
+        float prev_x = block.x;
+        float prev_y = block.y;
+
+        block.x = mx - block.drag_offset_x;
+        block.y = my - block.drag_offset_y;
+
+        float dx = block.x - prev_x;
+        float dy = block.y - prev_y;
+
+        Block* child = block.child;
+        while (child) {
+            child->x += dx;
+            child->y += dy;
+            child = child->child;
         }
+        break;
     }
 }
 
 void try_snap_blocks(std::vector<Block>& blocks, Block& dropped_block) {
+    int dropped_id = dropped_block.id;
+    float best_dist = (float)SNAP_DISTANCE;
+    int best_target_id = -1;
+
     for (auto& target : blocks) {
-        if (target.id == dropped_block.id) continue;
+        if (target.id == dropped_id) continue;
         if (target.child != nullptr) continue;
 
-        float dx = std::abs(dropped_block.x - target.x);
-        float dy = std::abs(dropped_block.y - (target.y + target.height));
+        float snap_x = target.x;
+        float snap_y = target.y + target.height;
 
-        if (dx < SNAP_DISTANCE && dy < SNAP_DISTANCE) {
-            dropped_block.x = target.x;
-            dropped_block.y = target.y + target.height;
-            dropped_block.is_snapped = true;
-            dropped_block.parent = &target;
-            target.child = &dropped_block;
+        float dx = std::abs(dropped_block.x - snap_x);
+        float dy = std::abs(dropped_block.y - snap_y);
+        float dist = std::sqrt(dx * dx + dy * dy);
 
-            log_info("Snapped block #" + std::to_string(dropped_block.id) +
-                     " to block #" + std::to_string(target.id));
-            return;
+        if (dist < best_dist) {
+            best_dist = dist;
+            best_target_id = target.id;
         }
     }
+
+    if (best_target_id < 0) return;
+
+    Block* target = find_block_by_id(blocks, best_target_id);
+    Block* dropped = find_block_by_id(blocks, dropped_id);
+    if (!target || !dropped) return;
+
+    float offset_x = target->x - dropped->x;
+    float offset_y = (target->y + target->height) - dropped->y;
+
+    dropped->x += offset_x;
+    dropped->y += offset_y;
+    dropped->is_snapped = true;
+    dropped->parent = target;
+    target->child = dropped;
+    target->next = dropped;
+    dropped->next = nullptr;
+
+    Block* ch = dropped->child;
+    while (ch) {
+        ch->x += offset_x;
+        ch->y += offset_y;
+        ch = ch->child;
+    }
+
+    log_info("Snapped block #" + std::to_string(dropped->id) +
+             " to block #" + std::to_string(target->id));
 }
 
 void unsnap_block(Block& block) {
     if (block.parent) {
         block.parent->child = nullptr;
+        block.parent->next = nullptr;
         block.parent = nullptr;
     }
     block.is_snapped = false;
     log_debug("Unsnapped block #" + std::to_string(block.id));
+}
+bool try_click_arg(const Block& block, int mx, int my, TextInputState& state) {
+    int arg_x = (int)block.x + 80;  
+    int arg_y = (int)block.y + 8;   
+    int arg_w = 40;
+    int arg_h = 20;
+    
+    for (size_t i = 0; i < block.args.size(); i++) {
+        int box_x = arg_x + (int)i * 50;
+        
+        if (mx >= box_x && mx <= box_x + arg_w &&
+            my >= arg_y && my <= arg_y + arg_h) {
+            state.active = true;
+            state.block_id = block.id;
+            state.arg_index = (int)i;
+            state.buffer = block.args[i];
+            state.cursor_pos = (int)state.buffer.length();
+            return true;
+        }
+    }
+    return false;
 }
 
 
@@ -1971,19 +2471,398 @@ void unsnap_block(Block& block) {
 #include <SDL2/SDL.h>
 #include <vector>
 #include "../common/definitions.h"
+#include "text_input.h" 
+bool is_point_in_rect(int px, int py, float rx, float ry, float rw, float rh);
 
 void handle_mouse_down(SDL_Event& event, std::vector<Block>& blocks,
                        std::vector<PaletteItem>& palette_items,
-                       int& next_block_id);
+                       int& next_block_id, int palette_scroll_offset);
 
 void handle_mouse_up(SDL_Event& event, std::vector<Block>& blocks);
-
 void handle_mouse_motion(SDL_Event& event, std::vector<Block>& blocks);
-
-bool is_point_in_rect(int px, int py, float rx, float ry, float rw, float rh);
-
 void try_snap_blocks(std::vector<Block>& blocks, Block& dropped_block);
 void unsnap_block(Block& block);
+bool try_click_arg(const Block& block, int mx, int my, TextInputState& state);
+
+#endif
+
+
+===== C:\Users\Roham\Scratch\src\frontend\menu.cpp =====
+
+#include "menu.h"
+#include "../common/definitions.h"
+#include <cstring>
+
+static Menu g_menus[2];  
+static int  g_menu_count = 2;
+
+
+static const unsigned char FONT_5x7[][7] = {
+    // A
+    {0x0E,0x11,0x11,0x1F,0x11,0x11,0x11},
+    // B
+    {0x1E,0x11,0x11,0x1E,0x11,0x11,0x1E},
+    // C
+    {0x0E,0x11,0x10,0x10,0x10,0x11,0x0E},
+    // D
+    {0x1E,0x11,0x11,0x11,0x11,0x11,0x1E},
+    // E
+    {0x1F,0x10,0x10,0x1E,0x10,0x10,0x1F},
+    // F
+    {0x1F,0x10,0x10,0x1E,0x10,0x10,0x10},
+    // G
+    {0x0E,0x11,0x10,0x17,0x11,0x11,0x0E},
+    // H
+    {0x11,0x11,0x11,0x1F,0x11,0x11,0x11},
+    // I
+    {0x0E,0x04,0x04,0x04,0x04,0x04,0x0E},
+    // J
+    {0x07,0x02,0x02,0x02,0x02,0x12,0x0C},
+    // K
+    {0x11,0x12,0x14,0x18,0x14,0x12,0x11},
+    // L
+    {0x10,0x10,0x10,0x10,0x10,0x10,0x1F},
+    // M
+    {0x11,0x1B,0x15,0x15,0x11,0x11,0x11},
+    // N
+    {0x11,0x19,0x15,0x13,0x11,0x11,0x11},
+    // O
+    {0x0E,0x11,0x11,0x11,0x11,0x11,0x0E},
+    // P
+    {0x1E,0x11,0x11,0x1E,0x10,0x10,0x10},
+    // Q
+    {0x0E,0x11,0x11,0x11,0x15,0x12,0x0D},
+    // R
+    {0x1E,0x11,0x11,0x1E,0x14,0x12,0x11},
+    // S
+    {0x0E,0x11,0x10,0x0E,0x01,0x11,0x0E},
+    // T
+    {0x1F,0x04,0x04,0x04,0x04,0x04,0x04},
+    // U
+    {0x11,0x11,0x11,0x11,0x11,0x11,0x0E},
+    // V
+    {0x11,0x11,0x11,0x11,0x0A,0x0A,0x04},
+    // W
+    {0x11,0x11,0x11,0x15,0x15,0x1B,0x11},
+    // X
+    {0x11,0x11,0x0A,0x04,0x0A,0x11,0x11},
+    // Y
+    {0x11,0x11,0x0A,0x04,0x04,0x04,0x04},
+    // Z
+    {0x1F,0x01,0x02,0x04,0x08,0x10,0x1F},
+};
+
+static const unsigned char FONT_LOWER_5x7[][7] = {
+    // a
+    {0x00,0x00,0x0E,0x01,0x0F,0x11,0x0F},
+    // b
+    {0x10,0x10,0x1E,0x11,0x11,0x11,0x1E},
+    // c
+    {0x00,0x00,0x0E,0x11,0x10,0x11,0x0E},
+    // d
+    {0x01,0x01,0x0F,0x11,0x11,0x11,0x0F},
+    // e
+    {0x00,0x00,0x0E,0x11,0x1F,0x10,0x0E},
+    // f
+    {0x06,0x09,0x08,0x1C,0x08,0x08,0x08},
+    // g
+    {0x00,0x00,0x0F,0x11,0x0F,0x01,0x0E},
+    // h
+    {0x10,0x10,0x16,0x19,0x11,0x11,0x11},
+    // i
+    {0x04,0x00,0x0C,0x04,0x04,0x04,0x0E},
+    // j
+    {0x02,0x00,0x06,0x02,0x02,0x12,0x0C},
+    // k
+    {0x10,0x10,0x12,0x14,0x18,0x14,0x12},
+    // l
+    {0x0C,0x04,0x04,0x04,0x04,0x04,0x0E},
+    // m
+    {0x00,0x00,0x1A,0x15,0x15,0x11,0x11},
+    // n
+    {0x00,0x00,0x16,0x19,0x11,0x11,0x11},
+    // o
+    {0x00,0x00,0x0E,0x11,0x11,0x11,0x0E},
+    // p
+    {0x00,0x00,0x1E,0x11,0x1E,0x10,0x10},
+    // q
+    {0x00,0x00,0x0F,0x11,0x0F,0x01,0x01},
+    // r
+    {0x00,0x00,0x16,0x19,0x10,0x10,0x10},
+    // s
+    {0x00,0x00,0x0E,0x10,0x0E,0x01,0x1E},
+    // t
+    {0x08,0x08,0x1C,0x08,0x08,0x09,0x06},
+    // u
+    {0x00,0x00,0x11,0x11,0x11,0x13,0x0D},
+    // v
+    {0x00,0x00,0x11,0x11,0x11,0x0A,0x04},
+    // w
+    {0x00,0x00,0x11,0x11,0x15,0x15,0x0A},
+    // x
+    {0x00,0x00,0x11,0x0A,0x04,0x0A,0x11},
+    // y
+    {0x00,0x00,0x11,0x11,0x0F,0x01,0x0E},
+    // z
+    {0x00,0x00,0x1F,0x02,0x04,0x08,0x1F},
+};
+
+static void draw_char(SDL_Renderer* r, char ch, int cx, int cy, int scale,
+                       Uint8 cr, Uint8 cg, Uint8 cb)
+{
+    const unsigned char* glyph = nullptr;
+
+    if (ch >= 'A' && ch <= 'Z') {
+        glyph = FONT_5x7[ch - 'A'];
+    } else if (ch >= 'a' && ch <= 'z') {
+        glyph = FONT_LOWER_5x7[ch - 'a'];
+    } else if (ch == ' ') {
+        return;
+    } else {
+        return;
+    }
+
+    SDL_SetRenderDrawColor(r, cr, cg, cb, 255);
+
+    for (int row = 0; row < 7; row++) {
+        for (int col = 0; col < 5; col++) {
+            if (glyph[row] & (0x10 >> col)) {
+                SDL_Rect px = { cx + col * scale, cy + row * scale, scale, scale };
+                SDL_RenderFillRect(r, &px);
+            }
+        }
+    }
+}
+
+static void draw_text(SDL_Renderer* r, const std::string& text, int x, int y, int scale,
+                       Uint8 cr, Uint8 cg, Uint8 cb)
+{
+    int cursor_x = x;
+    for (size_t i = 0; i < text.size(); i++) {
+        draw_char(r, text[i], cursor_x, y, scale, cr, cg, cb);
+        cursor_x += 6 * scale;
+    }
+}
+void menu_init()
+{
+
+    g_menus[0].title  = "File";
+    g_menus[0].x      = 4;
+    g_menus[0].y      = 0;
+    g_menus[0].width  = 40;
+    g_menus[0].height = MENU_BAR_OFFSET;
+    g_menus[0].is_open = false;
+    g_menus[0].title_highlighted = false;
+    g_menus[0].item_width  = 120;
+    g_menus[0].item_height = 24;
+    g_menus[0].items.clear();
+    g_menus[0].items.push_back(MenuItem("New"));
+    g_menus[0].items.push_back(MenuItem("Save"));
+    g_menus[0].items.push_back(MenuItem("Load"));
+    g_menus[0].items.push_back(MenuItem("Exit"));
+
+    g_menus[1].title  = "Help";
+    g_menus[1].x      = 52;
+    g_menus[1].y      = 0;
+    g_menus[1].width  = 40;
+    g_menus[1].height = MENU_BAR_OFFSET;
+    g_menus[1].is_open = false;
+    g_menus[1].title_highlighted = false;
+    g_menus[1].item_width  = 140;
+    g_menus[1].item_height = 24;
+    g_menus[1].items.clear();
+    g_menus[1].items.push_back(MenuItem("System Logger"));
+    g_menus[1].items.push_back(MenuItem("Debug Info"));
+    g_menus[1].items.push_back(MenuItem("About"));
+}
+
+bool menu_is_any_open()
+{
+    for (int i = 0; i < g_menu_count; i++) {
+        if (g_menus[i].is_open) return true;
+    }
+    return false;
+}
+
+void menu_handle_mouse_move(int mx, int my)
+{
+    for (int i = 0; i < g_menu_count; i++) {
+        Menu& m = g_menus[i];
+        bool over_title = (mx >= m.x && mx <= m.x + m.width &&
+                           my >= m.y && my <= m.y + m.height);
+        m.title_highlighted = over_title;
+
+        if (over_title && menu_is_any_open()) {
+            for (int j = 0; j < g_menu_count; j++) {
+                g_menus[j].is_open = (j == i);
+            }
+        }
+
+        if (m.is_open) {
+            int dropdown_x = m.x;
+            int dropdown_y = m.y + m.height;
+
+            for (int k = 0; k < (int)m.items.size(); k++) {
+                int item_y = dropdown_y + k * m.item_height;
+                bool over_item = (mx >= dropdown_x &&
+                                  mx <= dropdown_x + m.item_width &&
+                                  my >= item_y &&
+                                  my <= item_y + m.item_height);
+                m.items[k].highlighted = over_item;
+            }
+        } else {
+            for (auto& item : m.items) {
+                item.highlighted = false;
+            }
+        }
+    }
+}
+
+void menu_handle_mouse_down(int mx, int my)
+{
+    for (int i = 0; i < g_menu_count; i++) {
+        Menu& m = g_menus[i];
+        bool over_title = (mx >= m.x && mx <= m.x + m.width &&
+                           my >= m.y && my <= m.y + m.height);
+        if (over_title) {
+            bool was_open = m.is_open;
+
+            for (int j = 0; j < g_menu_count; j++) {
+                g_menus[j].is_open = false;
+            }
+
+            if (!was_open) {
+                m.is_open = true;
+            }
+            return;
+        }
+    }
+
+    for (int i = 0; i < g_menu_count; i++) {
+        Menu& m = g_menus[i];
+        if (!m.is_open) continue;
+
+        int dropdown_x = m.x;
+        int dropdown_y = m.y + m.height;
+
+        for (int k = 0; k < (int)m.items.size(); k++) {
+            int item_y = dropdown_y + k * m.item_height;
+            bool over_item = (mx >= dropdown_x &&
+                              mx <= dropdown_x + m.item_width &&
+                              my >= item_y &&
+                              my <= item_y + m.item_height);
+            if (over_item) {
+                m.is_open = false;
+                return;
+            }
+        }
+    }
+
+    for (int j = 0; j < g_menu_count; j++) {
+        g_menus[j].is_open = false;
+    }
+}
+
+void menu_handle_mouse_up(int mx, int my)
+{
+    (void)mx;
+    (void)my;
+}
+
+
+void menu_render(SDL_Renderer* renderer)
+{
+    SDL_SetRenderDrawColor(renderer, 45, 45, 48, 255);
+    SDL_Rect bar = { 0, 0, WINDOW_WIDTH, MENU_BAR_OFFSET };
+    SDL_RenderFillRect(renderer, &bar);
+
+    SDL_SetRenderDrawColor(renderer, 70, 70, 75, 255);
+    SDL_RenderDrawLine(renderer, 0, MENU_BAR_OFFSET - 1, WINDOW_WIDTH, MENU_BAR_OFFSET - 1);
+
+    for (int i = 0; i < g_menu_count; i++) {
+        Menu& m = g_menus[i];
+
+        if (m.title_highlighted || m.is_open) {
+            SDL_SetRenderDrawColor(renderer, 70, 70, 78, 255);
+            SDL_Rect hl = { m.x, m.y, m.width, m.height };
+            SDL_RenderFillRect(renderer, &hl);
+        }
+
+        int text_y = (MENU_BAR_OFFSET - 7 * 2) / 2;
+        draw_text(renderer, m.title, m.x + 6, text_y, 2, 210, 210, 215);
+
+        if (m.is_open) {
+            int dropdown_x = m.x;
+            int dropdown_y = m.y + m.height;
+            int dropdown_h = (int)m.items.size() * m.item_height;
+
+            SDL_SetRenderDrawColor(renderer, 50, 50, 55, 255);
+            SDL_Rect dd = { dropdown_x, dropdown_y, m.item_width, dropdown_h };
+            SDL_RenderFillRect(renderer, &dd);
+
+            SDL_SetRenderDrawColor(renderer, 80, 80, 88, 255);
+            SDL_RenderDrawRect(renderer, &dd);
+
+            for (int k = 0; k < (int)m.items.size(); k++) {
+                int item_y = dropdown_y + k * m.item_height;
+
+                if (m.items[k].highlighted) {
+                    SDL_SetRenderDrawColor(renderer, 75, 110, 175, 255);
+                    SDL_Rect ih = { dropdown_x + 1, item_y, m.item_width - 2, m.item_height };
+                    SDL_RenderFillRect(renderer, &ih);
+                }
+
+                draw_text(renderer, m.items[k].label,
+                          dropdown_x + 10, item_y + 5, 2,
+                          200, 200, 205);
+            }
+        }
+    }
+}
+
+
+===== C:\Users\Roham\Scratch\src\frontend\menu.h =====
+
+#ifndef MENU_H
+#define MENU_H
+
+#include <SDL2/SDL.h>
+#include <string>
+#include <vector>
+
+struct MenuItem {
+    std::string label;
+    bool        highlighted;
+
+    MenuItem() : label(""), highlighted(false) {}
+    MenuItem(const std::string& l) : label(l), highlighted(false) {}
+};
+
+struct Menu {
+    std::string       title;
+    int               x, y, width, height;    
+    bool              is_open;
+    bool              title_highlighted;
+    std::vector<MenuItem> items;
+    int               item_width;
+    int               item_height;
+
+    Menu()
+        : title("")
+        , x(0), y(0), width(0), height(0)
+        , is_open(false)
+        , title_highlighted(false)
+        , item_width(120)
+        , item_height(24)
+    {}
+};
+
+void menu_init();
+void menu_handle_mouse_move(int mx, int my);
+void menu_handle_mouse_down(int mx, int my);
+void menu_handle_mouse_up(int mx, int my);
+void menu_render(SDL_Renderer* renderer);
+bool menu_is_any_open();
 
 #endif
 
@@ -2010,24 +2889,28 @@ void init_palette(std::vector<PaletteItem>& items) {
     };
 
     PaletteDef defs[] = {
-        {CMD_START,          "When START clicked"},
-        {CMD_MOVE,           "Move (10) steps"},
-        {CMD_TURN,           "Turn (15) degrees"},
-        {CMD_GOTO,           "Go to x:(0) y:(0)"},
-        {CMD_SET_X,          "Set x to (0)"},
-        {CMD_SET_Y,          "Set y to (0)"},
-        {CMD_CHANGE_X,       "Change x by (10)"},
-        {CMD_CHANGE_Y,       "Change y by (10)"},
-        {CMD_REPEAT,         "Repeat (10)"},
-        {CMD_IF,             "If <> then"},
-        {CMD_WAIT,           "Wait (1) secs"},
-        {CMD_SAY,            "Say [Hello!]"},
-        {CMD_SWITCH_COSTUME, "Switch costume to (1)"},
-        {CMD_NEXT_COSTUME,   "Next costume"},
-        {CMD_SET_SIZE,       "Set size to (100)%"},
-        {CMD_CHANGE_SIZE,    "Change size by (10)"},
-        {CMD_SHOW,           "Show"},
-        {CMD_HIDE,           "Hide"},
+        {CMD_START,         "When START clicked"},
+        {CMD_MOVE,          "Move (10) steps"},
+        {CMD_TURN,          "Turn (15) degrees"},
+        {CMD_GOTO,          "Go to x:(0) y:(0)"},
+        {CMD_SET_X,         "Set x to (0)"},
+        {CMD_SET_Y,         "Set y to (0)"},
+        {CMD_CHANGE_X,      "Change x by (10)"},
+        {CMD_CHANGE_Y,      "Change y by (10)"},
+        {CMD_REPEAT,        "Repeat (10)"},
+        {CMD_IF,            "If <> then"},
+        {CMD_WAIT,          "Wait (1) secs"},
+        {CMD_SAY,           "Say [Hello!]"},
+        {CMD_SWITCH_COSTUME,"Switch costume to (1)"},
+        {CMD_NEXT_COSTUME,  "Next costume"},
+        {CMD_SET_SIZE,      "Set size to (100)%"},
+        {CMD_CHANGE_SIZE,   "Change size by (10)"},
+        {CMD_SHOW,          "Show"},
+        {CMD_HIDE,          "Hide"},
+        {CMD_PLAY_SOUND,    "Play sound"},
+        {CMD_STOP_ALL_SOUNDS,"Stop all sounds"},
+        {CMD_CHANGE_VOLUME, "Change volume by (10)"},
+        {CMD_SET_VOLUME,    "Set volume to (100)"}
     };
 
     int count = sizeof(defs) / sizeof(defs[0]);
@@ -2039,18 +2922,35 @@ void init_palette(std::vector<PaletteItem>& items) {
     }
 }
 
-void draw_palette(SDL_Renderer* renderer, const std::vector<PaletteItem>& items) {
+int get_palette_total_height(const std::vector<PaletteItem>& items) {
+    if (items.empty()) return 0;
+    float min_y = items[0].y;
+    float max_y = items.back().y + items.back().height;
+    return (int)(max_y - min_y + 40);
+}
+
+void draw_palette(SDL_Renderer* renderer, const std::vector<PaletteItem>& items, int scroll_offset) {
     draw_filled_rect(renderer, PALETTE_X, PALETTE_Y, PALETTE_WIDTH, PALETTE_HEIGHT, COLOR_PALETTE_BG);
 
+    SDL_Rect clip_rect = {PALETTE_X, PALETTE_Y, PALETTE_WIDTH, PALETTE_HEIGHT};
+    SDL_RenderSetClipRect(renderer, &clip_rect);
+
     for (const auto& item : items) {
+        float draw_y = item.y - (float)scroll_offset;
+        
+        if (draw_y + item.height < (float)PALETTE_Y) continue;
+        if (draw_y > (float)(PALETTE_Y + PALETTE_HEIGHT)) continue;
+
         Block temp;
         temp.x = item.x;
-        temp.y = item.y;
+        temp.y = draw_y;
         temp.width = item.width;
         temp.height = item.height;
         temp.color = item.color;
         draw_block(renderer, temp, item.label);
     }
+
+    SDL_RenderSetClipRect(renderer, nullptr);
 }
 
 
@@ -2064,7 +2964,8 @@ void draw_palette(SDL_Renderer* renderer, const std::vector<PaletteItem>& items)
 #include <vector>
 
 void init_palette(std::vector<PaletteItem>& items);
-void draw_palette(SDL_Renderer* renderer, const std::vector<PaletteItem>& items);
+void draw_palette(SDL_Renderer* renderer, const std::vector<PaletteItem>& items, int scroll_offset);
+int get_palette_total_height(const std::vector<PaletteItem>& items);
 
 #endif
 
@@ -2299,12 +3200,6 @@ void tick_cursor(TextInputState& state) {
 #include <vector>
 #include <string>
 #include "../common/definitions.h"
-
-int get_arg_count(BlockType type);
-
-SDL_Rect get_arg_box_rect(const Block& block, int arg_index);
-
-int try_click_arg(const Block& block, int mx, int my);
 
 void begin_editing(TextInputState& state, Block& block, int arg_index);
 
@@ -19115,12 +20010,6 @@ extern "C" {
 #include <fstream>
 #include <ctime>
 #include <sstream>
-<<<<<<< HEAD
-#include "file_io.h"
-#include "../frontend/block_utils.h"
-=======
-
->>>>>>> e1b803f1475ad4fab4b9179b581883d88bab4ffd
 static std::ofstream logFile;
 static bool consoleEnabled = true;
 static bool fileEnabled = true;
@@ -19195,7 +20084,6 @@ void log_separator() {
     std::string sep(60, '=');
     log_message(LOG_INFO, sep);
 }
-
 void log_block_info(const Block* block, const std::string& prefix) {
     if (!block) {
         log_warning(prefix + "Block is NULL");
@@ -19218,7 +20106,6 @@ void log_block_info(const Block* block, const std::string& prefix) {
         ss << "]";
         log_debug(ss.str());
     }
-<<<<<<< HEAD
 
     if (block->parent) {
         log_debug(prefix + "  Parent: #" + std::to_string(block->parent->id));
@@ -19226,8 +20113,6 @@ void log_block_info(const Block* block, const std::string& prefix) {
     if (block->child) {
         log_debug(prefix + "  Child: #" + std::to_string(block->child->id));
     }
-=======
->>>>>>> e1b803f1475ad4fab4b9179b581883d88bab4ffd
 }
 
 
@@ -19240,6 +20125,14 @@ void log_block_info(const Block* block, const std::string& prefix) {
 #include "../common/definitions.h"
 
 struct Block;
+
+enum LogLevel {
+    LOG_DEBUG,
+    LOG_INFO,
+    LOG_WARNING,
+    LOG_ERROR,
+    LOG_SUCCESS
+};
 
 void init_logger(const std::string& filename = "debug.log");
 void close_logger();
@@ -19429,6 +20322,8 @@ int  syslog_get_count();
 #include "frontend/input.h"
 #include "frontend/palette.h"
 #include "frontend/block_utils.h"
+#include "frontend/menu.h"
+#include "frontend/hover.h"
 #include "utils/logger.h"
 #include "frontend/text_input.h"
 #include "utils/system_logger.h"
@@ -19440,6 +20335,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     syslog_init();
+    menu_init();
 
     if (IMG_Init(IMG_INIT_PNG) == 0) {
         std::cerr << "IMG_Init Error: " << IMG_GetError() << std::endl;
@@ -19469,6 +20365,8 @@ int main(int argc, char* argv[]) {
         SDL_Quit();
         return 1;
     }
+
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 
     init_logger("debug.log");
     log_info("Application started");
@@ -19509,6 +20407,10 @@ int main(int argc, char* argv[]) {
 
     TextInputState text_state;
 
+    int mouse_x = 0, mouse_y = 0;
+    bool hover_run = false;
+    bool hover_stop = false;
+
     bool running = true;
     SDL_Event event;
 
@@ -19525,10 +20427,30 @@ int main(int argc, char* argv[]) {
                         int mx = event.button.x;
                         int my = event.button.y;
 
+                        if (my < MENU_BAR_OFFSET) {
+                            menu_handle_mouse_down(mx, my);
+                            break;
+                        }
+
+                        if (menu_is_any_open()) {
+                            menu_handle_mouse_down(mx, my);
+                            break;
+                        }
+
                         if (mx >= TOOLBAR_WIDTH - 90 && mx <= TOOLBAR_WIDTH - 90 + 30 &&
                             my >= 5 && my <= 5 + 30) {
                             g_execution_index = 0;
                             g_is_executing = true;
+                            break;
+                        }
+
+                        if (mx >= TOOLBAR_WIDTH - 50 && mx <= TOOLBAR_WIDTH - 50 + 30 &&
+                            my >= 5 && my <= 5 + 30) {
+                            g_is_executing = false;
+                            g_execution_index = -1;
+                            for (auto& b : blocks) {
+                                b.is_running = false;
+                            }
                             break;
                         }
 
@@ -19556,12 +20478,28 @@ int main(int argc, char* argv[]) {
 
                 case SDL_MOUSEBUTTONUP:
                     if (event.button.button == SDL_BUTTON_LEFT) {
+                        menu_handle_mouse_up(event.button.x, event.button.y);
                         handle_mouse_up(event, blocks);
                     }
                     break;
 
                 case SDL_MOUSEMOTION:
+                {
+                    int mx = event.motion.x;
+                    int my = event.motion.y;
+                    mouse_x = mx;
+                    mouse_y = my;
+
+                    menu_handle_mouse_move(mx, my);
+
+                    hover_run = (mx >= TOOLBAR_WIDTH - 90 && mx <= TOOLBAR_WIDTH - 90 + 30 &&
+                                 my >= 5 && my <= 5 + 30);
+
+                    hover_stop = (mx >= TOOLBAR_WIDTH - 50 && mx <= TOOLBAR_WIDTH - 50 + 30 &&
+                                  my >= 5 && my <= 5 + 30);
+
                     handle_mouse_motion(event, blocks);
+                }
                     break;
 
                 case SDL_TEXTINPUT:
@@ -19573,12 +20511,12 @@ int main(int argc, char* argv[]) {
                 case SDL_KEYDOWN:
                     if (text_state.active) {
                         on_key_input(text_state, event.key.keysym.sym, blocks);
+                    } else {
+                        if (event.key.keysym.sym == SDLK_l) {
+                            syslog_toggle();
+                        }
                     }
                     break;
-                case SDLK_l:
-                    syslog_toggle();
-                    break;
-
             }
         }
 
@@ -19632,6 +20570,26 @@ int main(int argc, char* argv[]) {
             draw_block(renderer, block, label);
             draw_arg_boxes(renderer, block, text_state);
         }
+
+        render_palette_hover(renderer, palette_items, mouse_x, mouse_y);
+
+        if (hover_run) {
+            SDL_SetRenderDrawColor(renderer, 255, 255, 255, 50);
+            SDL_Rect run_rect = { TOOLBAR_WIDTH - 90, 5, 30, 30 };
+            SDL_RenderFillRect(renderer, &run_rect);
+        }
+
+        if (hover_stop) {
+            SDL_SetRenderDrawColor(renderer, 255, 255, 255, 50);
+            SDL_Rect stop_rect = { TOOLBAR_WIDTH - 50, 5, 30, 30 };
+            SDL_RenderFillRect(renderer, &stop_rect);
+        }
+
+        if (syslog_is_visible()) {
+            syslog_render(renderer);
+        }
+
+        menu_render(renderer);
 
         SDL_RenderPresent(renderer);
     }

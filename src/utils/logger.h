@@ -31,5 +31,6 @@ void set_log_level(LogLevel level);
 void clear_log();
 void log_separator();
 void log_block_info(const Block* block, const std::string& prefix = "");
+void logger_tick();
 
 #endif

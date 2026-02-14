@@ -5,10 +5,45 @@
 #include <fstream>
 #include <ctime>
 #include <sstream>
+#include <SDL2/SDL.h>
+#include <cstring>
+
 static std::ofstream logFile;
 static bool consoleEnabled = true;
 static bool fileEnabled = true;
 static LogLevel minLogLevel = LOG_DEBUG;
+static char write_buffer[8192];
+static int buffer_pos = 0;
+static Uint32 last_flush_time = 0;
+static const int FLUSH_INTERVAL_MS = 2000;
+static const int BUFFER_THRESHOLD = 6144;  
+static void flush_buffer() {
+    if (buffer_pos > 0 && logFile.is_open()) {
+        logFile.write(write_buffer, buffer_pos);
+        logFile.flush();
+        buffer_pos = 0;
+    }
+    last_flush_time = SDL_GetTicks();
+}
+
+static void buffer_write(const char* data, int len) {
+    if (buffer_pos + len >= (int)sizeof(write_buffer))
+        flush_buffer();
+
+    if (len >= (int)sizeof(write_buffer)) {
+        if (logFile.is_open()) {
+            logFile.write(data, len);
+            logFile.flush();
+        }
+        return;
+    }
+
+    memcpy(write_buffer + buffer_pos, data, len);
+    buffer_pos += len;
+
+    if (buffer_pos >= BUFFER_THRESHOLD)
+        flush_buffer();
+}
 
 void init_logger(const std::string& filename) {
     logFile.open(filename, std::ios::out | std::ios::app);
@@ -21,6 +56,7 @@ void init_logger(const std::string& filename) {
 void close_logger() {
     if (logFile.is_open()) {
         log_info("Logger closing");
+        flush_buffer();
         logFile.close();
     }
 }
@@ -42,21 +78,22 @@ static std::string level_to_string(LogLevel level) {
     }
     return "???";
 }
-
 void log_message(LogLevel level, const std::string& message) {
     if (level < minLogLevel) return;
 
-    std::string line = "[" + get_timestamp() + "] [" + level_to_string(level) + "] " + message;
+    std::string line = "[" + get_timestamp() + "] [" + level_to_string(level) + "] " + message + "\n";
 
     if (consoleEnabled) {
-        std::cout << line << std::endl;
+        std::cout << line;
     }
 
     if (fileEnabled && logFile.is_open()) {
-        logFile << line << std::endl;
-        logFile.flush();
+        buffer_write(line.c_str(), (int)line.size());
+        if (level >= LOG_ERROR)
+            flush_buffer();
     }
 }
+
 
 void log_debug(const std::string& message)   { log_message(LOG_DEBUG, message); }
 void log_info(const std::string& message)    { log_message(LOG_INFO, message); }
@@ -79,7 +116,6 @@ void log_separator() {
     std::string sep(60, '=');
     log_message(LOG_INFO, sep);
 }
-
 void log_block_info(const Block* block, const std::string& prefix) {
     if (!block) {
         log_warning(prefix + "Block is NULL");
@@ -109,4 +145,9 @@ void log_block_info(const Block* block, const std::string& prefix) {
     if (block->child) {
         log_debug(prefix + "  Child: #" + std::to_string(block->child->id));
     }
+}
+void logger_tick() {
+    Uint32 now = SDL_GetTicks();
+    if (now - last_flush_time >= (Uint32)FLUSH_INTERVAL_MS)
+        flush_buffer();
 }

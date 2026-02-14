@@ -1,5 +1,9 @@
 #include <SDL2/SDL.h>
+#ifdef __linux__
+#include <SDL2/SDL_image.h>
+#else
 #include <SDL_image.h>
+#endif
 #include <iostream>
 #include <vector>
 #include <cmath>
@@ -15,9 +19,16 @@
 #include "frontend/text_input.h"
 #include "utils/system_logger.h"
 #include "backend/block_executor_looks.h"
+#include "backend/sound.h"
+#include "frontend/pen.h"
 
 int main(int argc, char* argv[]) {
-    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+    int g_execution_index = -1;
+    bool g_is_executing = false;
+    bool g_step_mode = false;
+    bool g_waiting_for_step = false;
+
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0) {
         std::cerr << "SDL_Init Error: " << SDL_GetError() << std::endl;
         return 1;
     }
@@ -28,6 +39,10 @@ int main(int argc, char* argv[]) {
         std::cerr << "IMG_Init Error: " << IMG_GetError() << std::endl;
         SDL_Quit();
         return 1;
+    }
+
+    if (!sound_init()) {
+        log_warning("Sound engine failed to initialize");
     }
 
     SDL_Window* window = SDL_CreateWindow(
@@ -55,17 +70,21 @@ int main(int argc, char* argv[]) {
 
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 
+    pen_init(renderer);
+
     init_logger("debug.log");
     log_info("Application started");
 
+    sound_load("meow", "../assets/meow.wav");
+
     Sprite sprite;
-    sprite.texture = load_texture(renderer, "assets/cat.png");
+    sprite.texture = load_texture(renderer, "../assets/cat.png");
     if (!sprite.texture) {
         log_warning("Failed to load cat.png - sprite will be invisible");
     }
 
     {
-        const char* costume_files[] = {"assets/cat.png", "assets/cat2.png"};
+        const char* costume_files[] = {"../assets/cat.png", "../assets/cat2.png"};
         const char* costume_names[] = {"costume1", "costume2"};
         int num_costumes = 2;
 
@@ -89,6 +108,10 @@ int main(int argc, char* argv[]) {
     std::vector<PaletteItem> palette_items;
     init_palette(palette_items);
 
+    int palette_scroll_offset = 0;
+    int palette_max_scroll = get_palette_total_height(palette_items) - PALETTE_HEIGHT + 20;
+    if (palette_max_scroll < 0) palette_max_scroll = 0;
+
     std::vector<Block> blocks;
     int next_block_id = 1;
 
@@ -108,6 +131,21 @@ int main(int argc, char* argv[]) {
                 case SDL_QUIT:
                     running = false;
                     break;
+
+                case SDL_MOUSEWHEEL: {
+                    int mx, my;
+                    SDL_GetMouseState(&mx, &my);
+
+                    if (mx >= PALETTE_X && mx < PALETTE_X + PALETTE_WIDTH &&
+                        my >= PALETTE_Y && my < PALETTE_Y + PALETTE_HEIGHT) {
+
+                        palette_scroll_offset -= event.wheel.y * 30;
+
+                        if (palette_scroll_offset < 0) palette_scroll_offset = 0;
+                        if (palette_scroll_offset > palette_max_scroll) palette_scroll_offset = palette_max_scroll;
+                    }
+                    break;
+                }
 
                 case SDL_MOUSEBUTTONDOWN:
                     if (event.button.button == SDL_BUTTON_LEFT) {
@@ -143,12 +181,7 @@ int main(int argc, char* argv[]) {
 
                         bool clicked_arg = false;
                         for (auto& block : blocks) {
-                            int arg_idx = try_click_arg(block, mx, my);
-                            if (arg_idx >= 0) {
-                                if (text_state.active) {
-                                    commit_editing(text_state, blocks);
-                                }
-                                begin_editing(text_state, block, arg_idx);
+                            if (try_click_arg(block, mx, my, text_state)) {
                                 clicked_arg = true;
                                 break;
                             }
@@ -158,7 +191,7 @@ int main(int argc, char* argv[]) {
                             if (text_state.active) {
                                 commit_editing(text_state, blocks);
                             }
-                            handle_mouse_down(event, blocks, palette_items, next_block_id);
+                            handle_mouse_down(event, blocks, palette_items, next_block_id, palette_scroll_offset);
                         }
                     }
                     break;
@@ -208,38 +241,57 @@ int main(int argc, char* argv[]) {
         }
 
         tick_cursor(text_state);
+        logger_tick();
 
         if (g_is_executing && g_execution_index >= 0 && g_execution_index < (int)blocks.size()) {
-            for (auto& b : blocks) {
-                b.is_running = false;
-            }
+            if (g_step_mode && g_waiting_for_step) {
 
-            Block& current = blocks[g_execution_index];
-            current.is_running = true;
-            current.glow_start_time = SDL_GetTicks();
+            } else {
+                for (auto& b : blocks) {
+                    b.is_running = false;
+                }
 
-            ExecutionContext exec_ctx;
-            exec_ctx.sprite = &sprite;
+                blocks[g_execution_index].is_running = true;
+                blocks[g_execution_index].glow_start_time = SDL_GetTicks();
+                Block& current = blocks[g_execution_index];
+                current.is_running = true;
+                current.glow_start_time = SDL_GetTicks();
 
-            switch (current.type) {
-                case CMD_SWITCH_COSTUME:
-                case CMD_NEXT_COSTUME:
-                case CMD_SET_SIZE:
-                case CMD_CHANGE_SIZE:
-                case CMD_SHOW:
-                case CMD_HIDE:
-                    execute_looks_block(&current, exec_ctx);
-                    break;
-                default:
-                    break;
-            }
+                ExecutionContext exec_ctx;
+                exec_ctx.sprite = &sprite;
 
-            g_execution_index++;
+                pen_update(renderer, sprite);
 
-            if (g_execution_index >= (int)blocks.size()) {
-                current.is_running = false;
-                g_execution_index = -1;
-                g_is_executing = false;
+                switch (current.type) {
+                    case CMD_SWITCH_COSTUME:
+                    case CMD_NEXT_COSTUME:
+                    case CMD_SET_SIZE:
+                    case CMD_CHANGE_SIZE:
+                    case CMD_SHOW:
+                    case CMD_HIDE:
+                        execute_looks_block(&current, exec_ctx);
+                        break;
+                    case CMD_PLAY_SOUND:
+                        play_sound(current.args[0], exec_ctx.sprite->volume);
+                        break;
+                    default:
+                        break;
+                }
+
+                sprite.prevPenX = sprite.x;
+                sprite.prevPenY = sprite.y;
+
+                g_execution_index++;
+
+                if (g_execution_index >= (int)blocks.size()) {
+                    blocks[g_execution_index - 1].is_running = false;
+                    g_execution_index = -1;
+                    g_is_executing = false;
+                }
+
+                if (g_step_mode) {
+                    g_waiting_for_step = true;
+                }
             }
         }
 
@@ -247,9 +299,11 @@ int main(int argc, char* argv[]) {
         SDL_RenderClear(renderer);
 
         draw_toolbar(renderer);
-        draw_palette(renderer, palette_items);
+        draw_palette(renderer, palette_items, palette_scroll_offset);
         draw_coding_area(renderer);
         draw_stage(renderer, sprite);
+
+        pen_render(renderer);
 
         for (const auto& block : blocks) {
             std::string label = block_get_label(block.type);
@@ -281,16 +335,20 @@ int main(int argc, char* argv[]) {
         SDL_RenderPresent(renderer);
     }
 
+    pen_shutdown();
+
     for (auto& c : sprite.costumes) {
         if (c.texture) {
             SDL_DestroyTexture(c.texture);
         }
     }
+
     close_logger();
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     IMG_Quit();
     SDL_Quit();
+    sound_cleanup();
 
     return 0;
 }

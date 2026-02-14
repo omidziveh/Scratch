@@ -5,6 +5,8 @@
 #include <cmath>
 #include <iostream>
 #include <algorithm>
+#include "text_input.h"
+
 
 bool is_point_in_rect(int px, int py, float rx, float ry, float rw, float rh) {
     return (px >= rx && px <= rx + rw && py >= ry && py <= ry + rh);
@@ -272,4 +274,25 @@ void unsnap_block(Block& block) {
     }
     block.is_snapped = false;
     log_debug("Unsnapped block #" + std::to_string(block.id));
+}
+bool try_click_arg(const Block& block, int mx, int my, TextInputState& state) {
+    int arg_x = (int)block.x + 80;  
+    int arg_y = (int)block.y + 8;   
+    int arg_w = 40;
+    int arg_h = 20;
+    
+    for (size_t i = 0; i < block.args.size(); i++) {
+        int box_x = arg_x + (int)i * 50;
+        
+        if (mx >= box_x && mx <= box_x + arg_w &&
+            my >= arg_y && my <= arg_y + arg_h) {
+            state.active = true;
+            state.block_id = block.id;
+            state.arg_index = (int)i;
+            state.buffer = block.args[i];
+            state.cursor_pos = (int)state.buffer.length();
+            return true;
+        }
+    }
+    return false;
 }

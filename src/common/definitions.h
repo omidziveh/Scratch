@@ -1,6 +1,14 @@
 #ifndef DEFINITIONS_H
 #define DEFINITIONS_H
 
+#ifndef __has_builtin
+#define __has_builtin(x) 0
+#endif
+
+#ifndef SDL_DISABLE_ANALYZE_MACROS
+#define SDL_DISABLE_ANALYZE_MACROS 1
+#endif
+
 #include <string>
 #include <vector>
 #include <SDL2/SDL.h>
@@ -103,7 +111,9 @@ struct Sprite {
     float scale;
     float volume;
     std::vector<Costume> costumes;
-
+    float prevPenX;
+    float prevPenY;
+    bool penMoved;
     Sprite()
         : x(STAGE_X + STAGE_WIDTH / 2.0f)
         , y(STAGE_Y + STAGE_HEIGHT / 2.0f)
@@ -168,7 +178,6 @@ struct Block {
     Block* parent;
     Block* child;
     bool is_snapped;
-
     Block* next;
     Block* inner;
 

@@ -6,12 +6,6 @@
 #include <string>
 #include "../common/definitions.h"
 
-int get_arg_count(BlockType type);
-
-SDL_Rect get_arg_box_rect(const Block& block, int arg_index);
-
-int try_click_arg(const Block& block, int mx, int my);
-
 void begin_editing(TextInputState& state, Block& block, int arg_index);
 
 void commit_editing(TextInputState& state, std::vector<Block>& blocks);
