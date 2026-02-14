@@ -27,6 +27,7 @@ struct Runtime {
     int maxTicksAllowed;
     bool stepMode;
     bool breakpointHit;
+    bool waitingForStep;
     int ticksSinceLastWait;
     int watchdogThreshold;
     bool watchdogTriggered;
@@ -41,7 +42,9 @@ void runtime_pause(Runtime* rt);
 void runtime_resume(Runtime* rt);
 void runtime_step(Runtime* rt, Stage* stage);
 void runtime_set_step_mode(Runtime* rt, bool enabled);
+void runtime_advance_step(Runtime* rt, Stage* stage);
 const char* runtime_get_status(Runtime* rt);
+bool runtime_is_waiting_for_step(Runtime* rt);
 bool runtime_check_watchdog(Runtime* rt);
 void runtime_set_max_ticks(Runtime* rt, int maxTicks);
 void runtime_set_watchdog_threshold(Runtime* rt, int threshold);

@@ -6,6 +6,14 @@
 
 struct Block;
 
+enum LogLevel {
+    LOG_DEBUG,
+    LOG_INFO,
+    LOG_WARNING,
+    LOG_ERROR,
+    LOG_SUCCESS
+};
+
 void init_logger(const std::string& filename = "debug.log");
 void close_logger();
 

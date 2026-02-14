@@ -101,6 +101,7 @@ struct Sprite {
     SDL_Texture* texture;
     std::string name;
     float scale;
+    float volume;
     std::vector<Costume> costumes;
 
     Sprite()
@@ -110,12 +111,13 @@ struct Sprite {
         , height(80)
         , angle(0.0f)
         , direction(0.0f)
-        , texture(nullptr)
-        , name("Cat")
-        , scale(1.0f)
         , visible(1)
         , isPenDown(0)
         , currentCostumeIndex(0)
+        , texture(nullptr)
+        , name("Cat")
+        , scale(0.05f)
+        , volume(100)
     {}
 };
 
@@ -140,6 +142,10 @@ enum BlockType {
     CMD_CHANGE_SIZE,
     CMD_SHOW,
     CMD_HIDE,
+    CMD_PLAY_SOUND,
+    CMD_STOP_ALL_SOUNDS,
+    CMD_CHANGE_VOLUME,
+    CMD_SET_VOLUME,
     SENSE_TOUCHING_MOUSE,
     SENSE_TOUCHING_EDGE,
     OP_ADD,
@@ -153,6 +159,7 @@ struct Block {
     float x, y;
     float width, height;
     bool dragging;
+    bool hasBreakpoint;
     float drag_offset_x;
     float drag_offset_y;
     std::vector<std::string> args;
@@ -174,6 +181,7 @@ struct Block {
         , x(0), y(0)
         , width(BLOCK_WIDTH), height(BLOCK_HEIGHT)
         , dragging(false)
+        , hasBreakpoint(false)
         , drag_offset_x(0), drag_offset_y(0)
         , color({100, 100, 255, 255})
         , parent(nullptr)

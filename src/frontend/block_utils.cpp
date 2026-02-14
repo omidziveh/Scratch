@@ -1,41 +1,6 @@
 #include "block_utils.h"
 #include "../common/globals.h"
 
-// std::string blocktype_to_string(BlockType type) {
-//     switch (type) {
-//         case CMD_MOVE:     return "MOVE";
-//         case CMD_TURN:     return "TURN";
-//         case CMD_GOTO:     return "GOTO";
-//         case CMD_SET_X:    return "SET_X";
-//         case CMD_SET_Y:    return "SET_Y";
-//         case CMD_CHANGE_X: return "CHANGE_X";
-//         case CMD_CHANGE_Y: return "CHANGE_Y";
-//         case CMD_REPEAT:   return "REPEAT";
-//         case CMD_IF:       return "IF";
-//         case CMD_WAIT:     return "WAIT";
-//         case CMD_SAY:      return "SAY";
-//         case CMD_START:    return "START";
-//         case CMD_NONE:     return "NONE";
-//         default:           return "UNKNOWN";
-//     }
-// }
-
-// BlockType string_to_blocktype(const std::string& str) {
-//     if (str == "MOVE")     return CMD_MOVE;
-//     if (str == "TURN")     return CMD_TURN;
-//     if (str == "GOTO")     return CMD_GOTO;
-//     if (str == "SET_X")    return CMD_SET_X;
-//     if (str == "SET_Y")    return CMD_SET_Y;
-//     if (str == "CHANGE_X") return CMD_CHANGE_X;
-//     if (str == "CHANGE_Y") return CMD_CHANGE_Y;
-//     if (str == "REPEAT")   return CMD_REPEAT;
-//     if (str == "IF")       return CMD_IF;
-//     if (str == "WAIT")     return CMD_WAIT;
-//     if (str == "SAY")      return CMD_SAY;
-//     if (str == "START")    return CMD_START;
-//     return CMD_NONE;
-// }
-
 std::string block_get_label(BlockType type) {
     switch (type) {
         case CMD_MOVE:     return "Move (10) steps";
@@ -56,7 +21,12 @@ std::string block_get_label(BlockType type) {
         case CMD_CHANGE_SIZE:    return "Change size by (10)";
         case CMD_SHOW:           return "Show";
         case CMD_HIDE:           return "Hide";
-        case CMD_NONE:     return "---";
+        case CMD_NONE:             return "---";
+        case CMD_PLAY_SOUND:       return "Play sound";
+        case CMD_STOP_ALL_SOUNDS:  return "Stop all sounds";
+        case CMD_CHANGE_VOLUME:    return "Change volume by";
+        case CMD_SET_VOLUME:       return "Set volume to";
+
         default:           return "Unknown";
     }
 }
@@ -85,7 +55,32 @@ SDL_Color block_get_color(BlockType type) {
             return COLOR_LOOKS;
         case CMD_START:
             return COLOR_EVENTS;
+        case CMD_PLAY_SOUND:
+        case CMD_STOP_ALL_SOUNDS:
+        case CMD_CHANGE_VOLUME:
+        case CMD_SET_VOLUME:
+            return COLOR_SOUND;
+        
         default:
             return COLOR_GRAY;
+    }
+}
+
+std::vector<std::string> get_default_args(BlockType type) {
+    switch (type) {
+        case CMD_MOVE:     return {"10"};
+        case CMD_TURN:     return {"15"};
+        case CMD_GOTO:     return {"0", "0"};
+        case CMD_SET_X:    return {"0"};
+        case CMD_SET_Y:    return {"0"};
+        case CMD_CHANGE_X: return {"10"};
+        case CMD_CHANGE_Y: return {"10"};
+        case CMD_REPEAT:   return {"10"};
+        case CMD_WAIT:     return {"1"};
+        case CMD_SAY:      return {"Hello!"};
+        case CMD_SWITCH_COSTUME: return {"1"};
+        case CMD_SET_SIZE:       return {"100"};
+        case CMD_CHANGE_SIZE:    return {"10"};
+        default:           return {};
     }
 }

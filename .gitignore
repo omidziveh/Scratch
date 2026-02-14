@@ -3,3 +3,6 @@ output/
 saves/
 .vscode/
 tests/
+project_code.txt
+project_context.txt
+debug.log
