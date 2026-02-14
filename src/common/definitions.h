@@ -47,6 +47,26 @@ const Uint32 CURSOR_BLINK_MS = 500;
 struct Color {
     Uint8 r, g, b, a;
 };
+struct Costume {
+    std::string name;
+    SDL_Texture* texture;
+    int width;
+    int height;
+
+    Costume()
+        : name("")
+        , texture(nullptr)
+        , width(0)
+        , height(0)
+    {}
+
+    Costume(const std::string& n, SDL_Texture* tex, int w, int h)
+        : name(n)
+        , texture(tex)
+        , width(w)
+        , height(h)
+    {}
+};
 
 struct Stage {
     int x;
@@ -79,6 +99,7 @@ struct Sprite {
     SDL_Texture* texture;
     std::string name;
     float scale;
+    std::vector<Costume> costumes;
 
     Sprite()
         : x(STAGE_X + STAGE_WIDTH / 2.0f)
@@ -111,6 +132,12 @@ enum BlockType {
     CMD_SAY,
     CMD_START,
     CMD_EVENT_CLICK,
+    CMD_SWITCH_COSTUME,
+    CMD_NEXT_COSTUME,
+    CMD_SET_SIZE,
+    CMD_CHANGE_SIZE,
+    CMD_SHOW,
+    CMD_HIDE,
     SENSE_TOUCHING_MOUSE,
     SENSE_TOUCHING_EDGE,
     OP_ADD,

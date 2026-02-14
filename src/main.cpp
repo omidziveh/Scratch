@@ -12,6 +12,7 @@
 #include "utils/logger.h"
 #include "frontend/text_input.h"
 #include "utils/system_logger.h"
+#include "backend/block_executor_looks.h"
 
 int main(int argc, char* argv[]) {
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
@@ -55,7 +56,29 @@ int main(int argc, char* argv[]) {
     Sprite sprite;
     sprite.texture = load_texture(renderer, "assets/cat.png");
     if (!sprite.texture) {
-        log_warning("Failed to load cat.png — sprite will be invisible");
+        log_warning("Failed to load cat.png - sprite will be invisible");
+    }
+
+    {
+        const char* costume_files[] = {"assets/cat.png", "assets/cat2.png"};
+        const char* costume_names[] = {"costume1", "costume2"};
+        int num_costumes = 2;
+
+        for (int i = 0; i < num_costumes; i++) {
+            SDL_Texture* tex = load_texture(renderer, costume_files[i]);
+            if (tex) {
+                int w = 0, h = 0;
+                SDL_QueryTexture(tex, nullptr, nullptr, &w, &h);
+                sprite.costumes.push_back(Costume(costume_names[i], tex, w, h));
+            }
+        }
+
+        if (!sprite.costumes.empty()) {
+            sprite.currentCostumeIndex = 0;
+            sprite.texture = sprite.costumes[0].texture;
+            sprite.width = sprite.costumes[0].width;
+            sprite.height = sprite.costumes[0].height;
+        }
     }
 
     std::vector<PaletteItem> palette_items;
@@ -82,7 +105,6 @@ int main(int argc, char* argv[]) {
                         int mx = event.button.x;
                         int my = event.button.y;
 
-                        // --- Green Flag (Run) button ---
                         if (mx >= TOOLBAR_WIDTH - 90 && mx <= TOOLBAR_WIDTH - 90 + 30 &&
                             my >= 5 && my <= 5 + 30) {
                             g_execution_index = 0;
@@ -142,19 +164,35 @@ int main(int argc, char* argv[]) {
 
         tick_cursor(text_state);
 
-        // ===== STEP-BY-STEP EXECUTION =====
         if (g_is_executing && g_execution_index >= 0 && g_execution_index < (int)blocks.size()) {
             for (auto& b : blocks) {
                 b.is_running = false;
             }
 
-            blocks[g_execution_index].is_running = true;
-            blocks[g_execution_index].glow_start_time = SDL_GetTicks();
+            Block& current = blocks[g_execution_index];
+            current.is_running = true;
+            current.glow_start_time = SDL_GetTicks();
+
+            ExecutionContext exec_ctx;
+            exec_ctx.sprite = &sprite;
+
+            switch (current.type) {
+                case CMD_SWITCH_COSTUME:
+                case CMD_NEXT_COSTUME:
+                case CMD_SET_SIZE:
+                case CMD_CHANGE_SIZE:
+                case CMD_SHOW:
+                case CMD_HIDE:
+                    execute_looks_block(&current, exec_ctx);
+                    break;
+                default:
+                    break;
+            }
 
             g_execution_index++;
 
             if (g_execution_index >= (int)blocks.size()) {
-                blocks[g_execution_index - 1].is_running = false;
+                current.is_running = false;
                 g_execution_index = -1;
                 g_is_executing = false;
             }
@@ -178,8 +216,10 @@ int main(int argc, char* argv[]) {
         SDL_RenderPresent(renderer);
     }
 
-    if (sprite.texture) {
-        SDL_DestroyTexture(sprite.texture);
+    for (auto& c : sprite.costumes) {
+        if (c.texture) {
+            SDL_DestroyTexture(c.texture);
+        }
     }
     close_logger();
     SDL_DestroyRenderer(renderer);

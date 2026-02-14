@@ -50,6 +50,12 @@ std::string block_get_label(BlockType type) {
         case CMD_WAIT:     return "Wait (1) secs";
         case CMD_SAY:      return "Say [Hello!]";
         case CMD_START:    return "When START clicked";
+        case CMD_SWITCH_COSTUME: return "Switch costume to (1)";
+        case CMD_NEXT_COSTUME:   return "Next costume";
+        case CMD_SET_SIZE:       return "Set size to (100)%";
+        case CMD_CHANGE_SIZE:    return "Change size by (10)";
+        case CMD_SHOW:           return "Show";
+        case CMD_HIDE:           return "Hide";
         case CMD_NONE:     return "---";
         default:           return "Unknown";
     }
@@ -70,6 +76,12 @@ SDL_Color block_get_color(BlockType type) {
         case CMD_WAIT:
             return COLOR_CONTROL;
         case CMD_SAY:
+        case CMD_SWITCH_COSTUME:
+        case CMD_NEXT_COSTUME:
+        case CMD_SET_SIZE:
+        case CMD_CHANGE_SIZE:
+        case CMD_SHOW:
+        case CMD_HIDE:
             return COLOR_LOOKS;
         case CMD_START:
             return COLOR_EVENTS;
