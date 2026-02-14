@@ -17,6 +17,7 @@
 #include "frontend/text_input.h"
 #include "utils/system_logger.h"
 #include "backend/block_executor_looks.h"
+#include "backend/sound.h"
 
 int main(int argc, char* argv[]) {
     int g_execution_index = -1;
@@ -24,7 +25,7 @@ int main(int argc, char* argv[]) {
     bool g_step_mode = false;
     bool g_waiting_for_step = false;
 
-    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0) {
         std::cerr << "SDL_Init Error: " << SDL_GetError() << std::endl;
         return 1;
     }
@@ -34,6 +35,10 @@ int main(int argc, char* argv[]) {
         std::cerr << "IMG_Init Error: " << IMG_GetError() << std::endl;
         SDL_Quit();
         return 1;
+    }
+
+    if (!sound_init()) {
+        log_warning("Sound engine failed to initialize");
     }
 
     SDL_Window* window = SDL_CreateWindow(
@@ -69,7 +74,7 @@ int main(int argc, char* argv[]) {
     }
 
     {
-        const char* costume_files[] = {"assets/cat.png", "assets/cat2.png"};
+        const char* costume_files[] = {"../assets/cat.png", "../assets/cat2.png"};
         const char* costume_names[] = {"costume1", "costume2"};
         int num_costumes = 2;
 
@@ -93,6 +98,10 @@ int main(int argc, char* argv[]) {
     std::vector<PaletteItem> palette_items;
     init_palette(palette_items);
 
+    int palette_scroll_offset = 0;
+    int palette_max_scroll = get_palette_total_height(palette_items) - PALETTE_HEIGHT + 20;
+    if (palette_max_scroll < 0) palette_max_scroll = 0;
+
     std::vector<Block> blocks;
     int next_block_id = 1;
 
@@ -108,6 +117,21 @@ int main(int argc, char* argv[]) {
                 case SDL_QUIT:
                     running = false;
                     break;
+
+                case SDL_MOUSEWHEEL: {
+                    int mx, my;
+                    SDL_GetMouseState(&mx, &my);
+                    
+                    if (mx >= PALETTE_X && mx < PALETTE_X + PALETTE_WIDTH &&
+                        my >= PALETTE_Y && my < PALETTE_Y + PALETTE_HEIGHT) {
+                        
+                        palette_scroll_offset -= event.wheel.y * 30;
+                        
+                        if (palette_scroll_offset < 0) palette_scroll_offset = 0;
+                        if (palette_scroll_offset > palette_max_scroll) palette_scroll_offset = palette_max_scroll;
+                    }
+                    break;
+                }
 
                 case SDL_MOUSEBUTTONDOWN:
                     if (event.button.button == SDL_BUTTON_LEFT) {
@@ -138,7 +162,7 @@ int main(int argc, char* argv[]) {
                             if (text_state.active) {
                                 commit_editing(text_state, blocks);
                             }
-                            handle_mouse_down(event, blocks, palette_items, next_block_id);
+                            handle_mouse_down(event, blocks, palette_items, next_block_id, palette_scroll_offset);
                         }
                     }
                     break;
@@ -185,7 +209,6 @@ int main(int argc, char* argv[]) {
 
         if (g_is_executing && g_execution_index >= 0 && g_execution_index < (int)blocks.size()) {
             if (g_step_mode && g_waiting_for_step) {
-                // Wait for Space key press
             } else {
                 for (auto& b : blocks) {
                     b.is_running = false;
@@ -231,7 +254,7 @@ int main(int argc, char* argv[]) {
         SDL_RenderClear(renderer);
 
         draw_toolbar(renderer);
-        draw_palette(renderer, palette_items);
+        draw_palette(renderer, palette_items, palette_scroll_offset);
         draw_coding_area(renderer);
         draw_stage(renderer, sprite);
 
@@ -255,6 +278,7 @@ int main(int argc, char* argv[]) {
     SDL_DestroyWindow(window);
     IMG_Quit();
     SDL_Quit();
+    sound_cleanup();
 
     return 0;
 }

@@ -47,16 +47,33 @@ void init_palette(std::vector<PaletteItem>& items) {
     }
 }
 
-void draw_palette(SDL_Renderer* renderer, const std::vector<PaletteItem>& items) {
+int get_palette_total_height(const std::vector<PaletteItem>& items) {
+    if (items.empty()) return 0;
+    float min_y = items[0].y;
+    float max_y = items.back().y + items.back().height;
+    return (int)(max_y - min_y + 40);
+}
+
+void draw_palette(SDL_Renderer* renderer, const std::vector<PaletteItem>& items, int scroll_offset) {
     draw_filled_rect(renderer, PALETTE_X, PALETTE_Y, PALETTE_WIDTH, PALETTE_HEIGHT, COLOR_PALETTE_BG);
 
+    SDL_Rect clip_rect = {PALETTE_X, PALETTE_Y, PALETTE_WIDTH, PALETTE_HEIGHT};
+    SDL_RenderSetClipRect(renderer, &clip_rect);
+
     for (const auto& item : items) {
+        float draw_y = item.y - (float)scroll_offset;
+        
+        if (draw_y + item.height < (float)PALETTE_Y) continue;
+        if (draw_y > (float)(PALETTE_Y + PALETTE_HEIGHT)) continue;
+
         Block temp;
         temp.x = item.x;
-        temp.y = item.y;
+        temp.y = draw_y;
         temp.width = item.width;
         temp.height = item.height;
         temp.color = item.color;
         draw_block(renderer, temp, item.label);
     }
+
+    SDL_RenderSetClipRect(renderer, nullptr);
 }

@@ -7,7 +7,7 @@
 
 void handle_mouse_down(SDL_Event& event, std::vector<Block>& blocks,
                        std::vector<PaletteItem>& palette_items,
-                       int& next_block_id);
+                       int& next_block_id, int palette_scroll_offset);
 
 void handle_mouse_up(SDL_Event& event, std::vector<Block>& blocks);
 
