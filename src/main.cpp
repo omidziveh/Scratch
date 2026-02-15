@@ -20,7 +20,30 @@
 #include "utils/system_logger.h"
 #include "backend/block_executor_looks.h"
 #include "backend/sound.h"
+#include "backend/runtime.h"
 #include "frontend/pen.h"
+#include <set>
+#include "backend/logic.h"
+
+Sprite sprite;
+Runtime gRuntime;
+Stage stage;
+
+void init_program(SDL_Renderer& renderer) {
+    syslog_init();
+    menu_init();
+    pen_init(&renderer);
+    init_logger("debug.log");
+    log_info("Application started");
+    sound_load("meow", "../assets/meow.wav");
+    sprite.texture = load_texture(&renderer, "../assets/cat.png");
+    if (!sprite.texture) {
+        log_warning("Failed to load cat.png - sprite will be invisible");
+    }
+}
+
+
+
 
 int main(int argc, char* argv[]) {
     int g_execution_index = -1;
@@ -28,12 +51,11 @@ int main(int argc, char* argv[]) {
     bool g_step_mode = false;
     bool g_waiting_for_step = false;
 
+    // ==========================================================
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0) {
         std::cerr << "SDL_Init Error: " << SDL_GetError() << std::endl;
         return 1;
     }
-    syslog_init();
-    menu_init();
 
     if (IMG_Init(IMG_INIT_PNG) == 0) {
         std::cerr << "IMG_Init Error: " << IMG_GetError() << std::endl;
@@ -67,21 +89,9 @@ int main(int argc, char* argv[]) {
         SDL_Quit();
         return 1;
     }
+    // ==========================================================
 
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-
-    pen_init(renderer);
-
-    init_logger("debug.log");
-    log_info("Application started");
-
-    sound_load("meow", "../assets/meow.wav");
-
-    Sprite sprite;
-    sprite.texture = load_texture(renderer, "../assets/cat.png");
-    if (!sprite.texture) {
-        log_warning("Failed to load cat.png - sprite will be invisible");
-    }
+    init_program(*renderer);
 
     {
         const char* costume_files[] = {"../assets/cat.png", "../assets/cat2.png"};
@@ -115,6 +125,13 @@ int main(int argc, char* argv[]) {
     std::vector<Block> blocks;
     int next_block_id = 1;
 
+
+    Stage stage;
+    stage.renderer = renderer;
+
+    sprite.x = STAGE_X + STAGE_WIDTH / 2;
+    sprite.y = STAGE_Y + STAGE_HEIGHT / 2;
+
     TextInputState text_state;
 
     int mouse_x = 0, mouse_y = 0;
@@ -123,6 +140,8 @@ int main(int argc, char* argv[]) {
 
     bool running = true;
     SDL_Event event;
+
+    std::vector<Runtime> activeRuntimes;
 
     while (running) {
         while (SDL_PollEvent(&event)) {
@@ -164,18 +183,24 @@ int main(int argc, char* argv[]) {
 
                         if (mx >= TOOLBAR_WIDTH - 90 && mx <= TOOLBAR_WIDTH - 90 + 30 &&
                             my >= TOOLBAR_Y + 5 && my <= TOOLBAR_Y + 5 + 30) {
-                            g_execution_index = 0;
-                            g_is_executing = true;
+                            activeRuntimes.clear();
+                            for (Block& b : blocks) {
+                                if (b.type == CMD_START && b.next) {
+                                    Runtime rt;
+                                    runtime_init(&rt, b.next, &sprite);
+                                    runtime_start(&rt);
+                                    activeRuntimes.push_back(rt);
+                                }
+                            }
                             break;
                         }
 
                         if (mx >= TOOLBAR_WIDTH - 50 && mx <= TOOLBAR_WIDTH - 50 + 30 &&
                             my >= TOOLBAR_Y + 5 && my <= TOOLBAR_Y + 5 + 30) {
-                            g_is_executing = false;
-                            g_execution_index = -1;
-                            for (auto& b : blocks) {
-                                b.is_running = false;
-                            }
+                                for (Runtime& rt : activeRuntimes) {
+                                    runtime_stop(&rt);
+                                }
+                                activeRuntimes.clear();
                             break;
                         }
 
@@ -235,8 +260,10 @@ int main(int argc, char* argv[]) {
                             syslog_toggle();
                         }
                         if (event.key.keysym.sym == SDLK_F12) {
-                            g_step_mode = !g_step_mode;
-                            g_waiting_for_step = g_step_mode;
+                            for (Runtime& rt : activeRuntimes) {
+                                rt.stepMode = !rt.stepMode;
+                                rt.waitingForStep = rt.stepMode;
+                            }
                         }
                         if (event.key.keysym.sym == SDLK_SPACE) {
                             if (g_step_mode && g_waiting_for_step) {
@@ -248,173 +275,14 @@ int main(int argc, char* argv[]) {
             }
         }
 
+
         tick_cursor(text_state);
         logger_tick();
 
-        if (g_is_executing && g_execution_index >= 0 && g_execution_index < (int)blocks.size()) {
-            if (g_step_mode && g_waiting_for_step) {
-
-            } else {
-                for (auto& b : blocks) {
-                    b.is_running = false;
-                }
-
-                blocks[g_execution_index].is_running = true;
-                blocks[g_execution_index].glow_start_time = SDL_GetTicks();
-                Block& current = blocks[g_execution_index];
-                current.is_running = true;
-                current.glow_start_time = SDL_GetTicks();
-
-                ExecutionContext exec_ctx;
-                exec_ctx.sprite = &sprite;
-
-                float oldX = sprite.x;
-                float oldY = sprite.y;
-
-                switch (current.type) {
-
-                    case CMD_MOVE: {
-                        float steps = 10.0f;
-                        if (!current.args.empty())
-                            steps = (float)std::atof(current.args[0].c_str());
-                        float rad = sprite.angle * (float)M_PI / 180.0f;
-                        sprite.x += steps * std::cos(rad);
-                        sprite.y += steps * std::sin(rad);
-                        break;
-                    }
-
-                    case CMD_TURN: {
-                        float deg = 15.0f;
-                        if (!current.args.empty())
-                            deg = (float)std::atof(current.args[0].c_str());
-                        sprite.angle += deg;
-                        break;
-                    }
-
-                    case CMD_GOTO: {
-                        float gx = 0.0f, gy = 0.0f;
-                        if (current.args.size() >= 1) gx = (float)std::atof(current.args[0].c_str());
-                        if (current.args.size() >= 2) gy = (float)std::atof(current.args[1].c_str());
-                        sprite.x = STAGE_X + STAGE_WIDTH / 2.0f + gx;
-                        sprite.y = STAGE_Y + STAGE_HEIGHT / 2.0f - gy;
-                        break;
-                    }
-
-                    case CMD_SET_X: {
-                        float nx = 0.0f;
-                        if (!current.args.empty()) nx = (float)std::atof(current.args[0].c_str());
-                        sprite.x = STAGE_X + STAGE_WIDTH / 2.0f + nx;
-                        break;
-                    }
-
-                    case CMD_SET_Y: {
-                        float ny = 0.0f;
-                        if (!current.args.empty()) ny = (float)std::atof(current.args[0].c_str());
-                        sprite.y = STAGE_Y + STAGE_HEIGHT / 2.0f - ny;
-                        break;
-                    }
-
-                    case CMD_CHANGE_X: {
-                        float dx = 0.0f;
-                        if (!current.args.empty()) dx = (float)std::atof(current.args[0].c_str());
-                        sprite.x += dx;
-                        break;
-                    }
-
-                    case CMD_CHANGE_Y: {
-                        float dy = 0.0f;
-                        if (!current.args.empty()) dy = (float)std::atof(current.args[0].c_str());
-                        sprite.y -= dy;
-                        break;
-                    }
-
-                    case CMD_SWITCH_COSTUME:
-                    case CMD_NEXT_COSTUME:
-                    case CMD_SET_SIZE:
-                    case CMD_CHANGE_SIZE:
-                    case CMD_SHOW:
-                    case CMD_HIDE:
-                        execute_looks_block(&current, exec_ctx);
-                        break;
-
-                    case CMD_PLAY_SOUND:
-                        if (!current.args.empty())
-                            play_sound(current.args[0], exec_ctx.sprite->volume);
-                        break;
-
-                    case CMD_CHANGE_VOLUME:
-                        if (!current.args.empty()) 
-                            set_sound_volume(get_sound_volume() + atoi(current.args[0].c_str()));
-                        break;
-
-                    case CMD_SET_VOLUME:
-                        if (!current.args.empty()) 
-                            set_sound_volume(atoi(current.args[0].c_str()));
-                        break;
-                
-                    case CMD_PEN_DOWN:
-                        sprite.isPenDown = 1;
-                        sprite.prevPenX = sprite.x;
-                        sprite.prevPenY = sprite.y;
-                        break;
-
-                    case CMD_PEN_UP:
-                        sprite.isPenDown = 0;
-                        break;
-
-                    case CMD_PEN_CLEAR:
-                        pen_clear(renderer);
-                        break;
-
-                    case CMD_PEN_SET_COLOR: {
-                        if (current.args.size() >= 3) {
-                            sprite.penR = (Uint8)std::atoi(current.args[0].c_str());
-                            sprite.penG = (Uint8)std::atoi(current.args[1].c_str());
-                            sprite.penB = (Uint8)std::atoi(current.args[2].c_str());
-                            pen_set_color(sprite.penR, sprite.penG, sprite.penB);
-                        }
-                        break;
-                    }
-
-                    case CMD_PEN_SET_SIZE: {
-                        if (!current.args.empty()) {
-                            sprite.penSize = std::atoi(current.args[0].c_str());
-                            if (sprite.penSize < 1) sprite.penSize = 1;
-                            pen_set_size(sprite.penSize);
-                        }
-                        break;
-                    }
-
-                    case CMD_PEN_STAMP:
-                        pen_stamp(renderer, sprite);
-                        break;
-
-
-                    default:
-                        break;
-                }
-
-                if (sprite.isPenDown && (sprite.x != oldX || sprite.y != oldY)) {
-                    pen_draw_line(renderer, oldX, oldY, sprite.x, sprite.y, sprite);
-                }
-
-                pen_update(renderer, sprite);
-
-                sprite.prevPenX = sprite.x;
-                sprite.prevPenY = sprite.y;
-
-                g_execution_index++;
-
-                if (g_execution_index >= (int)blocks.size()) {
-                    blocks[g_execution_index - 1].is_running = false;
-                    g_execution_index = -1;
-                    g_is_executing = false;
-                }
-
-                if (g_step_mode) {
-                    g_waiting_for_step = true;
-                }
-            }
+        int mouseX, mouseY;
+        SDL_GetMouseState(&mouseX, &mouseY);
+        for (Runtime& rt : activeRuntimes) {
+            runtime_tick(&rt, &stage, mouseX, mouseY);
         }
 
         SDL_SetRenderDrawColor(renderer, 30, 30, 30, 255);

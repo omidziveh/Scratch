@@ -3,6 +3,8 @@
 #include "file_io.h"
 
 void connect_blocks(Block* top, Block* bottom) {
+    if (!top) return;
+
     if (!bottom) {
         top->next = nullptr;
         return;
@@ -19,13 +21,54 @@ void connect_blocks(Block* top, Block* bottom) {
     }
 
     top->next = bottom;
+    bottom->parent = top;
+}
+
+void connect_inner(Block* container, Block* child) {
+    if (!container) return;
+
+    if (!child) {
+        container->inner = nullptr;
+        return;
+    }
+    
+    container->inner = child;
+    child->parent = container;
+}
+
+Block* disconnect_inner(Block* block) {
+    if (!block || !block->inner) return nullptr;
+
+    Block* disconnected = block->inner;
+    
+    block->inner = nullptr;
+    disconnected->parent = nullptr;
+
+    return disconnected;
+}
+
+Block* disconnect_from_parent(Block* block) {
+    if (!block || !block->parent) return nullptr;
+
+    Block* parent = block->parent;
+
+    if (parent->next == block) {
+        parent->next = nullptr;
+    } else if (parent->inner == block) {
+        parent->inner = nullptr;
+    }
+    
+    block->parent = nullptr;
+    return block;
 }
 
 Block* disconnect_next(Block* block) {
-    if (!block) return nullptr;
+    if (!block || !block->next) return nullptr;
 
     Block* disconnected = block->next;
     block->next = nullptr;
+    disconnected->parent = nullptr;
+
     return disconnected;
 }
 
@@ -70,6 +113,15 @@ Block* get_last_block(Block* block) {
 
     while (block->next) {
         block = block->next;
+    }
+    return block;
+}
+
+Block* get_first_block(Block* block) {
+    if (!block) return nullptr;
+
+    while (block->parent) {
+        block = block->parent;
     }
     return block;
 }

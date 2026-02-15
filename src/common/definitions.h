@@ -199,7 +199,6 @@ struct Block {
     SDL_Color color;
 
     Block* parent;
-    Block* child;
     bool is_snapped;
     Block* next;
     Block* inner;
@@ -217,7 +216,6 @@ struct Block {
         , drag_offset_x(0), drag_offset_y(0)
         , color({100, 100, 255, 255})
         , parent(nullptr)
-        , child(nullptr)
         , is_snapped(false)
         , next(nullptr)
         , inner(nullptr)
@@ -267,6 +265,25 @@ struct TextInputState {
         , cursor_pos(0)
         , blink_timer(0)
         , cursor_visible(true)
+    {}
+};
+
+
+struct ExecutionContext {
+    Sprite* sprite;
+    Stage*  stage;
+    int     mouseX;
+    int     mouseY;
+    float   lastResult;
+    bool    lastCondition;
+
+    ExecutionContext()
+        : sprite(nullptr)
+        , stage(nullptr)
+        , mouseX(0)
+        , mouseY(0)
+        , lastResult(0.0f)
+        , lastCondition(false)
     {}
 };
 

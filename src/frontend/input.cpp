@@ -6,6 +6,7 @@
 #include <iostream>
 #include <algorithm>
 #include "text_input.h"
+#include "../backend/logic.h"
 
 
 bool is_point_in_rect(int px, int py, float rx, float ry, float rw, float rh) {
@@ -14,8 +15,8 @@ bool is_point_in_rect(int px, int py, float rx, float ry, float rw, float rh) {
 
 static void reposition_chain(Block& head) {
     Block* current = &head;
-    while (current->child) {
-        Block* c = current->child;
+    while (current->next) {
+        Block* c = current->next;
         c->x = current->x;
         c->y = current->y + current->height;
         current = c;
@@ -34,9 +35,9 @@ static void unsnap_from_parent(std::vector<Block>& blocks, Block& block) {
 
     Block* p = find_block_by_id(blocks, block.parent->id);
     if (p) {
-        p->child->parent = nullptr;
         p->next->parent = nullptr;
-        p->child = nullptr;
+        p->next->parent = nullptr;
+        p->next = nullptr;
         p->next = nullptr;
     }
     block.parent = nullptr;
@@ -52,8 +53,8 @@ static void bring_to_front(std::vector<Block>& blocks, int index) {
 
 static void collect_chain_ids(std::vector<Block>& blocks, Block& head, std::vector<int>& ids) {
     ids.push_back(head.id);
-    if (head.child) {
-        Block* c = find_block_by_id(blocks, head.child->id);
+    if (head.next) {
+        Block* c = find_block_by_id(blocks, head.next->id);
         if (c) collect_chain_ids(blocks, *c, ids);
     }
 }
@@ -208,11 +209,11 @@ void handle_mouse_motion(SDL_Event& event, std::vector<Block>& blocks) {
         float dx = block.x - prev_x;
         float dy = block.y - prev_y;
 
-        Block* child = block.child;
-        while (child) {
-            child->x += dx;
-            child->y += dy;
-            child = child->child;
+        Block* next = block.next;
+        while (next) {
+            next->x += dx;
+            next->y += dy;
+            next = next->next;
         }
         break;
     }
@@ -225,7 +226,7 @@ void try_snap_blocks(std::vector<Block>& blocks, Block& dropped_block) {
 
     for (auto& target : blocks) {
         if (target.id == dropped_id) continue;
-        if (target.child != nullptr) continue;
+        if (target.next != nullptr) continue;
 
         float snap_x = target.x;
         float snap_y = target.y + target.height;
@@ -251,17 +252,13 @@ void try_snap_blocks(std::vector<Block>& blocks, Block& dropped_block) {
 
     dropped->x += offset_x;
     dropped->y += offset_y;
-    dropped->is_snapped = true;
-    dropped->parent = target;
-    target->child = dropped;
-    target->next = dropped;
-    dropped->next = nullptr;
+    connect_blocks(target, dropped);
 
-    Block* ch = dropped->child;
+    Block* ch = dropped->next;
     while (ch) {
         ch->x += offset_x;
         ch->y += offset_y;
-        ch = ch->child;
+        ch = ch->next;
     }
 
     log_info("Snapped block #" + std::to_string(dropped->id) +
@@ -269,11 +266,7 @@ void try_snap_blocks(std::vector<Block>& blocks, Block& dropped_block) {
 }
 
 void unsnap_block(Block& block) {
-    if (block.parent) {
-        block.parent->child = nullptr;
-        block.parent->next = nullptr;
-        block.parent = nullptr;
-    }
+    disconnect_from_parent(&block);
     block.is_snapped = false;
     log_debug("Unsnapped block #" + std::to_string(block.id));
 }

@@ -142,8 +142,8 @@ void log_block_info(const Block* block, const std::string& prefix) {
     if (block->parent) {
         log_debug(prefix + "  Parent: #" + std::to_string(block->parent->id));
     }
-    if (block->child) {
-        log_debug(prefix + "  Child: #" + std::to_string(block->child->id));
+    if (block->next) {
+        log_debug(prefix + "  Child: #" + std::to_string(block->next->id));
     }
 }
 void logger_tick() {

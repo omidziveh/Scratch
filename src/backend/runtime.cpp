@@ -5,6 +5,9 @@
 #include <cstdlib>
 #include <sstream>
 #include "sensing.h"
+#include "block_executor_sensing.h"
+#include "block_executor_sound.h"
+#include "block_executor_looks.h"
 
 void runtime_init(Runtime* rt, Block* head, Sprite* sprite) {
     rt->programHead = head;
@@ -22,6 +25,8 @@ void runtime_init(Runtime* rt, Block* head, Sprite* sprite) {
     rt->ticksSinceLastWait = 0;
     rt->watchdogThreshold = DEFAULT_WATCHDOG_THRESHOLD;
     rt->watchdogTriggered = false;
+    rt->mouseX = 0;
+    rt->mouseY = 0;
 }
 
 void runtime_reset(Runtime* rt) {
@@ -85,8 +90,12 @@ void runtime_step(Runtime* rt, Stage* stage) {
     }
 }
 
-void runtime_advance_step(Runtime* rt, Stage* stage) {
+void runtime_advance_step(Runtime* rt, Stage* stage, int mouseX, int mouseY) {
     if (!rt->stepMode || !rt->waitingForStep) return;
+
+    rt->mouseX = mouseX;
+    rt->mouseY = mouseY;
+
     if (rt->state != RUNTIME_RUNNING) return;
     if (!rt->currentBlock) {
         rt->state = RUNTIME_FINISHED;
@@ -146,8 +155,11 @@ bool runtime_is_waiting_for_step(Runtime* rt) {
     return rt->stepMode && rt->waitingForStep && rt->state == RUNTIME_RUNNING;
 }
 
-void runtime_tick(Runtime* rt, Stage* stage) {
+void runtime_tick(Runtime* rt, Stage* stage, int mouseX, int mouseY) {
     if (rt->state != RUNTIME_RUNNING) return;
+
+    rt->mouseX = mouseX;
+    rt->mouseY = mouseY;
 
     if (rt->stepMode && rt->waitingForStep) {
         return;
@@ -182,6 +194,7 @@ void runtime_tick(Runtime* rt, Stage* stage) {
     bool isLastBlock = (rt->currentBlock->next == nullptr && rt->loopStack.empty());
     execute_block(rt, rt->currentBlock, stage);
     if (isLastBlock) {
+        log_info("Last block");
         rt->waitTicksRemaining = 30;
     }
     advance_to_next_block(rt);
@@ -330,6 +343,7 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
     bool hasChanged = false;
 
     switch (b->type) {
+        // Motion:
         case CMD_MOVE: {
             float steps = 10.0f;
             if (!b->args.empty()) steps = (float)std::atof(b->args[0].c_str());
@@ -348,7 +362,6 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
             }
             break;
         }
-
         case CMD_TURN: {
             float degrees = 15.0f;
             if (!b->args.empty()) degrees = (float)std::atof(b->args[0].c_str());
@@ -358,7 +371,6 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
             while (rt->targetSprite->angle < 0.0f) rt->targetSprite->angle += 360.0f;
             break;
         }
-
         case CMD_GOTO: {
             float gotoX = 0.0f;
             float gotoY = 0.0f;
@@ -381,6 +393,7 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
             break;
         }
 
+        // Control:
         case CMD_WAIT: {
             float seconds = 1.0f;
             if (!b->args.empty()) seconds = (float)std::atof(b->args[0].c_str());
@@ -392,14 +405,12 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
             }
             break;
         }
-
         case CMD_SAY: {
             std::string msg = "Hello!";
             if (!b->args.empty()) msg = b->args[0];
             log_info("Sprite says: " + msg);
             break;
         }
-
         case CMD_REPEAT: {
             int times = 10;
             if (!b->args.empty()) times = std::atoi(b->args[0].c_str());
@@ -421,7 +432,6 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
             rt->loopStack.push_back(ctx);
             break;
         }
-
         case CMD_IF: {
             bool condition = evaluate_condition(rt, b);
 
@@ -439,6 +449,7 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
             break;
         }
 
+        // Position:
         case CMD_SET_X: {
             float newX = 0.0f;
             if (!b->args.empty()) newX = (float)std::atof(b->args[0].c_str());
@@ -455,7 +466,6 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
             }
             break;
         }
-
         case CMD_SET_Y: {
             float newY = 0.0f;
             if (!b->args.empty()) newY = (float)std::atof(b->args[0].c_str());
@@ -472,7 +482,6 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
             }
             break;
         }
-
         case CMD_CHANGE_X: {
             float deltaX = 0.0f;
             if (!b->args.empty()) deltaX = (float)std::atof(b->args[0].c_str());
@@ -489,7 +498,6 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
             }
             break;
         }
-
         case CMD_CHANGE_Y: {
             float deltaY = 0.0f;
             if (!b->args.empty()) deltaY = (float)std::atof(b->args[0].c_str());
@@ -507,22 +515,17 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
             break;
         }
 
-        case CMD_EVENT_CLICK: {
-            break;
-        }
-
+        // Pen:
         case CMD_PEN_DOWN: {
             rt->targetSprite->isPenDown = 1;
             log_info("Pen down");
             break;
         }
-
         case CMD_PEN_UP: {
             rt->targetSprite->isPenDown = 0;
             log_info("Pen up");
             break;
         }
-
         case CMD_PEN_CLEAR: {
             if (stage && stage->renderer) {
                 pen_clear(stage->renderer, stage);
@@ -530,7 +533,6 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
             log_info("Pen cleared");
             break;
         }
-
         case CMD_PEN_SET_COLOR: {
             if (!b->args.empty()) {
                 int colorVal = std::atoi(b->args[0].c_str());
@@ -550,7 +552,6 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
             log_info("Pen color set");
             break;
         }
-
         case CMD_PEN_SET_SIZE: {
             if (!b->args.empty()) {
                 int size = std::atoi(b->args[0].c_str());
@@ -561,12 +562,70 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
             log_info("Pen size set");
             break;
         }
-
         case CMD_PEN_STAMP: {
             if (stage && stage->renderer) {
                 pen_stamp(stage->renderer, rt->targetSprite);
             }
             log_info("Stamp");
+            break;
+        }
+
+        // Looks:
+        case CMD_SWITCH_COSTUME:
+        case CMD_NEXT_COSTUME:
+        case CMD_SET_SIZE:
+        case CMD_CHANGE_SIZE:
+        case CMD_SHOW:
+        case CMD_HIDE: {
+            ExecutionContext ctx;
+            ctx.sprite = rt->targetSprite;
+            ctx.stage = stage;
+            ctx.mouseX = rt->mouseX;
+            ctx.mouseY = rt->mouseY;
+            execute_looks_block(b, ctx);
+            break;
+        }
+
+        // Sounds:
+        case CMD_PLAY_SOUND: {
+            execute_play_sound(b, *rt->targetSprite);
+            break;
+        }
+        case CMD_STOP_ALL_SOUNDS: {
+            execute_stop_all_sounds(b, *rt->targetSprite);
+            break;
+        }
+        case CMD_CHANGE_VOLUME: {
+            execute_change_volume(b, *rt->targetSprite);
+            break;
+        }
+        case CMD_SET_VOLUME: {
+            execute_set_volume(b, *rt->targetSprite);
+            break;
+        }
+
+        // Sensing:
+        case SENSE_TOUCHING_MOUSE:
+        case SENSE_TOUCHING_EDGE: {
+            ExecutionContext ctx;
+            ctx.sprite = rt->targetSprite;
+            ctx.stage = stage;
+            ctx.mouseX = rt->mouseX;
+            ctx.mouseY = rt->mouseY;
+            execute_sensing_block(b, ctx);
+            break;
+        }
+
+        // Logical:
+        case OP_ADD:
+        case OP_SUB:
+        case OP_DIV: {
+            ExecutionContext ctx;
+            ctx.sprite = rt->targetSprite;
+            ctx.stage = stage;
+            ctx.mouseX = rt->mouseX;
+            ctx.mouseY = rt->mouseY;
+            execute_operator_block(b, ctx);
             break;
         }
 
