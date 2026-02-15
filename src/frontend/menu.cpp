@@ -1,6 +1,13 @@
 #include "menu.h"
 #include "../common/definitions.h"
 #include <cstring>
+static MenuAction g_last_action = MENU_ACTION_NONE;
+
+MenuAction menu_consume_action() {
+    MenuAction a = g_last_action;
+    g_last_action = MENU_ACTION_NONE;
+    return a;
+}
 
 static Menu g_menus[2];  
 static int  g_menu_count = 2;
@@ -165,11 +172,10 @@ void menu_init()
     g_menus[0].item_width  = 120;
     g_menus[0].item_height = 24;
     g_menus[0].items.clear();
-    g_menus[0].items.push_back(MenuItem("New"));
-    g_menus[0].items.push_back(MenuItem("Save"));
-    g_menus[0].items.push_back(MenuItem("Load"));
-    g_menus[0].items.push_back(MenuItem("Exit"));
-
+    g_menus[0].items.push_back(MenuItem("New",  MENU_ACTION_NEW));    
+    g_menus[0].items.push_back(MenuItem("Save", MENU_ACTION_SAVE));  
+    g_menus[0].items.push_back(MenuItem("Load", MENU_ACTION_LOAD));   
+    g_menus[0].items.push_back(MenuItem("Exit", MENU_ACTION_EXIT));  
     g_menus[1].title  = "Help";
     g_menus[1].x      = 52;
     g_menus[1].y      = 0;
@@ -180,9 +186,9 @@ void menu_init()
     g_menus[1].item_width  = 140;
     g_menus[1].item_height = 24;
     g_menus[1].items.clear();
-    g_menus[1].items.push_back(MenuItem("System Logger"));
-    g_menus[1].items.push_back(MenuItem("Debug Info"));
-    g_menus[1].items.push_back(MenuItem("About"));
+    g_menus[1].items.push_back(MenuItem("System Logger", MENU_ACTION_SYSTEM_LOGGER)); 
+    g_menus[1].items.push_back(MenuItem("Debug Info",    MENU_ACTION_DEBUG_INFO));    
+    g_menus[1].items.push_back(MenuItem("About",         MENU_ACTION_ABOUT));       
 }
 
 bool menu_is_any_open()
@@ -261,6 +267,7 @@ void menu_handle_mouse_down(int mx, int my)
                               my >= item_y &&
                               my <= item_y + m.item_height);
             if (over_item) {
+                g_last_action = m.items[k].action;
                 m.is_open = false;
                 return;
             }

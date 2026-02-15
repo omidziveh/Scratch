@@ -1001,6 +1001,41 @@ bool evaluate_condition(Runtime* rt, Block* b) {
     return true;
 }
 
+void pen_draw_line(SDL_Renderer* renderer, Sprite* sprite, float oldX, float oldY, float newX, float newY) {
+    if (!renderer || !sprite) return;
+    SDL_SetRenderDrawColor(renderer, sprite->penR, sprite->penG, sprite->penB, 255);
+    int size = sprite->penSize;
+    if (size < 1) size = 1;
+    for (int w = -(size / 2); w <= (size / 2); w++) {
+        SDL_RenderDrawLine(renderer,
+            (int)oldX + w, (int)oldY,
+            (int)newX + w, (int)newY);
+        SDL_RenderDrawLine(renderer,
+            (int)oldX, (int)oldY + w,
+            (int)newX, (int)newY + w);
+    }
+}
+
+void pen_clear(SDL_Renderer* renderer, Stage* stage) {
+    if (!renderer || !stage) return;
+    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+    SDL_Rect rect = {STAGE_X, STAGE_Y, STAGE_WIDTH, STAGE_HEIGHT};
+    SDL_RenderFillRect(renderer, &rect);
+}
+
+void pen_stamp(SDL_Renderer* renderer, Sprite* sprite) {
+    if (!renderer || !sprite) return;
+    SDL_SetRenderDrawColor(renderer, sprite->penR, sprite->penG, sprite->penB, 255);
+    int stampSize = sprite->penSize * 5;
+    if (stampSize < 10) stampSize = 10;
+    SDL_Rect r;
+    r.x = (int)sprite->x - stampSize / 2;
+    r.y = (int)sprite->y - stampSize / 2;
+    r.w = stampSize;
+    r.h = stampSize;
+    SDL_RenderFillRect(renderer, &r);
+}
+
 void execute_block(Runtime* rt, Block* b, Stage* stage) {
     if (!b || !rt->targetSprite) return;
 
@@ -1021,10 +1056,19 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
         case CMD_MOVE: {
             float steps = 10.0f;
             if (!b->args.empty()) steps = (float)std::atof(b->args[0].c_str());
+
+            float oldX = rt->targetSprite->x;
+            float oldY = rt->targetSprite->y;
+
             float rad = rt->targetSprite->angle * 3.14159265f / 180.0f;
             rt->targetSprite->x += steps * std::cos(rad);
             rt->targetSprite->y += steps * std::sin(rad);
             hasChanged = true;
+
+            if (rt->targetSprite->isPenDown && stage && stage->renderer) {
+                pen_draw_line(stage->renderer, rt->targetSprite, oldX, oldY,
+                              rt->targetSprite->x, rt->targetSprite->y);
+            }
             break;
         }
 
@@ -1045,9 +1089,18 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
                 gotoX = (float)std::atof(b->args[0].c_str());
                 gotoY = (float)std::atof(b->args[1].c_str());
             }
+
+            float oldX = rt->targetSprite->x;
+            float oldY = rt->targetSprite->y;
+
             rt->targetSprite->x = gotoX;
             rt->targetSprite->y = gotoY;
             hasChanged = true;
+
+            if (rt->targetSprite->isPenDown && stage && stage->renderer) {
+                pen_draw_line(stage->renderer, rt->targetSprite, oldX, oldY,
+                              rt->targetSprite->x, rt->targetSprite->y);
+            }
             break;
         }
 
@@ -1108,39 +1161,135 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
             }
             break;
         }
+
         case CMD_SET_X: {
             float newX = 0.0f;
             if (!b->args.empty()) newX = (float)std::atof(b->args[0].c_str());
+
+            float oldX = rt->targetSprite->x;
+            float oldY = rt->targetSprite->y;
+
             rt->targetSprite->x = STAGE_X + STAGE_WIDTH / 2.0f + newX;
             hasChanged = true;
+
+            if (rt->targetSprite->isPenDown && stage && stage->renderer) {
+                pen_draw_line(stage->renderer, rt->targetSprite, oldX, oldY,
+                              rt->targetSprite->x, rt->targetSprite->y);
+            }
             break;
         }
 
         case CMD_SET_Y: {
             float newY = 0.0f;
             if (!b->args.empty()) newY = (float)std::atof(b->args[0].c_str());
+
+            float oldX = rt->targetSprite->x;
+            float oldY = rt->targetSprite->y;
+
             rt->targetSprite->y = STAGE_Y + STAGE_HEIGHT / 2.0f - newY;
             hasChanged = true;
+
+            if (rt->targetSprite->isPenDown && stage && stage->renderer) {
+                pen_draw_line(stage->renderer, rt->targetSprite, oldX, oldY,
+                              rt->targetSprite->x, rt->targetSprite->y);
+            }
             break;
         }
 
         case CMD_CHANGE_X: {
             float deltaX = 0.0f;
             if (!b->args.empty()) deltaX = (float)std::atof(b->args[0].c_str());
+
+            float oldX = rt->targetSprite->x;
+            float oldY = rt->targetSprite->y;
+
             rt->targetSprite->x += deltaX;
             hasChanged = true;
+
+            if (rt->targetSprite->isPenDown && stage && stage->renderer) {
+                pen_draw_line(stage->renderer, rt->targetSprite, oldX, oldY,
+                              rt->targetSprite->x, rt->targetSprite->y);
+            }
             break;
         }
 
         case CMD_CHANGE_Y: {
             float deltaY = 0.0f;
             if (!b->args.empty()) deltaY = (float)std::atof(b->args[0].c_str());
+
+            float oldX = rt->targetSprite->x;
+            float oldY = rt->targetSprite->y;
+
             rt->targetSprite->y -= deltaY;
             hasChanged = true;
+
+            if (rt->targetSprite->isPenDown && stage && stage->renderer) {
+                pen_draw_line(stage->renderer, rt->targetSprite, oldX, oldY,
+                              rt->targetSprite->x, rt->targetSprite->y);
+            }
             break;
         }
 
         case CMD_EVENT_CLICK: {
+            break;
+        }
+
+        case CMD_PEN_DOWN: {
+            rt->targetSprite->isPenDown = 1;
+            log_info("Pen down");
+            break;
+        }
+
+        case CMD_PEN_UP: {
+            rt->targetSprite->isPenDown = 0;
+            log_info("Pen up");
+            break;
+        }
+
+        case CMD_PEN_CLEAR: {
+            if (stage && stage->renderer) {
+                pen_clear(stage->renderer, stage);
+            }
+            log_info("Pen cleared");
+            break;
+        }
+
+        case CMD_PEN_SET_COLOR: {
+            if (!b->args.empty()) {
+                int colorVal = std::atoi(b->args[0].c_str());
+                int r = (colorVal >> 16) & 0xFF;
+                int g = (colorVal >> 8) & 0xFF;
+                int bVal = colorVal & 0xFF;
+                if (r == 0 && g == 0 && bVal == 0 && colorVal != 0) {
+                    rt->targetSprite->penR = (Uint8)(colorVal % 256);
+                    rt->targetSprite->penG = (Uint8)(colorVal % 256);
+                    rt->targetSprite->penB = (Uint8)(colorVal % 256);
+                } else {
+                    rt->targetSprite->penR = (Uint8)r;
+                    rt->targetSprite->penG = (Uint8)g;
+                    rt->targetSprite->penB = (Uint8)bVal;
+                }
+            }
+            log_info("Pen color set");
+            break;
+        }
+
+        case CMD_PEN_SET_SIZE: {
+            if (!b->args.empty()) {
+                int size = std::atoi(b->args[0].c_str());
+                if (size < 1) size = 1;
+                if (size > 100) size = 100;
+                rt->targetSprite->penSize = size;
+            }
+            log_info("Pen size set");
+            break;
+        }
+
+        case CMD_PEN_STAMP: {
+            if (stage && stage->renderer) {
+                pen_stamp(stage->renderer, rt->targetSprite);
+            }
+            log_info("Stamp");
             break;
         }
 
@@ -1565,6 +1714,8 @@ struct Stage {
     int height;
     Color border_color;
     Color background_color;
+    SDL_Renderer* renderer;
+    SDL_Texture* penCanvas;
 
     Stage()
         : x(STAGE_X)
@@ -1573,8 +1724,11 @@ struct Stage {
         , height(STAGE_HEIGHT)
         , border_color({100, 100, 100, 255})
         , background_color({255, 255, 255, 255})
+        , renderer(nullptr)
+        , penCanvas(nullptr)
     {}
 };
+
 
 struct Sprite {
     float x;
@@ -1594,6 +1748,10 @@ struct Sprite {
     float prevPenX;
     float prevPenY;
     bool penMoved;
+    Uint8 penR;
+    Uint8 penG;
+    Uint8 penB;
+    int penSize;
     Sprite()
         : x(STAGE_X + STAGE_WIDTH / 2.0f)
         , y(STAGE_Y + STAGE_HEIGHT / 2.0f)
@@ -1608,6 +1766,13 @@ struct Sprite {
         , name("Cat")
         , scale(0.05f)
         , volume(100)
+        , prevPenX(STAGE_X + STAGE_WIDTH / 2.0f)
+        , prevPenY(STAGE_Y + STAGE_HEIGHT / 2.0f)
+        , penMoved(false)
+        , penR(0)
+        , penG(0)
+        , penB(255)
+        , penSize(1)
     {}
 };
 
@@ -1640,7 +1805,14 @@ enum BlockType {
     SENSE_TOUCHING_EDGE,
     OP_ADD,
     OP_SUB,
-    OP_DIV
+    OP_DIV,
+    CMD_PEN_DOWN,
+    CMD_PEN_UP,
+    CMD_PEN_CLEAR,
+    CMD_PEN_SET_COLOR,
+    CMD_PEN_SET_SIZE,
+    CMD_PEN_STAMP
+
 };
 
 struct Block {
@@ -1754,7 +1926,8 @@ const SDL_Color COLOR_MOTION     = {76,  151, 255, 255};
 const SDL_Color COLOR_CONTROL    = {255, 171, 25,  255};
 const SDL_Color COLOR_LOOKS      = {153, 102, 255, 255};
 const SDL_Color COLOR_EVENTS     = {255, 213, 0,   255};
-const SDL_Color COLOR_SOUND      = {207, 99, 207, 255};
+const SDL_Color COLOR_SOUND      = {207, 99,  207, 255};
+const SDL_Color COLOR_PEN        = {0,   171, 132, 255};
 
 const SDL_Color COLOR_TOOLBAR_BG    = {60,  60,  60,  255};
 const SDL_Color COLOR_PALETTE_BG    = {45,  45,  45,  255};
@@ -1800,6 +1973,12 @@ std::string block_get_label(BlockType type) {
         case CMD_STOP_ALL_SOUNDS:  return "Stop all sounds";
         case CMD_CHANGE_VOLUME:    return "Change volume by";
         case CMD_SET_VOLUME:       return "Set volume to";
+        case CMD_PEN_DOWN: return "pen down";
+        case CMD_PEN_UP: return "pen up";
+        case CMD_PEN_CLEAR: return "clear pen";
+        case CMD_PEN_SET_COLOR: return "set pen color";
+        case CMD_PEN_SET_SIZE: return "set pen size";
+        case CMD_PEN_STAMP: return "stamp";
 
         default:           return "Unknown";
     }
@@ -2975,7 +3154,13 @@ void init_palette(std::vector<PaletteItem>& items) {
         {CMD_PLAY_SOUND,    "Play sound"},
         {CMD_STOP_ALL_SOUNDS,"Stop all sounds"},
         {CMD_CHANGE_VOLUME, "Change volume by (10)"},
-        {CMD_SET_VOLUME,    "Set volume to (100)"}
+        {CMD_SET_VOLUME,    "Set volume to (100)"},
+        {CMD_PEN_DOWN,      "Pen down"},
+        {CMD_PEN_UP,        "Pen up"},
+        {CMD_PEN_CLEAR,     "Clear pen"},
+        {CMD_PEN_SET_COLOR, "Set pen color to (0)"},
+        {CMD_PEN_SET_SIZE,  "Set pen size to (1)"},
+        {CMD_PEN_STAMP,     "Stamp"}
     };
 
     int count = sizeof(defs) / sizeof(defs[0]);
@@ -3002,7 +3187,7 @@ void draw_palette(SDL_Renderer* renderer, const std::vector<PaletteItem>& items,
 
     for (const auto& item : items) {
         float draw_y = item.y - (float)scroll_offset;
-        
+
         if (draw_y + item.height < (float)PALETTE_Y) continue;
         if (draw_y > (float)(PALETTE_Y + PALETTE_HEIGHT)) continue;
 
@@ -3038,7 +3223,8 @@ int get_palette_total_height(const std::vector<PaletteItem>& items);
 ===== C:\Users\Roham\Scratch\src\frontend\pen.cpp =====
 
 #include "pen.h"
-#include <../gfx/SDL2_gfxPrimitives.h>
+#include "../gfx/SDL2_gfxPrimitives.h"
+
 #include <cmath>
 
 static SDL_Texture* pen_canvas = nullptr;
@@ -3107,9 +3293,36 @@ void pen_stamp(SDL_Renderer* renderer, Sprite& sprite) {
     int sy = (int)(sprite.y - STAGE_Y - draw_h / 2);
 
     SDL_Rect dst = { sx, sy, draw_w, draw_h };
-    SDL_RenderCopyEx(renderer, sprite.texture, nullptr, &dst, sprite.direction, nullptr, SDL_FLIP_NONE);
+    SDL_RenderCopyEx(renderer, sprite.texture, nullptr, &dst,
+                     sprite.direction, nullptr, SDL_FLIP_NONE);
 
     SDL_SetRenderTarget(renderer, prev);
+}
+
+void pen_draw_line(SDL_Renderer* renderer, float x1, float y1,
+                   float x2, float y2, const Sprite& sprite) {
+    if (!pen_canvas) return;
+
+    int cx1 = (int)(x1 - STAGE_X);
+    int cy1 = (int)(y1 - STAGE_Y);
+    int cx2 = (int)(x2 - STAGE_X);
+    int cy2 = (int)(y2 - STAGE_Y);
+
+    SDL_Texture* prev_target = SDL_GetRenderTarget(renderer);
+    SDL_SetRenderTarget(renderer, pen_canvas);
+
+    Uint8 r = sprite.penR;
+    Uint8 g = sprite.penG;
+    Uint8 b = sprite.penB;
+    int thickness = sprite.penSize;
+
+    if (thickness <= 1) {
+        lineRGBA(renderer, cx1, cy1, cx2, cy2, r, g, b, 255);
+    } else {
+        thickLineRGBA(renderer, cx1, cy1, cx2, cy2, thickness, r, g, b, 255);
+    }
+
+    SDL_SetRenderTarget(renderer, prev_target);
 }
 
 void pen_update(SDL_Renderer* renderer, Sprite& sprite) {
@@ -3135,7 +3348,8 @@ void pen_update(SDL_Renderer* renderer, Sprite& sprite) {
     if (pen_thickness <= 1) {
         lineRGBA(renderer, x1, y1, x2, y2, pen_r, pen_g, pen_b, pen_a);
     } else {
-        thickLineRGBA(renderer, x1, y1, x2, y2, pen_thickness, pen_r, pen_g, pen_b, pen_a);
+        thickLineRGBA(renderer, x1, y1, x2, y2, pen_thickness,
+                      pen_r, pen_g, pen_b, pen_a);
     }
 
     SDL_SetRenderTarget(renderer, prev_target);
@@ -3165,8 +3379,9 @@ void pen_clear(SDL_Renderer* renderer);
 void pen_stamp(SDL_Renderer* renderer, Sprite& sprite);
 void pen_update(SDL_Renderer* renderer, Sprite& sprite);
 void pen_render(SDL_Renderer* renderer);
-void pen_set_color(Uint8 r, Uint8 g, Uint8 b, Uint8 a);
+void pen_set_color(Uint8 r, Uint8 g, Uint8 b, Uint8 a = 255);
 void pen_set_size(int size);
+void pen_draw_line(SDL_Renderer* renderer, float x1, float y1, float x2, float y2, const Sprite& sprite);
 
 #endif
 
@@ -3203,6 +3418,10 @@ int get_arg_count(BlockType type) {
         case CMD_START:
         case CMD_EVENT_CLICK:
         case CMD_NONE:
+        case CMD_PEN_SET_COLOR:
+        case CMD_PEN_SET_SIZE:
+            return 1;
+
         default:
             return 0;
     }
@@ -20817,9 +21036,66 @@ int main(int argc, char* argv[]) {
                 ExecutionContext exec_ctx;
                 exec_ctx.sprite = &sprite;
 
-                pen_update(renderer, sprite);
+                float oldX = sprite.x;
+                float oldY = sprite.y;
 
                 switch (current.type) {
+
+                    case CMD_MOVE: {
+                        float steps = 10.0f;
+                        if (!current.args.empty())
+                            steps = (float)std::atof(current.args[0].c_str());
+                        float rad = sprite.angle * (float)M_PI / 180.0f;
+                        sprite.x += steps * std::cos(rad);
+                        sprite.y += steps * std::sin(rad);
+                        break;
+                    }
+
+                    case CMD_TURN: {
+                        float deg = 15.0f;
+                        if (!current.args.empty())
+                            deg = (float)std::atof(current.args[0].c_str());
+                        sprite.angle += deg;
+                        break;
+                    }
+
+                    case CMD_GOTO: {
+                        float gx = 0.0f, gy = 0.0f;
+                        if (current.args.size() >= 1) gx = (float)std::atof(current.args[0].c_str());
+                        if (current.args.size() >= 2) gy = (float)std::atof(current.args[1].c_str());
+                        sprite.x = STAGE_X + STAGE_WIDTH / 2.0f + gx;
+                        sprite.y = STAGE_Y + STAGE_HEIGHT / 2.0f - gy;
+                        break;
+                    }
+
+                    case CMD_SET_X: {
+                        float nx = 0.0f;
+                        if (!current.args.empty()) nx = (float)std::atof(current.args[0].c_str());
+                        sprite.x = STAGE_X + STAGE_WIDTH / 2.0f + nx;
+                        break;
+                    }
+
+                    case CMD_SET_Y: {
+                        float ny = 0.0f;
+                        if (!current.args.empty()) ny = (float)std::atof(current.args[0].c_str());
+                        sprite.y = STAGE_Y + STAGE_HEIGHT / 2.0f - ny;
+                        break;
+                    }
+
+                    case CMD_CHANGE_X: {
+                        float dx = 0.0f;
+                        if (!current.args.empty()) dx = (float)std::atof(current.args[0].c_str());
+                        sprite.x += dx;
+                        break;
+                    }
+
+                    case CMD_CHANGE_Y: {
+                        float dy = 0.0f;
+                        if (!current.args.empty()) dy = (float)std::atof(current.args[0].c_str());
+                        sprite.y -= dy;
+                        break;
+                    }
+
                     case CMD_SWITCH_COSTUME:
                     case CMD_NEXT_COSTUME:
                     case CMD_SET_SIZE:
@@ -20828,12 +21104,61 @@ int main(int argc, char* argv[]) {
                     case CMD_HIDE:
                         execute_looks_block(&current, exec_ctx);
                         break;
+
                     case CMD_PLAY_SOUND:
-                        play_sound(current.args[0], exec_ctx.sprite->volume);
+                        if (!current.args.empty())
+                            play_sound(current.args[0], exec_ctx.sprite->volume);
                         break;
+
+                
+                    case CMD_PEN_DOWN:
+                        sprite.isPenDown = 1;
+                        sprite.prevPenX = sprite.x;
+                        sprite.prevPenY = sprite.y;
+                        break;
+
+                    case CMD_PEN_UP:
+                        sprite.isPenDown = 0;
+                        break;
+
+                    case CMD_PEN_CLEAR:
+                        pen_clear(renderer);
+                        break;
+
+                    case CMD_PEN_SET_COLOR: {
+                        if (current.args.size() >= 3) {
+                            sprite.penR = (Uint8)std::atoi(current.args[0].c_str());
+                            sprite.penG = (Uint8)std::atoi(current.args[1].c_str());
+                            sprite.penB = (Uint8)std::atoi(current.args[2].c_str());
+                            pen_set_color(sprite.penR, sprite.penG, sprite.penB);
+                        }
+                        break;
+                    }
+
+                    case CMD_PEN_SET_SIZE: {
+                        if (!current.args.empty()) {
+                            sprite.penSize = std::atoi(current.args[0].c_str());
+                            if (sprite.penSize < 1) sprite.penSize = 1;
+                            pen_set_size(sprite.penSize);
+                        }
+                        break;
+                    }
+
+                    case CMD_PEN_STAMP:
+                        pen_stamp(renderer, sprite);
+                        break;
+
+
                     default:
                         break;
                 }
+
+                // --- CHANGED: Ø±Ø³Ù… Ø®Ø· Pen Ø¨Ø¹Ø¯ Ø§Ø² Ø­Ø±Ú©Øª ---
+                if (sprite.isPenDown && (sprite.x != oldX || sprite.y != oldY)) {
+                    pen_draw_line(renderer, oldX, oldY, sprite.x, sprite.y, sprite);
+                }
+
+                pen_update(renderer, sprite);
 
                 sprite.prevPenX = sprite.x;
                 sprite.prevPenY = sprite.y;

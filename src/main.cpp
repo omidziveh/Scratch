@@ -7,6 +7,10 @@
 #include <iostream>
 #include <vector>
 #include <cmath>
+#include <fstream>
+#include <cstdlib>
+#include <cstring>
+
 #include "common/definitions.h"
 #include "common/globals.h"
 #include "frontend/draw.h"
@@ -22,16 +26,158 @@
 #include "backend/sound.h"
 #include "frontend/pen.h"
 
+static void save_project(const char* filename,
+                         const std::vector<Block>& blocks,
+                         const Sprite& sprite)
+{
+    std::ofstream file(filename, std::ios::binary);
+    if (!file.is_open()) {
+        log_warning("SAVE: Failed to open file for saving");
+        return;
+    }
+
+    int count = (int)blocks.size();
+    file.write(reinterpret_cast<const char*>(&count), sizeof(count));
+
+    for (const auto& b : blocks) {
+        file.write(reinterpret_cast<const char*>(&b.id),   sizeof(b.id));
+        file.write(reinterpret_cast<const char*>(&b.type), sizeof(b.type));
+        file.write(reinterpret_cast<const char*>(&b.x),    sizeof(b.x));
+        file.write(reinterpret_cast<const char*>(&b.y),    sizeof(b.y));
+
+        int argCount = (int)b.args.size();
+        file.write(reinterpret_cast<const char*>(&argCount), sizeof(argCount));
+        for (const auto& arg : b.args) {
+            int len = (int)arg.size();
+            file.write(reinterpret_cast<const char*>(&len), sizeof(len));
+            file.write(arg.c_str(), len);
+        }
+    }
+
+    file.write(reinterpret_cast<const char*>(&sprite.x),     sizeof(sprite.x));
+    file.write(reinterpret_cast<const char*>(&sprite.y),     sizeof(sprite.y));
+    file.write(reinterpret_cast<const char*>(&sprite.angle), sizeof(sprite.angle));
+    file.write(reinterpret_cast<const char*>(&sprite.visible), sizeof(sprite.visible));
+    file.write(reinterpret_cast<const char*>(&sprite.currentCostumeIndex),
+               sizeof(sprite.currentCostumeIndex));
+
+    file.close();
+    log_info("SAVE: Project saved to file");
+}
+
+static bool load_project(const char* filename,
+                          std::vector<Block>& blocks,
+                          Sprite& sprite,
+                          int& next_block_id)
+{
+    std::ifstream file(filename, std::ios::binary);
+    if (!file.is_open()) {
+        log_warning("LOAD: Failed to open file for loading");
+        return false;
+    }
+
+    blocks.clear();
+    next_block_id = 1;
+
+    int count = 0;
+    file.read(reinterpret_cast<char*>(&count), sizeof(count));
+
+    for (int i = 0; i < count; i++) {
+        Block b;
+        file.read(reinterpret_cast<char*>(&b.id),   sizeof(b.id));
+        file.read(reinterpret_cast<char*>(&b.type), sizeof(b.type));
+        file.read(reinterpret_cast<char*>(&b.x),    sizeof(b.x));
+        file.read(reinterpret_cast<char*>(&b.y),    sizeof(b.y));
+
+        b.is_running = false;
+        b.glow_start_time = 0;
+
+        int argCount = 0;
+        file.read(reinterpret_cast<char*>(&argCount), sizeof(argCount));
+        for (int j = 0; j < argCount; j++) {
+            int len = 0;
+            file.read(reinterpret_cast<char*>(&len), sizeof(len));
+            std::string arg(len, '\0');
+            file.read(&arg[0], len);
+            b.args.push_back(arg);
+        }
+
+        blocks.push_back(b);
+
+        if (b.id >= next_block_id) {
+            next_block_id = b.id + 1;
+        }
+    }
+
+    file.read(reinterpret_cast<char*>(&sprite.x),     sizeof(sprite.x));
+    file.read(reinterpret_cast<char*>(&sprite.y),     sizeof(sprite.y));
+    file.read(reinterpret_cast<char*>(&sprite.angle), sizeof(sprite.angle));
+    file.read(reinterpret_cast<char*>(&sprite.visible), sizeof(sprite.visible));
+    file.read(reinterpret_cast<char*>(&sprite.currentCostumeIndex),
+              sizeof(sprite.currentCostumeIndex));
+
+    if (sprite.currentCostumeIndex >= 0 &&
+        sprite.currentCostumeIndex < (int)sprite.costumes.size()) {
+        sprite.texture = sprite.costumes[sprite.currentCostumeIndex].texture;
+        sprite.width   = sprite.costumes[sprite.currentCostumeIndex].width;
+        sprite.height  = sprite.costumes[sprite.currentCostumeIndex].height;
+    }
+
+    file.close();
+    log_info("LOAD: Project loaded from file");
+    return true;
+}
+
+static void new_project(std::vector<Block>& blocks,
+                         Sprite& sprite,
+                         int& next_block_id,
+                         int& execution_index,
+                         bool& is_executing,
+                         SDL_Renderer* renderer)
+{
+    blocks.clear();
+    next_block_id = 1;
+    execution_index = -1;
+    is_executing = false;
+
+    sprite.x = STAGE_X + STAGE_WIDTH / 2.0f;
+    sprite.y = STAGE_Y + STAGE_HEIGHT / 2.0f;
+    sprite.angle = 0.0f;
+    sprite.visible = true;
+    sprite.isPenDown = 0;
+    sprite.penR = 0;
+    sprite.penG = 0;
+    sprite.penB = 255;
+    sprite.penSize = 1;
+    sprite.prevPenX = sprite.x;
+    sprite.prevPenY = sprite.y;
+
+    if (!sprite.costumes.empty()) {
+        sprite.currentCostumeIndex = 0;
+        sprite.texture = sprite.costumes[0].texture;
+        sprite.width   = sprite.costumes[0].width;
+        sprite.height  = sprite.costumes[0].height;
+    }
+
+    pen_clear(renderer);
+
+    log_info("NEW: New project created");
+}
+
 int main(int argc, char* argv[]) {
-    int g_execution_index = -1;
-    bool g_is_executing = false;
-    bool g_step_mode = false;
-    bool g_waiting_for_step = false;
+    (void)argc;
+    (void)argv;
+
+    int g_execution_index     = -1;
+    bool g_is_executing       = false;
+    bool g_step_mode          = false;
+    bool g_waiting_for_step   = false;
 
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0) {
         std::cerr << "SDL_Init Error: " << SDL_GetError() << std::endl;
         return 1;
     }
+
     syslog_init();
     menu_init();
 
@@ -84,8 +230,8 @@ int main(int argc, char* argv[]) {
     }
 
     {
-        const char* costume_files[] = {"../assets/cat.png", "../assets/cat2.png"};
-        const char* costume_names[] = {"costume1", "costume2"};
+        const char* costume_files[] = { "../assets/cat.png", "../assets/cat2.png" };
+        const char* costume_names[] = { "costume1", "costume2" };
         int num_costumes = 2;
 
         for (int i = 0; i < num_costumes; i++) {
@@ -100,8 +246,8 @@ int main(int argc, char* argv[]) {
         if (!sprite.costumes.empty()) {
             sprite.currentCostumeIndex = 0;
             sprite.texture = sprite.costumes[0].texture;
-            sprite.width = sprite.costumes[0].width;
-            sprite.height = sprite.costumes[0].height;
+            sprite.width   = sprite.costumes[0].width;
+            sprite.height  = sprite.costumes[0].height;
         }
     }
 
@@ -117,7 +263,7 @@ int main(int argc, char* argv[]) {
 
     TextInputState text_state;
 
-    int mouse_x = 0, mouse_y = 0;
+    int  mouse_x   = 0, mouse_y   = 0;
     bool hover_run = false;
     bool hover_stop = false;
 
@@ -125,6 +271,7 @@ int main(int argc, char* argv[]) {
     SDL_Event event;
 
     while (running) {
+
         while (SDL_PollEvent(&event)) {
             switch (event.type) {
 
@@ -140,9 +287,10 @@ int main(int argc, char* argv[]) {
                         my >= PALETTE_Y && my < PALETTE_Y + PALETTE_HEIGHT) {
 
                         palette_scroll_offset -= event.wheel.y * 30;
-
-                        if (palette_scroll_offset < 0) palette_scroll_offset = 0;
-                        if (palette_scroll_offset > palette_max_scroll) palette_scroll_offset = palette_max_scroll;
+                        if (palette_scroll_offset < 0)
+                            palette_scroll_offset = 0;
+                        if (palette_scroll_offset > palette_max_scroll)
+                            palette_scroll_offset = palette_max_scroll;
                     }
                     break;
                 }
@@ -191,7 +339,8 @@ int main(int argc, char* argv[]) {
                             if (text_state.active) {
                                 commit_editing(text_state, blocks);
                             }
-                            handle_mouse_down(event, blocks, palette_items, next_block_id, palette_scroll_offset);
+                            handle_mouse_down(event, blocks, palette_items,
+                                              next_block_id, palette_scroll_offset);
                         }
                     }
                     break;
@@ -203,8 +352,7 @@ int main(int argc, char* argv[]) {
                     }
                     break;
 
-                case SDL_MOUSEMOTION:
-                {
+                case SDL_MOUSEMOTION: {
                     int mx = event.motion.x;
                     int my = event.motion.y;
                     mouse_x = mx;
@@ -214,13 +362,12 @@ int main(int argc, char* argv[]) {
 
                     hover_run = (mx >= TOOLBAR_WIDTH - 90 && mx <= TOOLBAR_WIDTH - 90 + 30 &&
                                  my >= 5 && my <= 5 + 30);
-
                     hover_stop = (mx >= TOOLBAR_WIDTH - 50 && mx <= TOOLBAR_WIDTH - 50 + 30 &&
                                   my >= 5 && my <= 5 + 30);
 
                     handle_mouse_motion(event, blocks);
-                }
                     break;
+                }
 
                 case SDL_TEXTINPUT:
                     if (text_state.active) {
@@ -240,19 +387,61 @@ int main(int argc, char* argv[]) {
             }
         }
 
+        MenuAction action = menu_consume_action();
+        switch (action) {
+            case MENU_ACTION_NEW:
+                new_project(blocks, sprite, next_block_id,
+                            g_execution_index, g_is_executing, renderer);
+                break;
+
+            case MENU_ACTION_SAVE:
+                save_project("project.scratch", blocks, sprite);
+                break;
+
+            case MENU_ACTION_LOAD:
+                load_project("project.scratch", blocks, sprite, next_block_id);
+                g_execution_index = -1;
+                g_is_executing = false;
+                break;
+
+            case MENU_ACTION_EXIT:
+                running = false;
+                break;
+
+            case MENU_ACTION_SYSTEM_LOGGER:
+                syslog_toggle();
+                break;
+
+            case MENU_ACTION_DEBUG_INFO:
+                log_info("DEBUG: Blocks=" + std::to_string(blocks.size()) +
+                         " Sprite=(" + std::to_string((int)sprite.x) + "," +
+                         std::to_string((int)sprite.y) + ")" +
+                         " Angle=" + std::to_string((int)sprite.angle) +
+                         " PenDown=" + std::to_string(sprite.isPenDown));
+                break;
+
+            case MENU_ACTION_ABOUT:
+                log_info("ABOUT: Block Coding v1.0 - Scratch Clone built with SDL2");
+                break;
+
+            case MENU_ACTION_NONE:
+            default:
+                break;
+        }
+
         tick_cursor(text_state);
         logger_tick();
 
-        if (g_is_executing && g_execution_index >= 0 && g_execution_index < (int)blocks.size()) {
+        if (g_is_executing &&
+            g_execution_index >= 0 &&
+            g_execution_index < (int)blocks.size())
+        {
             if (g_step_mode && g_waiting_for_step) {
-
             } else {
                 for (auto& b : blocks) {
                     b.is_running = false;
                 }
 
-                blocks[g_execution_index].is_running = true;
-                blocks[g_execution_index].glow_start_time = SDL_GetTicks();
                 Block& current = blocks[g_execution_index];
                 current.is_running = true;
                 current.glow_start_time = SDL_GetTicks();
@@ -285,8 +474,10 @@ int main(int argc, char* argv[]) {
 
                     case CMD_GOTO: {
                         float gx = 0.0f, gy = 0.0f;
-                        if (current.args.size() >= 1) gx = (float)std::atof(current.args[0].c_str());
-                        if (current.args.size() >= 2) gy = (float)std::atof(current.args[1].c_str());
+                        if (current.args.size() >= 1)
+                            gx = (float)std::atof(current.args[0].c_str());
+                        if (current.args.size() >= 2)
+                            gy = (float)std::atof(current.args[1].c_str());
                         sprite.x = STAGE_X + STAGE_WIDTH / 2.0f + gx;
                         sprite.y = STAGE_Y + STAGE_HEIGHT / 2.0f - gy;
                         break;
@@ -294,28 +485,32 @@ int main(int argc, char* argv[]) {
 
                     case CMD_SET_X: {
                         float nx = 0.0f;
-                        if (!current.args.empty()) nx = (float)std::atof(current.args[0].c_str());
+                        if (!current.args.empty())
+                            nx = (float)std::atof(current.args[0].c_str());
                         sprite.x = STAGE_X + STAGE_WIDTH / 2.0f + nx;
                         break;
                     }
 
                     case CMD_SET_Y: {
                         float ny = 0.0f;
-                        if (!current.args.empty()) ny = (float)std::atof(current.args[0].c_str());
+                        if (!current.args.empty())
+                            ny = (float)std::atof(current.args[0].c_str());
                         sprite.y = STAGE_Y + STAGE_HEIGHT / 2.0f - ny;
                         break;
                     }
 
                     case CMD_CHANGE_X: {
                         float dx = 0.0f;
-                        if (!current.args.empty()) dx = (float)std::atof(current.args[0].c_str());
+                        if (!current.args.empty())
+                            dx = (float)std::atof(current.args[0].c_str());
                         sprite.x += dx;
                         break;
                     }
 
                     case CMD_CHANGE_Y: {
                         float dy = 0.0f;
-                        if (!current.args.empty()) dy = (float)std::atof(current.args[0].c_str());
+                        if (!current.args.empty())
+                            dy = (float)std::atof(current.args[0].c_str());
                         sprite.y -= dy;
                         break;
                     }
@@ -334,11 +529,10 @@ int main(int argc, char* argv[]) {
                             play_sound(current.args[0], exec_ctx.sprite->volume);
                         break;
 
-                
                     case CMD_PEN_DOWN:
                         sprite.isPenDown = 1;
-                        sprite.prevPenX = sprite.x;
-                        sprite.prevPenY = sprite.y;
+                        sprite.prevPenX  = sprite.x;
+                        sprite.prevPenY  = sprite.y;
                         break;
 
                     case CMD_PEN_UP:
@@ -349,7 +543,7 @@ int main(int argc, char* argv[]) {
                         pen_clear(renderer);
                         break;
 
-                    case CMD_PEN_SET_COLOR: {
+                    case CMD_PEN_SET_COLOR:
                         if (current.args.size() >= 3) {
                             sprite.penR = (Uint8)std::atoi(current.args[0].c_str());
                             sprite.penG = (Uint8)std::atoi(current.args[1].c_str());
@@ -357,29 +551,27 @@ int main(int argc, char* argv[]) {
                             pen_set_color(sprite.penR, sprite.penG, sprite.penB);
                         }
                         break;
-                    }
 
-                    case CMD_PEN_SET_SIZE: {
+                    case CMD_PEN_SET_SIZE:
                         if (!current.args.empty()) {
                             sprite.penSize = std::atoi(current.args[0].c_str());
                             if (sprite.penSize < 1) sprite.penSize = 1;
                             pen_set_size(sprite.penSize);
                         }
                         break;
-                    }
 
                     case CMD_PEN_STAMP:
                         pen_stamp(renderer, sprite);
                         break;
 
-
                     default:
                         break;
                 }
 
-                // --- CHANGED: رسم خط Pen بعد از حرکت ---
-                if (sprite.isPenDown && (sprite.x != oldX || sprite.y != oldY)) {
-                    pen_draw_line(renderer, oldX, oldY, sprite.x, sprite.y, sprite);
+                if (sprite.isPenDown &&
+                    (sprite.x != oldX || sprite.y != oldY)) {
+                    pen_draw_line(renderer, oldX, oldY,
+                                 sprite.x, sprite.y, sprite);
                 }
 
                 pen_update(renderer, sprite);
