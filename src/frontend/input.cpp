@@ -34,6 +34,8 @@ static void unsnap_from_parent(std::vector<Block>& blocks, Block& block) {
 
     Block* p = find_block_by_id(blocks, block.parent->id);
     if (p) {
+        p->child->parent = nullptr;
+        p->next->parent = nullptr;
         p->child = nullptr;
         p->next = nullptr;
     }
@@ -69,14 +71,14 @@ void handle_mouse_down(SDL_Event& event, std::vector<Block>& blocks,
             Block new_block;
             new_block.id = next_block_id++;
             new_block.type = item.type;
-            new_block.x = (float)mx;
-            new_block.y = (float)my;
+            new_block.x = (float)item.x;
+            new_block.y = (float)item_y;
             new_block.width = item.width;
             new_block.height = item.height;
             new_block.color = item.color;
             new_block.dragging = true;
-            new_block.drag_offset_x = item.width / 2.0f;
-            new_block.drag_offset_y = item.height / 2.0f;
+            new_block.drag_offset_x = mx - item.x;
+            new_block.drag_offset_y = my - item_y;
 
             if (new_block.type == CMD_MOVE || new_block.type == CMD_TURN ||
                 new_block.type == CMD_GOTO || new_block.type == CMD_SET_X ||

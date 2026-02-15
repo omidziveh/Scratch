@@ -135,8 +135,8 @@ SDL_Rect get_arg_box_rect(const Block& block, int arg_index) {
 
     const int ARG_BOX_WIDTH  = 40;
     const int ARG_BOX_HEIGHT = 16;
-    const int ARG_PADDING_X  = 8;
-    const int ARG_PADDING_Y  = 28;   
+    const int ARG_PADDING_X  = 30;
+    const int ARG_PADDING_Y  = 7;
     const int ARG_SPACING    = 6;
 
     rect.x = (int)block.x + ARG_PADDING_X + arg_index * (ARG_BOX_WIDTH + ARG_SPACING);

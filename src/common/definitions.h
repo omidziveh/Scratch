@@ -22,26 +22,26 @@ const int WINDOW_WIDTH  = 1280;
 const int WINDOW_HEIGHT = 720;
 
 const int STAGE_X      = 800;
-const int STAGE_Y      = 40;
+const int STAGE_Y      = 70;
 const int STAGE_WIDTH  = 460;
 const int STAGE_HEIGHT = 340;
 
 const int PALETTE_X      = 0;
-const int PALETTE_Y      = 40;
+const int PALETTE_Y      = 70;
 const int PALETTE_WIDTH  = 200;
 const int PALETTE_HEIGHT = 680;
 
 const int CODING_AREA_X      = 200;
-const int CODING_AREA_Y      = 40;
+const int CODING_AREA_Y      = 70;
 const int CODING_AREA_WIDTH  = 600;
 const int CODING_AREA_HEIGHT = 680;
 
 const int TOOLBAR_X      = 0;
-const int TOOLBAR_Y      = 0;
+const int TOOLBAR_Y      = 30;
 const int TOOLBAR_WIDTH  = 1280;
 const int TOOLBAR_HEIGHT = 40;
 
-const int BLOCK_WIDTH  = 160;
+const int BLOCK_WIDTH  = 200;
 const int BLOCK_HEIGHT = 40;
 const int SNAP_DISTANCE = 20;
 
@@ -51,7 +51,7 @@ const int ARG_BOX_MARGIN_X = 8;
 const int ARG_BOX_Y_OFFSET = 10;
 const Uint32 CURSOR_BLINK_MS = 500;
 
-const int MENU_BAR_OFFSET = 28;
+const int MENU_BAR_OFFSET = 30;
 
 struct Color {
     Uint8 r, g, b, a;

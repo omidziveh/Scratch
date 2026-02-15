@@ -69,6 +69,7 @@ void set_sound_volume(int volume) {
     g_sound_volume = volume;
     if (g_sound_volume < 0) g_sound_volume = 0;
     if (g_sound_volume > 100) g_sound_volume = 100;
+    log_info("Volume set to " + std::to_string(g_sound_volume));
 }
 
 int get_sound_volume() {

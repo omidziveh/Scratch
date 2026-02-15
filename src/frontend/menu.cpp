@@ -152,9 +152,7 @@ static void draw_text(SDL_Renderer* r, const std::string& text, int x, int y, in
         cursor_x += 6 * scale;
     }
 }
-void menu_init()
-{
-
+void menu_init() {
     g_menus[0].title  = "File";
     g_menus[0].x      = 4;
     g_menus[0].y      = 0;
@@ -185,16 +183,14 @@ void menu_init()
     g_menus[1].items.push_back(MenuItem("About"));
 }
 
-bool menu_is_any_open()
-{
+bool menu_is_any_open() {
     for (int i = 0; i < g_menu_count; i++) {
         if (g_menus[i].is_open) return true;
     }
     return false;
 }
 
-void menu_handle_mouse_move(int mx, int my)
-{
+void menu_handle_mouse_move(int mx, int my) {
     for (int i = 0; i < g_menu_count; i++) {
         Menu& m = g_menus[i];
         bool over_title = (mx >= m.x && mx <= m.x + m.width &&
@@ -227,8 +223,7 @@ void menu_handle_mouse_move(int mx, int my)
     }
 }
 
-void menu_handle_mouse_down(int mx, int my)
-{
+void menu_handle_mouse_down(int mx, int my) {
     for (int i = 0; i < g_menu_count; i++) {
         Menu& m = g_menus[i];
         bool over_title = (mx >= m.x && mx <= m.x + m.width &&
@@ -272,8 +267,7 @@ void menu_handle_mouse_down(int mx, int my)
     }
 }
 
-void menu_handle_mouse_up(int mx, int my)
-{
+void menu_handle_mouse_up(int mx, int my) {
     (void)mx;
     (void)my;
 }

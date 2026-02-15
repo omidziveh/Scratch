@@ -99,8 +99,8 @@ void draw_all_blocks(SDL_Renderer* renderer, const std::vector<Block>& blocks, c
 
 void draw_toolbar(SDL_Renderer* renderer) {
     draw_filled_rect(renderer, TOOLBAR_X, TOOLBAR_Y, TOOLBAR_WIDTH, TOOLBAR_HEIGHT, COLOR_TOOLBAR_BG);
-    draw_filled_rect(renderer, TOOLBAR_WIDTH - 90, 5, 30, 30, COLOR_GREEN);
-    draw_filled_rect(renderer, TOOLBAR_WIDTH - 50, 5, 30, 30, COLOR_RED);
+    draw_filled_rect(renderer, TOOLBAR_WIDTH - 90, TOOLBAR_Y + 5, 30, 30, COLOR_GREEN);
+    draw_filled_rect(renderer, TOOLBAR_WIDTH - 50, TOOLBAR_Y + 5, 30, 30, COLOR_RED);
 }
 
 void draw_coding_area(SDL_Renderer* renderer) {
@@ -133,9 +133,11 @@ void draw_sprite(SDL_Renderer* renderer, Sprite& sprite) {
     dest.w = draw_w;
     dest.h = draw_h;
 
+    SDL_Point center = {w / 2, h / 2};
+
     SDL_Rect stageClip = {STAGE_X, STAGE_Y, STAGE_WIDTH, STAGE_HEIGHT};
     SDL_RenderSetClipRect(renderer, &stageClip);
-    SDL_RenderCopyEx(renderer, sprite.texture, nullptr, &dest, sprite.direction, nullptr, SDL_FLIP_NONE);
+    SDL_RenderCopyEx(renderer, sprite.texture, nullptr, &dest, sprite.angle, nullptr, SDL_FLIP_NONE);
     SDL_RenderSetClipRect(renderer, nullptr);
 }
 

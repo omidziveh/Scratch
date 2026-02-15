@@ -3,72 +3,72 @@
 #include "block_utils.h"
 #include <algorithm>
 
-int get_arg_count(BlockType type) {
-    switch (type) {
-        case CMD_MOVE:
-        case CMD_TURN:
-        case CMD_SET_X:
-        case CMD_SET_Y:
-        case CMD_CHANGE_X:
-        case CMD_CHANGE_Y:
-        case CMD_REPEAT:
-        case CMD_WAIT:
-        case CMD_SAY:
-        case CMD_SWITCH_COSTUME:
-        case CMD_SET_SIZE:
-        case CMD_CHANGE_SIZE:
-            return 1;
-        case CMD_GOTO:
-            return 2;
-        case CMD_IF:
-            return 1;
-        case CMD_NEXT_COSTUME:
-        case CMD_SHOW:
-        case CMD_HIDE:
-        case CMD_START:
-        case CMD_EVENT_CLICK:
-        case CMD_NONE:
-        case CMD_PEN_SET_COLOR:
-        case CMD_PEN_SET_SIZE:
-            return 1;
+// int get_arg_count(BlockType type) {
+//     switch (type) {
+//         case CMD_MOVE:
+//         case CMD_TURN:
+//         case CMD_SET_X:
+//         case CMD_SET_Y:
+//         case CMD_CHANGE_X:
+//         case CMD_CHANGE_Y:
+//         case CMD_REPEAT:
+//         case CMD_WAIT:
+//         case CMD_SAY:
+//         case CMD_SWITCH_COSTUME:
+//         case CMD_SET_SIZE:
+//         case CMD_CHANGE_SIZE:
+//             return 1;
+//         case CMD_GOTO:
+//             return 2;
+//         case CMD_IF:
+//             return 1;
+//         case CMD_NEXT_COSTUME:
+//         case CMD_SHOW:
+//         case CMD_HIDE:
+//         case CMD_START:
+//         case CMD_EVENT_CLICK:
+//         case CMD_NONE:
+//         case CMD_PEN_SET_COLOR:
+//         case CMD_PEN_SET_SIZE:
+//             return 1;
 
-        default:
-            return 0;
-    }
-}
+//         default:
+//             return 0;
+//     }
+// }
 
-SDL_Rect get_arg_box_rect(const Block& block, int arg_index) {
-    SDL_Rect rect;
-    int total_args = get_arg_count(block.type);
+// SDL_Rect get_arg_box_rect(const Block& block, int arg_index) {
+//     SDL_Rect rect;
+//     int total_args = get_arg_count(block.type);
 
-    if (total_args == 0) {
-        rect = {0, 0, 0, 0};
-        return rect;
-    }
+//     if (total_args == 0) {
+//         rect = {0, 0, 0, 0};
+//         return rect;
+//     }
 
-    std::string label = block_get_label(block.type);
+//     std::string label = block_get_label(block.type);
 
-    int paren_count = 0;
-    int char_pos = 0;
-    for (size_t i = 0; i < label.size(); i++) {
-        if (label[i] == '(' || label[i] == '[' || label[i] == '<') {
-            if (paren_count == arg_index) {
-                char_pos = (int)i;
-                break;
-            }
-            paren_count++;
-        }
-    }
+//     int paren_count = 0;
+//     int char_pos = 0;
+//     for (size_t i = 0; i < label.size(); i++) {
+//         if (label[i] == '(' || label[i] == '[' || label[i] == '<') {
+//             if (paren_count == arg_index) {
+//                 char_pos = (int)i;
+//                 break;
+//             }
+//             paren_count++;
+//         }
+//     }
 
-    int text_x_offset = char_pos * 8; 
+//     int text_x_offset = char_pos * 8; 
 
-    rect.x = (int)block.x + 8 + text_x_offset;
-    rect.y = (int)block.y + ARG_BOX_Y_OFFSET;
-    rect.w = ARG_BOX_WIDTH;
-    rect.h = ARG_BOX_HEIGHT;
+//     rect.x = (int)block.x + 8 + text_x_offset;
+//     rect.y = (int)block.y + ARG_BOX_Y_OFFSET;
+//     rect.w = ARG_BOX_WIDTH;
+//     rect.h = ARG_BOX_HEIGHT;
 
-    return rect;
-}
+//     return rect;
+// }
 
 int try_click_arg(const Block& block, int mx, int my) {
     int count = get_arg_count(block.type);

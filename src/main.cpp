@@ -132,7 +132,7 @@ int main(int argc, char* argv[]) {
                     running = false;
                     break;
 
-                case SDL_MOUSEWHEEL: {
+                case SDL_MOUSEWHEEL: 
                     int mx, my;
                     SDL_GetMouseState(&mx, &my);
 
@@ -145,7 +145,7 @@ int main(int argc, char* argv[]) {
                         if (palette_scroll_offset > palette_max_scroll) palette_scroll_offset = palette_max_scroll;
                     }
                     break;
-                }
+                
 
                 case SDL_MOUSEBUTTONDOWN:
                     if (event.button.button == SDL_BUTTON_LEFT) {
@@ -163,14 +163,14 @@ int main(int argc, char* argv[]) {
                         }
 
                         if (mx >= TOOLBAR_WIDTH - 90 && mx <= TOOLBAR_WIDTH - 90 + 30 &&
-                            my >= 5 && my <= 5 + 30) {
+                            my >= TOOLBAR_Y + 5 && my <= TOOLBAR_Y + 5 + 30) {
                             g_execution_index = 0;
                             g_is_executing = true;
                             break;
                         }
 
                         if (mx >= TOOLBAR_WIDTH - 50 && mx <= TOOLBAR_WIDTH - 50 + 30 &&
-                            my >= 5 && my <= 5 + 30) {
+                            my >= TOOLBAR_Y + 5 && my <= TOOLBAR_Y + 5 + 30) {
                             g_is_executing = false;
                             g_execution_index = -1;
                             for (auto& b : blocks) {
@@ -203,8 +203,7 @@ int main(int argc, char* argv[]) {
                     }
                     break;
 
-                case SDL_MOUSEMOTION:
-                {
+                case SDL_MOUSEMOTION: {
                     int mx = event.motion.x;
                     int my = event.motion.y;
                     mouse_x = mx;
@@ -213,10 +212,10 @@ int main(int argc, char* argv[]) {
                     menu_handle_mouse_move(mx, my);
 
                     hover_run = (mx >= TOOLBAR_WIDTH - 90 && mx <= TOOLBAR_WIDTH - 90 + 30 &&
-                                 my >= 5 && my <= 5 + 30);
+                                 my >= TOOLBAR_Y + 5 && my <= TOOLBAR_Y + 5 + 30);
 
                     hover_stop = (mx >= TOOLBAR_WIDTH - 50 && mx <= TOOLBAR_WIDTH - 50 + 30 &&
-                                  my >= 5 && my <= 5 + 30);
+                                  my >= TOOLBAR_Y + 5 && my <= TOOLBAR_Y + 5 + 30);
 
                     handle_mouse_motion(event, blocks);
                 }
@@ -234,6 +233,15 @@ int main(int argc, char* argv[]) {
                     } else {
                         if (event.key.keysym.sym == SDLK_l) {
                             syslog_toggle();
+                        }
+                        if (event.key.keysym.sym == SDLK_F12) {
+                            g_step_mode = !g_step_mode;
+                            g_waiting_for_step = g_step_mode;
+                        }
+                        if (event.key.keysym.sym == SDLK_SPACE) {
+                            if (g_step_mode && g_waiting_for_step) {
+                                g_waiting_for_step = false;
+                            }
                         }
                     }
                     break;
@@ -334,6 +342,15 @@ int main(int argc, char* argv[]) {
                             play_sound(current.args[0], exec_ctx.sprite->volume);
                         break;
 
+                    case CMD_CHANGE_VOLUME:
+                        if (!current.args.empty()) 
+                            set_sound_volume(get_sound_volume() + atoi(current.args[0].c_str()));
+                        break;
+
+                    case CMD_SET_VOLUME:
+                        if (!current.args.empty()) 
+                            set_sound_volume(atoi(current.args[0].c_str()));
+                        break;
                 
                     case CMD_PEN_DOWN:
                         sprite.isPenDown = 1;
@@ -377,7 +394,6 @@ int main(int argc, char* argv[]) {
                         break;
                 }
 
-                // --- CHANGED: رسم خط Pen بعد از حرکت ---
                 if (sprite.isPenDown && (sprite.x != oldX || sprite.y != oldY)) {
                     pen_draw_line(renderer, oldX, oldY, sprite.x, sprite.y, sprite);
                 }
@@ -418,26 +434,31 @@ int main(int argc, char* argv[]) {
             draw_arg_boxes(renderer, block, text_state);
         }
 
-        render_palette_hover(renderer, palette_items, mouse_x, mouse_y);
 
         if (hover_run) {
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
             SDL_SetRenderDrawColor(renderer, 255, 255, 255, 50);
-            SDL_Rect run_rect = { TOOLBAR_WIDTH - 90, 5, 30, 30 };
+            SDL_Rect run_rect = { TOOLBAR_WIDTH - 90, TOOLBAR_Y + 5, 30, 30 };
             SDL_RenderFillRect(renderer, &run_rect);
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
         }
 
         if (hover_stop) {
-            SDL_SetRenderDrawColor(renderer, 255, 255, 255, 50);
-            SDL_Rect stop_rect = { TOOLBAR_WIDTH - 50, 5, 30, 30 };
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+            SDL_SetRenderDrawColor(renderer, 255, 255, 255, 0);
+            SDL_Rect stop_rect = { TOOLBAR_WIDTH - 50, TOOLBAR_Y + 5, 30, 30 };
             SDL_RenderFillRect(renderer, &stop_rect);
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
         }
 
         if (syslog_is_visible()) {
             syslog_render(renderer);
         }
 
+        
         menu_render(renderer);
-
+        
+        render_palette_hover(renderer, palette_items, mouse_x, mouse_y, palette_scroll_offset);
         SDL_RenderPresent(renderer);
     }
 
