@@ -156,7 +156,7 @@ void menu_init() {
     g_menus[0].title  = "File";
     g_menus[0].x      = 4;
     g_menus[0].y      = 0;
-    g_menus[0].width  = 40;
+    g_menus[0].width  = 60;
     g_menus[0].height = MENU_BAR_OFFSET;
     g_menus[0].is_open = false;
     g_menus[0].title_highlighted = false;
@@ -169,9 +169,9 @@ void menu_init() {
     g_menus[0].items.push_back(MenuItem("Exit"));
 
     g_menus[1].title  = "Help";
-    g_menus[1].x      = 52;
+    g_menus[1].x      = 62;
     g_menus[1].y      = 0;
-    g_menus[1].width  = 40;
+    g_menus[1].width  = 60;
     g_menus[1].height = MENU_BAR_OFFSET;
     g_menus[1].is_open = false;
     g_menus[1].title_highlighted = false;

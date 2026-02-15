@@ -7,6 +7,7 @@
 #include <iostream>
 #include <cmath>
 #include <algorithm>
+#include "../utils/logger.h"
 
 
 SDL_Texture* load_texture(SDL_Renderer* renderer, const std::string& path) {
@@ -38,6 +39,7 @@ void draw_block_glow(SDL_Renderer* renderer, const Block& block) {
     if (!block.is_running)
         return;
 
+    log_info(" glowing block: " + std::to_string(block.id));
     int bx = (int)block.x;
     int by = (int)block.y;
     int bw = (int)block.width;
@@ -51,7 +53,7 @@ void draw_block_glow(SDL_Renderer* renderer, const Block& block) {
         Uint8 layer_alpha = (Uint8)(alpha * (1.0f - (float)i / 5.0f));
         roundedRectangleRGBA(renderer,
             bx - i, by - i, bx + bw + i, by + bh + i,
-            6 + i,
+            8 + i,
             255, 255, 100, layer_alpha);
     }
 }
@@ -82,7 +84,7 @@ void draw_block(SDL_Renderer* renderer, const Block& block, const std::string& l
     Uint8 db = (Uint8)(b * 0.7f);
     roundedRectangleRGBA(renderer,
         bx, by, bx + bw, by + bh,
-        6,
+        8,
         dr, dg, db, 255);
 
     draw_text(renderer, bx + 8, by + 12, label, COLOR_WHITE);
