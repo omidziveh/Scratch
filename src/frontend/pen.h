@@ -1,8 +1,8 @@
 #ifndef PEN_H
 #define PEN_H
-
-#include <SDL2/SDL.h>
 #include "../common/definitions.h"
+#include <SDL2/SDL.h>
+
 
 void pen_init(SDL_Renderer* renderer);
 void pen_shutdown();

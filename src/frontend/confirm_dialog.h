@@ -1,5 +1,6 @@
 #ifndef CONFIRM_DIALOG_H
 #define CONFIRM_DIALOG_H
+#include "../common/definitions.h" 
 
 #include <SDL2/SDL.h>
 #include "../gfx/SDL2_gfxPrimitives.h"

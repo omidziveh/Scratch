@@ -39,9 +39,8 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 )
 
 if(WIN32)
-    target_link_libraries(${PROJECT_NAME} PRIVATE mingw32 SDL2::SDL2main SDL2::SDL2 SDL2_ttf::SDL2_ttf SDL2_image::SDL2_image)
+    target_link_libraries(${PROJECT_NAME} PRIVATE mingw32 SDL2::SDL2main SDL2::SDL2 SDL2_ttf::SDL2_ttf SDL2_image::SDL2_image SDL2_mixer)
     set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS "-mwindows")
 else()
-    # Ubuntu Linker (much simpler)
     target_link_libraries(${PROJECT_NAME} PRIVATE SDL2 SDL2_ttf SDL2_image SDL2_gfx SDL2_mixer)
 endif()

@@ -1,5 +1,6 @@
 #ifndef BACKGROUND_MENU_H
 #define BACKGROUND_MENU_H
+#include "../common/definitions.h" 
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>

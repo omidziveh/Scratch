@@ -1,5 +1,6 @@
 #ifndef COSTUME_EDITOR_H
 #define COSTUME_EDITOR_H
+#include "../common/definitions.h" 
 
 #include <SDL2/SDL.h>
 #include <string>

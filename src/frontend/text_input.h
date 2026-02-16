@@ -1,10 +1,10 @@
 #ifndef TEXT_INPUT_H
 #define TEXT_INPUT_H
-
+#include "../common/definitions.h"
 #include <SDL2/SDL.h>
 #include <vector>
 #include <string>
-#include "../common/definitions.h"
+
 
 void begin_editing(TextInputState& state, Block& block, int arg_index);
 

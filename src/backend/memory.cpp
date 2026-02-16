@@ -39,12 +39,33 @@ Block* create_block(BlockType t) {
         case CMD_REPEAT:
             b->args.push_back("10");
             break;
+        case CMD_GOTO:
+            b->args.push_back("0");
+            b->args.push_back("0");
+            b->width = 140.0f;
+            break;
+        case OP_ADD:
+            b->args.push_back("0");
+            b->args.push_back("0");
+            b->width = 140.0f;
+            break;
+        case OP_SUB:
+            b->args.push_back("0");
+            b->args.push_back("0");
+            b->width = 140.0f;
+            break;
+        case OP_DIV:
+            b->args.push_back("0");
+            b->args.push_back("0");
+            b->width = 140.0f;
+            break;
         default:
             break;
     }
 
     return b;
 }
+
 
 void delete_block(Block* b) {
     if (!b) return;
@@ -63,4 +84,18 @@ void delete_chain(Block* b) {
 int count_blocks(Block* b) {
     if (!b) return 0;
     return 1 + count_blocks(b->inner) + count_blocks(b->next);
+}
+void safe_delete_chain(Block* b, Block* parent_block) {
+    if (!b) return;
+
+    if (parent_block) {
+        if (parent_block->next == b) {
+            parent_block->next = nullptr;
+        }
+        if (parent_block->inner == b) {
+            parent_block->inner = nullptr;
+        }
+    }
+
+    delete_chain(b);
 }

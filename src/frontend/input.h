@@ -1,9 +1,9 @@
 #ifndef INPUT_H
 #define INPUT_H
-
+#include "../common/definitions.h"
 #include <SDL2/SDL.h>
 #include <vector>
-#include "../common/definitions.h"
+
 #include "text_input.h" 
 bool is_point_in_rect(int px, int py, float rx, float ry, float rw, float rh);
 
