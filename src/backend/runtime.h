@@ -56,3 +56,4 @@ void execute_block(Runtime* rt, Block* b, Stage* stage);
 void advance_to_next_block(Runtime* rt);
 
 bool evaluate_condition(Runtime* rt, Block* b);
+float resolve_argument(Runtime* rt, const std::string& arg);

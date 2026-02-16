@@ -10,39 +10,68 @@ std::string blocktype_to_string(BlockType type) {
         case CMD_MOVE: return "MOVE";
         case CMD_TURN: return "TURN";
         case CMD_GOTO: return "GOTO";
+        case CMD_SET_X: return "SET_X";
+        case CMD_SET_Y: return "SET_Y";
+        case CMD_CHANGE_X: return "CHANGE_X";
+        case CMD_CHANGE_Y: return "CHANGE_Y";
         case CMD_REPEAT: return "REPEAT";
         case CMD_IF: return "IF";
         case CMD_WAIT: return "WAIT";
         case CMD_SAY: return "SAY";
+        case CMD_START: return "START";
         case CMD_EVENT_CLICK: return "EVENT_CLICK";
+        
+        case CMD_SWITCH_COSTUME: return "SWITCH_COSTUME";
+        case CMD_NEXT_COSTUME: return "NEXT_COSTUME";
+        case CMD_SET_SIZE: return "SET_SIZE";
+        case CMD_CHANGE_SIZE: return "CHANGE_SIZE";
+        case CMD_SHOW: return "SHOW";
+        case CMD_HIDE: return "HIDE";
+
+        case CMD_PLAY_SOUND: return "PLAY_SOUND";
+        case CMD_STOP_ALL_SOUNDS: return "STOP_ALL_SOUNDS";
+        case CMD_CHANGE_VOLUME: return "CHANGE_VOLUME";
+        case CMD_SET_VOLUME: return "SET_VOLUME";
+
         case SENSE_TOUCHING_MOUSE: return "SENSE_MOUSE";
         case SENSE_TOUCHING_EDGE: return "SENSE_EDGE";
+        case SENSE_MOUSE_DOWN: return "SENSE_MOUSE_DOWN";
+        case SENSE_MOUSE_X: return "SENSE_MOUSE_X";
+        case SENSE_MOUSE_Y: return "SENSE_MOUSE_Y";
+        case SENSE_TIMER: return "SENSE_TIMER";
+        case SENSE_RESET_TIMER: return "SENSE_RESET_TIMER";
+
         case OP_ADD: return "OP_ADD";
         case OP_SUB: return "OP_SUB";
-        case OP_MUL:        return "OP_MUL";
-        case OP_DIV:        return "OP_DIV";
-        case OP_MOD:        return "OP_MOD";
-        case OP_ABS:        return "OP_ABS";
-        case OP_FLOOR:      return "OP_FLOOR";
-        case OP_CEIL:       return "OP_CEIL";
-        case OP_SQRT:       return "OP_SQRT";
-        case OP_SIN:        return "OP_SIN";
-        case OP_COS:        return "OP_COS";
-        case OP_GT:         return "OP_GT";
-        case OP_LT:         return "OP_LT";
-        case OP_EQ:         return "OP_EQ";
-        case OP_AND:        return "OP_AND";
-        case OP_OR:         return "OP_OR";
-        case OP_NOT:        return "OP_NOT";
-        case OP_XOR:        return "OP_XOR";
-        case OP_STR_LEN:    return "OP_STR_LEN";
-        case OP_STR_CHAR:   return "OP_STR_CHAR";
+        case OP_MUL: return "OP_MUL";
+        case OP_DIV: return "OP_DIV";
+        case OP_MOD: return "OP_MOD";
+        case OP_ABS: return "OP_ABS";
+        case OP_FLOOR: return "OP_FLOOR";
+        case OP_CEIL: return "OP_CEIL";
+        case OP_SQRT: return "OP_SQRT";
+        case OP_SIN: return "OP_SIN";
+        case OP_COS: return "OP_COS";
+        case OP_GT: return "OP_GT";
+        case OP_LT: return "OP_LT";
+        case OP_EQ: return "OP_EQ";
+        case OP_AND: return "OP_AND";
+        case OP_OR: return "OP_OR";
+        case OP_NOT: return "OP_NOT";
+        case OP_XOR: return "OP_XOR";
+        case OP_STR_LEN: return "OP_STR_LEN";
+        case OP_STR_CHAR: return "OP_STR_CHAR";
         case OP_STR_CONCAT: return "OP_STR_CONCAT";
-        case SENSE_MOUSE_DOWN: return "SENSE_MOUSE_DOWN";
-        case SENSE_MOUSE_X:    return "SENSE_MOUSE_X";
-        case SENSE_MOUSE_Y:    return "SENSE_MOUSE_Y";
-        case SENSE_TIMER:      return "SENSE_TIMER";
-        case SENSE_RESET_TIMER:return "SENSE_RESET_TIMER";
+
+        case CMD_PEN_DOWN: return "PEN_DOWN";
+        case CMD_PEN_UP: return "PEN_UP";
+        case CMD_PEN_CLEAR: return "PEN_CLEAR";
+        case CMD_PEN_SET_COLOR: return "PEN_SET_COLOR";
+        case CMD_PEN_SET_SIZE: return "PEN_SET_SIZE";
+        case CMD_PEN_STAMP: return "PEN_STAMP";
+
+        case CMD_SET_VAR: return "SET_VAR";
+        case CMD_CHANGE_VAR: return "CHANGE_VAR";
         
         default: return "UNKNOWN";
     }
@@ -52,62 +81,77 @@ BlockType string_to_blocktype(const std::string& str) {
     if (str == "MOVE") return CMD_MOVE;
     if (str == "TURN") return CMD_TURN;
     if (str == "GOTO") return CMD_GOTO;
+    if (str == "SET_X") return CMD_SET_X;
+    if (str == "SET_Y") return CMD_SET_Y;
+    if (str == "CHANGE_X") return CMD_CHANGE_X;
+    if (str == "CHANGE_Y") return CMD_CHANGE_Y;
     if (str == "REPEAT") return CMD_REPEAT;
     if (str == "IF") return CMD_IF;
     if (str == "WAIT") return CMD_WAIT;
     if (str == "SAY") return CMD_SAY;
+    if (str == "START") return CMD_START;
     if (str == "EVENT_CLICK") return CMD_EVENT_CLICK;
+    
+    if (str == "SWITCH_COSTUME") return CMD_SWITCH_COSTUME;
+    if (str == "NEXT_COSTUME") return CMD_NEXT_COSTUME;
+    if (str == "SET_SIZE") return CMD_SET_SIZE;
+    if (str == "CHANGE_SIZE") return CMD_CHANGE_SIZE;
+    if (str == "SHOW") return CMD_SHOW;
+    if (str == "HIDE") return CMD_HIDE;
+
+    if (str == "PLAY_SOUND") return CMD_PLAY_SOUND;
+    if (str == "STOP_ALL_SOUNDS") return CMD_STOP_ALL_SOUNDS;
+    if (str == "CHANGE_VOLUME") return CMD_CHANGE_VOLUME;
+    if (str == "SET_VOLUME") return CMD_SET_VOLUME;
+
     if (str == "SENSE_MOUSE") return SENSE_TOUCHING_MOUSE;
     if (str == "SENSE_EDGE") return SENSE_TOUCHING_EDGE;
+    if (str == "SENSE_MOUSE_DOWN") return SENSE_MOUSE_DOWN;
+    if (str == "SENSE_MOUSE_X") return SENSE_MOUSE_X;
+    if (str == "SENSE_MOUSE_Y") return SENSE_MOUSE_Y;
+    if (str == "SENSE_TIMER") return SENSE_TIMER;
+    if (str == "SENSE_RESET_TIMER") return SENSE_RESET_TIMER;
+
     if (str == "OP_ADD") return OP_ADD;
     if (str == "OP_SUB") return OP_SUB;
     if (str == "OP_MUL") return OP_MUL;
     if (str == "OP_DIV") return OP_DIV;
-    if (str == "MOVE")     return CMD_MOVE;
-    if (str == "TURN")     return CMD_TURN;
-    if (str == "GOTO")     return CMD_GOTO;
-    if (str == "SET_X")    return CMD_SET_X;
-    if (str == "SET_Y")    return CMD_SET_Y;
-    if (str == "CHANGE_X") return CMD_CHANGE_X;
-    if (str == "CHANGE_Y") return CMD_CHANGE_Y;
-    if (str == "REPEAT")   return CMD_REPEAT;
-    if (str == "IF")       return CMD_IF;
-    if (str == "WAIT")     return CMD_WAIT;
-    if (str == "SAY")      return CMD_SAY;
-    if (str == "START")    return CMD_START;
-    if (str == "OP_ADD")    return OP_ADD;
-    if (str == "OP_SUB")    return OP_SUB;
-    if (str == "OP_MUL")    return OP_MUL;
-    if (str == "OP_DIV")    return OP_DIV;
-    if (str == "OP_MOD")    return OP_MOD;
-    if (str == "OP_ABS")    return OP_ABS;
-    if (str == "OP_FLOOR")  return OP_FLOOR;
-    if (str == "OP_CEIL")   return OP_CEIL;
-    if (str == "OP_SQRT")   return OP_SQRT;
-    if (str == "OP_SIN")    return OP_SIN;
-    if (str == "OP_COS")    return OP_COS;
-    if (str == "OP_GT")     return OP_GT;
-    if (str == "OP_LT")     return OP_LT;
-    if (str == "OP_EQ")     return OP_EQ;
-    if (str == "OP_AND")    return OP_AND;
-    if (str == "OP_OR")     return OP_OR;
-    if (str == "OP_NOT")    return OP_NOT;
-    if (str == "OP_XOR")    return OP_XOR;
-    if (str == "OP_STR_LEN")    return OP_STR_LEN;
-    if (str == "OP_STR_CHAR")   return OP_STR_CHAR;
+    if (str == "OP_MOD") return OP_MOD;
+    if (str == "OP_ABS") return OP_ABS;
+    if (str == "OP_FLOOR") return OP_FLOOR;
+    if (str == "OP_CEIL") return OP_CEIL;
+    if (str == "OP_SQRT") return OP_SQRT;
+    if (str == "OP_SIN") return OP_SIN;
+    if (str == "OP_COS") return OP_COS;
+    if (str == "OP_GT") return OP_GT;
+    if (str == "OP_LT") return OP_LT;
+    if (str == "OP_EQ") return OP_EQ;
+    if (str == "OP_AND") return OP_AND;
+    if (str == "OP_OR") return OP_OR;
+    if (str == "OP_NOT") return OP_NOT;
+    if (str == "OP_XOR") return OP_XOR;
+    if (str == "OP_STR_LEN") return OP_STR_LEN;
+    if (str == "OP_STR_CHAR") return OP_STR_CHAR;
     if (str == "OP_STR_CONCAT") return OP_STR_CONCAT;
-    if (str == "SENSE_MOUSE_DOWN") return SENSE_MOUSE_DOWN;
-    if (str == "SENSE_MOUSE_X")    return SENSE_MOUSE_X;
-    if (str == "SENSE_MOUSE_Y")    return SENSE_MOUSE_Y;
-    if (str == "SENSE_TIMER")      return SENSE_TIMER;
-    if (str == "SENSE_RESET_TIMER")return SENSE_RESET_TIMER;
+
+    if (str == "PEN_DOWN") return CMD_PEN_DOWN;
+    if (str == "PEN_UP") return CMD_PEN_UP;
+    if (str == "PEN_CLEAR") return CMD_PEN_CLEAR;
+    if (str == "PEN_SET_COLOR") return CMD_PEN_SET_COLOR;
+    if (str == "PEN_SET_SIZE") return CMD_PEN_SET_SIZE;
+    if (str == "PEN_STAMP") return CMD_PEN_STAMP;
+
+    if (str == "SET_VAR") return CMD_SET_VAR;
+    if (str == "CHANGE_VAR") return CMD_CHANGE_VAR;
+
     return CMD_NONE;
 }
 
-void save_block_recursive(std::ofstream& file, Block* b, int parentId, int slot) {
+static void save_block_recursive(std::ofstream& file, Block* b, int parentId, int slot) {
     if (!b) return;
 
-    file << b->id << " "
+    file << "BLOCK "
+         << b->id << " "
          << blocktype_to_string(b->type) << " "
          << b->x << " " << b->y << " "
          << b->width << " " << b->height << " "
@@ -119,26 +163,39 @@ void save_block_recursive(std::ofstream& file, Block* b, int parentId, int slot)
     }
     file << "\n";
 
-    // Slot 0 = Inner, Slot 1 = Next
     save_block_recursive(file, b->inner, b->id, 0);
     save_block_recursive(file, b->next, b->id, 1);
 }
 
-bool save_to_file(Block* head, std::string filename) {
+bool save_project(const std::string& filename, Block* head, const Sprite& sprite) {
     std::ofstream file(filename);
     if (!file.is_open()) {
         log_error("Cannot open file for writing: " + filename);
         return false;
     }
 
+    // 1. Save Sprite Data
+    file << "SPRITE " 
+         << sprite.x << " " 
+         << sprite.y << " " 
+         << sprite.angle << " "
+         << sprite.visible << " "
+         << sprite.currentCostumeIndex << "\n";
+
+    // 2. Save Variables
+    for (const auto& var : sprite.variables) {
+        file << "VAR " << var.name << " " << var.value << "\n";
+    }
+
+    // 3. Save Blocks
     save_block_recursive(file, head, -1, 1);
 
     file.close();
-    log_success("Saved to " + filename);
+    log_success("Saved project to " + filename);
     return true;
 }
 
-Block* load_from_file(std::string filename) {
+Block* load_project(const std::string& filename, Sprite& sprite) {
     std::ifstream file(filename);
     if (!file.is_open()) {
         log_error("Cannot open file for reading: " + filename);
@@ -151,31 +208,43 @@ Block* load_from_file(std::string filename) {
     std::string line;
     while (std::getline(file, line)) {
         std::stringstream ss(line);
+        std::string type;
+        ss >> type;
 
-        int id;
-        std::string typeStr;
-        float x, y, w, h;
-        int parentId, slot, argCount;
-
-        ss >> id >> typeStr >> x >> y >> w >> h >> parentId >> slot >> argCount;
-
-        Block* b = create_block(string_to_blocktype(typeStr));
-        b->id = id;
-        b->x = x;
-        b->y = y;
-        b->width = w;
-        b->height = h;
-        b->args.clear();
-
-        for (int i = 0; i < argCount; i++) {
-            std::string arg;
-            ss >> arg;
-            b->args.push_back(arg);
+        if (type == "SPRITE") {
+            ss >> sprite.x >> sprite.y >> sprite.angle >> sprite.visible >> sprite.currentCostumeIndex;
+        } 
+        else if (type == "VAR") {
+            std::string name, value;
+            ss >> name >> value;
+            sprite.variables.push_back(Variable(name, value));
         }
+        else if (type == "BLOCK") {
+            int id;
+            std::string typeStr;
+            float x, y, w, h;
+            int parentId, slot, argCount;
 
-        blocks[id] = b;
-        if (parentId != -1) {
-            links.push_back({id, parentId, slot});
+            ss >> id >> typeStr >> x >> y >> w >> h >> parentId >> slot >> argCount;
+
+            Block* b = create_block(string_to_blocktype(typeStr));
+            b->id = id;
+            b->x = x;
+            b->y = y;
+            b->width = w;
+            b->height = h;
+            b->args.clear();
+
+            for (int i = 0; i < argCount; i++) {
+                std::string arg;
+                ss >> arg;
+                b->args.push_back(arg);
+            }
+
+            blocks[id] = b;
+            if (parentId != -1) {
+                links.push_back({id, parentId, slot});
+            }
         }
     }
 
@@ -201,31 +270,10 @@ Block* load_from_file(std::string filename) {
         reset_block_counter(last->first + 1);
     }
 
-    log_success("Loaded from " + filename);
+    log_success("Loaded project from " + filename);
     
     for (auto& pair : blocks) {
         if (pair.second->parent == nullptr) return pair.second;
     }
     return nullptr;
-}
-
-void save_sprite(const Sprite& sprite, std::string filename) {
-    std::ofstream file(filename);
-    if (!file.is_open()) return;
-
-    file << sprite.x << " " << sprite.y << " " << sprite.angle << " "
-         << sprite.isPenDown << " " << sprite.currentCostumeIndex << "\n";
-    file.close();
-}
-
-Sprite load_sprite(std::string filename) {
-    Sprite s;
-    std::ifstream file(filename);
-    if (!file.is_open()) return s;
-
-    int penDown;
-    file >> s.x >> s.y >> s.angle >> penDown >> s.currentCostumeIndex;
-    s.isPenDown = (penDown != 0);
-    file.close();
-    return s;
 }

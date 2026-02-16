@@ -34,6 +34,7 @@
 #include "frontend/character_panel.h"
 #include "frontend/confirm_dialog.h"
 #include "frontend/block_highlight.h"
+#include <map>
 
 Sprite sprite;
 Runtime gRuntime;
@@ -80,6 +81,18 @@ static void save_project(const char* filename,
         }
     }
 
+    int varCount = (int)sprite.variables.size();
+    file.write(reinterpret_cast<const char*>(&varCount), sizeof(varCount));
+    for (const auto& var : sprite.variables) {
+        int len = (int)var.name.size();
+        file.write(reinterpret_cast<const char*>(&len), sizeof(len));
+        file.write(var.name.c_str(), len);
+        
+        len = (int)var.value.size();
+        file.write(reinterpret_cast<const char*>(&len), sizeof(len));
+        file.write(var.value.c_str(), len);
+    }
+
     file.write(reinterpret_cast<const char*>(&sprite.x),     sizeof(sprite.x));
     file.write(reinterpret_cast<const char*>(&sprite.y),     sizeof(sprite.y));
     file.write(reinterpret_cast<const char*>(&sprite.angle), sizeof(sprite.angle));
@@ -88,7 +101,7 @@ static void save_project(const char* filename,
                sizeof(sprite.currentCostumeIndex));
 
     file.close();
-    log_info("SAVE: Project saved to file");
+    log_info("SAVE: Project saved with variables");
 }
 
 static bool load_project(const char* filename,
@@ -149,8 +162,26 @@ static bool load_project(const char* filename,
         sprite.height  = sprite.costumes[sprite.currentCostumeIndex].height;
     }
 
+    int varCount = 0;
+    file.read(reinterpret_cast<char*>(&varCount), sizeof(varCount));
+    sprite.variables.clear();
+    for (int i = 0; i < varCount; i++) {
+        Variable var;
+        int len = 0;
+        
+        file.read(reinterpret_cast<char*>(&len), sizeof(len));
+        var.name.resize(len);
+        file.read(&var.name[0], len);
+        
+        file.read(reinterpret_cast<char*>(&len), sizeof(len));
+        var.value.resize(len);
+        file.read(&var.value[0], len);
+        
+        sprite.variables.push_back(var);
+    }
+
     file.close();
-    log_info("LOAD: Project loaded from file");
+    log_info("LOAD: Project loaded with variables");
     return true;
 }
 
@@ -188,6 +219,27 @@ static void new_project(std::vector<Block>& blocks,
     pen_clear(renderer);
 
     log_info("NEW: New project created");
+}
+
+void draw_variables(SDL_Renderer* renderer, const Sprite& sprite) {
+    if (sprite.variables.empty()) return;
+
+    int y_offset = 10;
+    for (const auto& var : sprite.variables) {
+        std::string display = var.name + ": " + var.value;
+        
+        int textW = display.length() * 8 + 10;
+        SDL_Rect bg = {STAGE_X + 5, STAGE_Y + y_offset, textW, 18};
+        SDL_SetRenderDrawColor(renderer, 255, 140, 26, 200);
+        SDL_RenderFillRect(renderer, &bg);
+        
+        SDL_SetRenderDrawColor(renderer, 200, 100, 10, 255);
+        SDL_RenderDrawRect(renderer, &bg);
+
+        stringRGBA(renderer, bg.x + 5, bg.y + 4, display.c_str(), 255, 255, 255, 255);
+        
+        y_offset += 22;
+    }
 }
 
 int main(int argc, char* argv[]) {
@@ -289,6 +341,8 @@ int main(int argc, char* argv[]) {
 
     int target_scroll_override = -1;
 
+
+    Block* program_head = nullptr;
     std::vector<Block> blocks;
     int next_block_id = 1;
 
@@ -486,13 +540,29 @@ int main(int argc, char* argv[]) {
         switch (action) {
             case MENU_ACTION_NEW:
                 activeRuntimes.clear();
-                new_project(blocks, sprite, next_block_id,
-                            g_execution_index, g_is_executing, renderer);
+                blocks.clear();
+                next_block_id = 1;
+                g_execution_index = -1;
+                g_is_executing = false;
+                sprite.variables.clear(); // Clear variables
+                sprite.x = STAGE_X + STAGE_WIDTH / 2.0f;
+                sprite.y = STAGE_Y + STAGE_HEIGHT / 2.0f;
+                sprite.angle = 0;
+                log_info("NEW: New project created");
                 break;
 
             case MENU_ACTION_SAVE:
                 if (!blocks.empty()) {
-                    save_project("project.scratch", blocks, sprite);
+                    Block* headToSave = nullptr;
+                    for(auto& b : blocks) {
+                        if(!b.parent) {
+                            headToSave = &b;
+                            break;
+                        }
+                    }
+                    if(headToSave) {
+                        save_project("project.scratch", headToSave, sprite);
+                    }
                 } else {
                     log_warning("SAVE: No blocks to save");
                 }
@@ -500,13 +570,44 @@ int main(int argc, char* argv[]) {
 
             case MENU_ACTION_LOAD:
                 activeRuntimes.clear();
-                if (load_project("project.scratch", blocks, sprite, next_block_id)) {
+                blocks.clear();
+                {
+                    Block* loadedHead = load_project("project.scratch", sprite);
+                    if (loadedHead) {
+                        std::vector<Block*> stack;
+                        stack.push_back(loadedHead);
+                        while(!stack.empty()) {
+                            Block* curr = stack.back();
+                            stack.pop_back();
+                            
+                            blocks.push_back(*curr);
+                            Block& added = blocks.back();
+                            
+                            if(next_block_id <= curr->id) next_block_id = curr->id + 1;
+                            
+                            if(curr->inner) stack.push_back(curr->inner);
+                            if(curr->next) stack.push_back(curr->next);
+                        }
+                        
+                        std::map<int, int> idToIndex;
+                        for(int i=0; i<(int)blocks.size(); i++) idToIndex[blocks[i].id] = i;
+                        
+                        for(auto& b : blocks) {
+                            if(b.inner) {
+                                if(idToIndex.count(b.inner->id)) b.inner = &blocks[idToIndex[b.inner->id]];
+                            }
+                            if(b.next) {
+                                if(idToIndex.count(b.next->id)) b.next = &blocks[idToIndex[b.next->id]];
+                            }
+                            if(b.parent) {
+                                if(idToIndex.count(b.parent->id)) b.parent = &blocks[idToIndex[b.parent->id]];
+                            }
+                        }
+                        
                     g_execution_index = -1;
                     g_is_executing = false;
-                    log_info("LOAD: Project loaded successfully with " +
-                             std::to_string(blocks.size()) + " blocks");
-                } else {
-                    log_warning("LOAD: Failed to load project");
+                        log_info("LOAD: Project loaded successfully");
+                    }
                 }
                 break;
 
@@ -523,9 +624,7 @@ int main(int argc, char* argv[]) {
                          " Sprite=(" + std::to_string((int)sprite.x) + "," +
                          std::to_string((int)sprite.y) + ")" +
                          " Angle=" + std::to_string((int)sprite.angle) +
-                         " PenDown=" + std::to_string(sprite.isPenDown) +
-                         " Costumes=" + std::to_string(sprite.costumes.size()) +
-                         " ActiveRuntimes=" + std::to_string(activeRuntimes.size()));
+                         " Variables=" + std::to_string(sprite.variables.size()));
                 break;
 
             case MENU_ACTION_ABOUT:
@@ -570,6 +669,7 @@ int main(int argc, char* argv[]) {
         draw_coding_area(renderer);
         draw_stage(renderer, sprite);
         pen_render(renderer);
+        draw_variables(renderer, sprite);
 
         for (const auto& block : blocks) {
             std::string label = block_get_label(block.type);

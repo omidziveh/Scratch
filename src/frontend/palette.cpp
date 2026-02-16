@@ -44,6 +44,9 @@ BlockCategory get_block_category(BlockType type) {
         case OP_SUB:
         case OP_DIV:
             return CAT_OPERATORS;
+        case CMD_SET_VAR:
+        case CMD_CHANGE_VAR:
+            return CAT_VARIABLES;
         default:
             return CAT_NONE;
     }
@@ -59,6 +62,7 @@ void init_categories() {
     g_categories.push_back({CAT_PEN,       "Pen",       COLOR_PEN,      PEN_BLOCKS_COUNT * BLOCK_HEIGHT});
     g_categories.push_back({CAT_SENSING,   "Sensing",   COLOR_SENSING,  SENSING_BLOCKS_COUNT * BLOCK_HEIGHT});
     g_categories.push_back({CAT_OPERATORS, "Operators", COLOR_OPERATOR, OPERATORS_BLOCKS_COUNT * BLOCK_HEIGHT});
+    g_categories.push_back({CAT_VARIABLES, "Variables", COLOR_VARIABLE, VARIABLE_BLOCKS_COUNT * BLOCK_HEIGHT});
 }
 
 const std::vector<CategoryItem>& get_categories() {
@@ -135,7 +139,9 @@ void init_palette(std::vector<PaletteItem>& items) {
         {OP_STR_CONCAT, "join ( ) ( )"},
         {OP_MOD,        "mod ( )"},
         {OP_ABS,        "abs ( )"},
-        {OP_SQRT,       "sqrt ( )"}
+        {OP_SQRT,       "sqrt ( )"},
+        {CMD_SET_VAR,     "Set [var] to (0)"},
+        {CMD_CHANGE_VAR,  "Change [var] by (1)"}
     };
 
     int count = sizeof(defs) / sizeof(defs[0]);

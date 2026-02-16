@@ -58,6 +58,8 @@ std::string block_get_label(BlockType type) {
         case SENSE_MOUSE_Y:    return "mouse y";
         case SENSE_TIMER:      return "timer";
         case SENSE_RESET_TIMER:return "reset timer";
+        case CMD_SET_VAR:       return "Set [var] to (0)";
+        case CMD_CHANGE_VAR:    return "Change [var] by (1)";
 
         default:           return "Unknown";
     }
@@ -113,6 +115,10 @@ SDL_Color block_get_color(BlockType type) {
         case SENSE_MOUSE_DOWN: case SENSE_MOUSE_X: case SENSE_MOUSE_Y:
         case SENSE_TIMER: case SENSE_RESET_TIMER:
             return COLOR_SENSING;
+
+        case CMD_SET_VAR:
+        case CMD_CHANGE_VAR:
+            return COLOR_VARIABLE;
         
         default:
             return COLOR_GRAY;
@@ -134,6 +140,10 @@ std::vector<std::string> get_default_args(BlockType type) {
         case CMD_SWITCH_COSTUME: return {"1"};
         case CMD_SET_SIZE:       return {"100"};
         case CMD_CHANGE_SIZE:    return {"10"};
+        
+        case CMD_SET_VAR:     return {"score", "0"};
+        case CMD_CHANGE_VAR:  return {"score", "1"};
+
         default:           return {};
     }
 }
@@ -177,6 +187,8 @@ int get_arg_count(BlockType type) {
         case OP_OR:
         case OP_XOR:
         case OP_STR_CONCAT:
+        case CMD_SET_VAR:
+        case CMD_CHANGE_VAR:
             return 2;
 
         case CMD_START:

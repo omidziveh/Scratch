@@ -2,10 +2,9 @@
 #include "../common/definitions.h"
 #include <string>
 
-bool save_to_file(Block* head, std::string filename);
-Block* load_from_file(std::string filename);
+bool save_project(const std::string& filename, Block* head, const Sprite& sprite);
+
+Block* load_project(const std::string& filename, Sprite& sprite);
+
 std::string blocktype_to_string(BlockType type);
 BlockType string_to_blocktype(const std::string& str);
-void save_sprite(const Sprite& sprite, std::string filename);
-Sprite load_sprite(std::string filename);
-void save_block_recursive(std::ofstream& file, Block* b, int parentId, int slot);

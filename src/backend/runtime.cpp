@@ -9,6 +9,62 @@
 #include "block_executor_sound.h"
 #include "block_executor_looks.h"
 
+float resolve_argument(Runtime* rt, const std::string& arg) {
+    if (!rt || !rt->targetSprite) return 0.0f;
+
+    try {
+        size_t pos = 0;
+        float val = std::stof(arg, &pos);
+        if (pos == arg.size()) {
+            return val;
+        }
+    } catch (...) {
+        // NOT NUMBER
+    }
+
+    for (const auto& var : rt->targetSprite->variables) {
+        if (var.name == arg) {
+            try {
+                return std::stof(var.value);
+            } catch (...) {
+                return 0.0f;
+            }
+        }
+    }
+
+    return 0.0f;
+}
+
+void sprite_set_variable(Sprite* sprite, const std::string& name, const std::string& value) {
+    for (auto& var : sprite->variables) {
+        if (var.name == name) {
+            var.value = value;
+            log_info("Set var " + name + " = " + value);
+            return;
+        }
+    }
+    sprite->variables.push_back(Variable(name, value));
+    log_info("Created var " + name + " = " + value);
+}
+
+void sprite_change_variable(Sprite* sprite, const std::string& name, float delta) {
+    if (!sprite) return;
+    for (auto& var : sprite->variables) {
+        if (var.name == name) {
+            try {
+                float current = std::stof(var.value);
+                var.value = std::to_string(current + delta);
+                log_info("Variable '" + name + "' changed to " + var.value);
+            } catch (...) {
+                var.value = std::to_string(delta);
+            }
+            return;
+        }
+    }
+    sprite->variables.push_back(Variable(name, std::to_string(delta)));
+    log_info("Variable '" + name + "' created via change with value " + std::to_string(delta));
+}
+
 void runtime_init(Runtime* rt, Block* head, Sprite* sprite) {
     rt->programHead = head;
     rt->currentBlock = head;
@@ -345,8 +401,7 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
     switch (b->type) {
         // Motion:
         case CMD_MOVE: {
-            float steps = 10.0f;
-            if (!b->args.empty()) steps = (float)std::atof(b->args[0].c_str());
+            float steps = resolve_argument(rt, b->args.empty() ? "10" : b->args[0]);
 
             float oldX = rt->targetSprite->x;
             float oldY = rt->targetSprite->y;
@@ -363,8 +418,7 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
             break;
         }
         case CMD_TURN: {
-            float degrees = 15.0f;
-            if (!b->args.empty()) degrees = (float)std::atof(b->args[0].c_str());
+            float degrees = resolve_argument(rt, b->args.empty() ? "15" : b->args[0]);
             rt->targetSprite->angle += degrees;
 
             while (rt->targetSprite->angle >= 360.0f) rt->targetSprite->angle -= 360.0f;
@@ -375,8 +429,8 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
             float gotoX = 0.0f;
             float gotoY = 0.0f;
             if (b->args.size() >= 2) {
-                gotoX = (float)std::atof(b->args[0].c_str());
-                gotoY = (float)std::atof(b->args[1].c_str());
+                gotoX = resolve_argument(rt, b->args[0]);
+                gotoY = resolve_argument(rt, b->args[1]);
             }
 
             float oldX = rt->targetSprite->x;
@@ -395,8 +449,7 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
 
         // Control:
         case CMD_WAIT: {
-            float seconds = 1.0f;
-            if (!b->args.empty()) seconds = (float)std::atof(b->args[0].c_str());
+            float seconds = resolve_argument(rt, b->args.empty() ? "1" : b->args[0]);
             rt->waitTicksRemaining = (int)(seconds * rt->tickRate);
 
             rt->ticksSinceLastWait = 0;
@@ -412,9 +465,8 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
             break;
         }
         case CMD_REPEAT: {
-            int times = 10;
-            if (!b->args.empty()) times = std::atoi(b->args[0].c_str());
-
+            int times = (int)resolve_argument(rt, b->args.empty() ? "10" : b->args[0]);
+            
             if (times <= 0) {
                 log_warning("REPEAT with zero or negative count, skipping");
                 break;
@@ -434,7 +486,7 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
         }
         case CMD_IF: {
             bool condition = evaluate_condition(rt, b);
-
+            
             std::stringstream condLog;
             condLog << "IF condition evaluated to: " << (condition ? "true" : "false");
             log_debug(condLog.str());
@@ -451,9 +503,7 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
 
         // Position:
         case CMD_SET_X: {
-            float newX = 0.0f;
-            if (!b->args.empty()) newX = (float)std::atof(b->args[0].c_str());
-
+            float newX = resolve_argument(rt, b->args.empty() ? "0" : b->args[0]);
             float oldX = rt->targetSprite->x;
             float oldY = rt->targetSprite->y;
 
@@ -467,9 +517,7 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
             break;
         }
         case CMD_SET_Y: {
-            float newY = 0.0f;
-            if (!b->args.empty()) newY = (float)std::atof(b->args[0].c_str());
-
+            float newY = resolve_argument(rt, b->args.empty() ? "0" : b->args[0]);
             float oldX = rt->targetSprite->x;
             float oldY = rt->targetSprite->y;
 
@@ -483,9 +531,7 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
             break;
         }
         case CMD_CHANGE_X: {
-            float deltaX = 0.0f;
-            if (!b->args.empty()) deltaX = (float)std::atof(b->args[0].c_str());
-
+            float deltaX = resolve_argument(rt, b->args.empty() ? "0" : b->args[0]);
             float oldX = rt->targetSprite->x;
             float oldY = rt->targetSprite->y;
 
@@ -499,9 +545,7 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
             break;
         }
         case CMD_CHANGE_Y: {
-            float deltaY = 0.0f;
-            if (!b->args.empty()) deltaY = (float)std::atof(b->args[0].c_str());
-
+            float deltaY = resolve_argument(rt, b->args.empty() ? "0" : b->args[0]);
             float oldX = rt->targetSprite->x;
             float oldY = rt->targetSprite->y;
 
@@ -514,6 +558,47 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
             }
             break;
         }
+
+        // Variables:
+        case CMD_SET_VAR: {
+            if (b->args.size() >= 2) {
+                std::string name = b->args[0];
+                std::string value = b->args[1];
+                
+                // Value can also be a variable name or expression, but for now, treat as string/number
+                // We can support dynamic evaluation here if needed, similar to resolve_argument but returning string
+                sprite_set_variable(rt->targetSprite, name, value);
+            } else {
+                log_warning("Set variable block missing arguments");
+            }
+            break;
+        }
+        case CMD_CHANGE_VAR: {
+            if (b->args.size() >= 2) {
+                std::string name = b->args[0];
+                float delta = resolve_argument(rt, b->args[1]);
+                
+                bool found = false;
+                for (auto& var : rt->targetSprite->variables) {
+                    if (var.name == name) {
+                        try {
+                            float current = std::stof(var.value);
+                            var.value = std::to_string(current + delta);
+                        } catch (...) {
+                            var.value = std::to_string(delta);
+                        }
+                        found = true;
+                        log_info("Changed var " + name + " by " + std::to_string(delta) + " -> " + var.value);
+                        break;
+                    }
+                }
+                if (!found) {
+                    rt->targetSprite->variables.push_back(Variable(name, std::to_string(delta)));
+                }
+            }
+            break;
+        }
+
 
         // Pen:
         case CMD_PEN_DOWN: {

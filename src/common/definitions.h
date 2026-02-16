@@ -64,7 +64,7 @@ const int SOUND_BLOCKS_COUNT = 18;
 const int PEN_BLOCKS_COUNT = 22;
 const int SENSING_BLOCKS_COUNT = 28;
 const int OPERATORS_BLOCKS_COUNT = 33;
-
+const int VARIABLE_BLOCKS_COUNT = 40;
 
 struct Color {
     Uint8 r, g, b, a;
@@ -89,6 +89,14 @@ struct Costume {
         , width(w)
         , height(h)
     {}
+};
+
+struct Variable {
+    std::string name;
+    std::string value;
+
+    Variable() : name(""), value("0") {}
+    Variable(std::string n, std::string v) : name(n), value(v) {}
 };
 
 struct Stage {
@@ -138,7 +146,9 @@ struct Sprite {
     int penSize;
     std::string sayText;
     Uint32 sayStartTime;
-    float sayDuration; 
+    float sayDuration;
+    std::vector<Variable> variables;
+
     Sprite()
         : x(STAGE_X + STAGE_WIDTH / 2.0f)
         , y(STAGE_Y + STAGE_HEIGHT / 2.0f)
@@ -234,7 +244,11 @@ enum BlockType {
     CMD_PEN_CLEAR,
     CMD_PEN_SET_COLOR,
     CMD_PEN_SET_SIZE,
-    CMD_PEN_STAMP
+    CMD_PEN_STAMP,
+
+    // Variables
+    CMD_SET_VAR,
+    CMD_CHANGE_VAR
 };
 
 struct Block {
@@ -350,7 +364,8 @@ enum BlockCategory {
     CAT_SOUND,
     CAT_PEN,
     CAT_SENSING,
-    CAT_OPERATORS
+    CAT_OPERATORS,
+    CAT_VARIABLES
 };
 
 #endif
