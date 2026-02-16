@@ -34,7 +34,30 @@ std::string block_get_label(BlockType type) {
         case CMD_PEN_STAMP: return "stamp";
         case OP_ADD:        return "( + )";
         case OP_SUB:        return "( - )";
-        case OP_DIV:        return "( / )"; 
+        case OP_MUL:        return "( * )";
+        case OP_DIV:        return "( / )";
+        case OP_MOD:        return "mod ( % )";
+        case OP_ABS:        return "abs ( 0 )";
+        case OP_FLOOR:      return "floor ( 0 )";
+        case OP_CEIL:       return "ceiling ( 0 )";
+        case OP_SQRT:       return "sqrt ( 0 )";
+        case OP_SIN:        return "sin ( 0 )";
+        case OP_COS:        return "cos ( 0 )";
+        case OP_GT:         return "( > )";
+        case OP_LT:         return "( < )";
+        case OP_EQ:         return "( = )";
+        case OP_AND:        return "( and )";
+        case OP_OR:         return "( or )";
+        case OP_NOT:        return "not ( )";
+        case OP_XOR:        return "xor ( )";
+        case OP_STR_LEN:    return "length of ( )";
+        case OP_STR_CHAR:   return "letter ( 1 ) of ( )";
+        case OP_STR_CONCAT: return "join ( ) ( )";
+        case SENSE_MOUSE_DOWN: return "mouse down?";
+        case SENSE_MOUSE_X:    return "mouse x";
+        case SENSE_MOUSE_Y:    return "mouse y";
+        case SENSE_TIMER:      return "timer";
+        case SENSE_RESET_TIMER:return "reset timer";
 
         default:           return "Unknown";
     }
@@ -78,10 +101,18 @@ SDL_Color block_get_color(BlockType type) {
         case CMD_PEN_UP:
             return COLOR_PEN;
         
-        case OP_ADD:
-        case OP_SUB:
-        case OP_DIV:
+        case OP_ADD: case OP_SUB: case OP_MUL: case OP_DIV:
+        case OP_MOD: case OP_ABS: case OP_FLOOR: case OP_CEIL:
+        case OP_SQRT: case OP_SIN: case OP_COS:
+        case OP_GT: case OP_LT: case OP_EQ:
+        case OP_AND: case OP_OR: case OP_NOT: case OP_XOR:
+        case OP_STR_LEN: case OP_STR_CHAR: case OP_STR_CONCAT:
             return COLOR_OPERATOR;
+
+        case SENSE_TOUCHING_MOUSE: case SENSE_TOUCHING_EDGE:
+        case SENSE_MOUSE_DOWN: case SENSE_MOUSE_X: case SENSE_MOUSE_Y:
+        case SENSE_TIMER: case SENSE_RESET_TIMER:
+            return COLOR_SENSING;
         
         default:
             return COLOR_GRAY;
@@ -123,12 +154,29 @@ int get_arg_count(BlockType type) {
         case CMD_PLAY_SOUND:
         case CMD_CHANGE_VOLUME:
         case CMD_SET_VOLUME:
+        case OP_ABS:
+        case OP_FLOOR:
+        case OP_CEIL:
+        case OP_SQRT:
+        case OP_SIN:
+        case OP_COS:
+        case OP_NOT:
+        case OP_STR_LEN:
             return 1;
 
         case CMD_GOTO:
-        case OP_DIV:
         case OP_ADD:
         case OP_SUB:
+        case OP_MUL:
+        case OP_DIV:
+        case OP_MOD:
+        case OP_GT:
+        case OP_LT:
+        case OP_EQ:
+        case OP_AND:
+        case OP_OR:
+        case OP_XOR:
+        case OP_STR_CONCAT:
             return 2;
 
         case CMD_START:

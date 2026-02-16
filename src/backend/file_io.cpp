@@ -19,23 +19,31 @@ std::string blocktype_to_string(BlockType type) {
         case SENSE_TOUCHING_EDGE: return "SENSE_EDGE";
         case OP_ADD: return "OP_ADD";
         case OP_SUB: return "OP_SUB";
-        case OP_DIV: return "OP_DIV";
-        case CMD_SET_X:    return "SET_X";
-        case CMD_SET_Y:    return "SET_Y";
-        case CMD_CHANGE_X: return "CHANGE_X";
-        case CMD_CHANGE_Y: return "CHANGE_Y";
-        case CMD_START:    return "START";
-        case CMD_NONE:     return "NONE";
-        case CMD_SWITCH_COSTUME: return "SWITCH_COSTUME";
-        case CMD_NEXT_COSTUME:   return "NEXT_COSTUME";
-        case CMD_SET_SIZE:       return "SET_SIZE";
-        case CMD_CHANGE_SIZE:    return "CHANGE_SIZE";
-        case CMD_SHOW:           return "SHOW";
-        case CMD_HIDE:           return "HIDE";
-        case CMD_PLAY_SOUND:     return "PLAY_SOUND";
-        case CMD_STOP_ALL_SOUNDS: return "STOP_ALL_SOUNDS";
-        case CMD_CHANGE_VOLUME:  return "CHANGE_VOLUME";
-        case CMD_SET_VOLUME:     return "SET_VOLUME";
+        case OP_MUL:        return "OP_MUL";
+        case OP_DIV:        return "OP_DIV";
+        case OP_MOD:        return "OP_MOD";
+        case OP_ABS:        return "OP_ABS";
+        case OP_FLOOR:      return "OP_FLOOR";
+        case OP_CEIL:       return "OP_CEIL";
+        case OP_SQRT:       return "OP_SQRT";
+        case OP_SIN:        return "OP_SIN";
+        case OP_COS:        return "OP_COS";
+        case OP_GT:         return "OP_GT";
+        case OP_LT:         return "OP_LT";
+        case OP_EQ:         return "OP_EQ";
+        case OP_AND:        return "OP_AND";
+        case OP_OR:         return "OP_OR";
+        case OP_NOT:        return "OP_NOT";
+        case OP_XOR:        return "OP_XOR";
+        case OP_STR_LEN:    return "OP_STR_LEN";
+        case OP_STR_CHAR:   return "OP_STR_CHAR";
+        case OP_STR_CONCAT: return "OP_STR_CONCAT";
+        case SENSE_MOUSE_DOWN: return "SENSE_MOUSE_DOWN";
+        case SENSE_MOUSE_X:    return "SENSE_MOUSE_X";
+        case SENSE_MOUSE_Y:    return "SENSE_MOUSE_Y";
+        case SENSE_TIMER:      return "SENSE_TIMER";
+        case SENSE_RESET_TIMER:return "SENSE_RESET_TIMER";
+        
         default: return "UNKNOWN";
     }
 }
@@ -53,6 +61,7 @@ BlockType string_to_blocktype(const std::string& str) {
     if (str == "SENSE_EDGE") return SENSE_TOUCHING_EDGE;
     if (str == "OP_ADD") return OP_ADD;
     if (str == "OP_SUB") return OP_SUB;
+    if (str == "OP_MUL") return OP_MUL;
     if (str == "OP_DIV") return OP_DIV;
     if (str == "MOVE")     return CMD_MOVE;
     if (str == "TURN")     return CMD_TURN;
@@ -66,7 +75,33 @@ BlockType string_to_blocktype(const std::string& str) {
     if (str == "WAIT")     return CMD_WAIT;
     if (str == "SAY")      return CMD_SAY;
     if (str == "START")    return CMD_START;
-    return CMD_MOVE;
+    if (str == "OP_ADD")    return OP_ADD;
+    if (str == "OP_SUB")    return OP_SUB;
+    if (str == "OP_MUL")    return OP_MUL;
+    if (str == "OP_DIV")    return OP_DIV;
+    if (str == "OP_MOD")    return OP_MOD;
+    if (str == "OP_ABS")    return OP_ABS;
+    if (str == "OP_FLOOR")  return OP_FLOOR;
+    if (str == "OP_CEIL")   return OP_CEIL;
+    if (str == "OP_SQRT")   return OP_SQRT;
+    if (str == "OP_SIN")    return OP_SIN;
+    if (str == "OP_COS")    return OP_COS;
+    if (str == "OP_GT")     return OP_GT;
+    if (str == "OP_LT")     return OP_LT;
+    if (str == "OP_EQ")     return OP_EQ;
+    if (str == "OP_AND")    return OP_AND;
+    if (str == "OP_OR")     return OP_OR;
+    if (str == "OP_NOT")    return OP_NOT;
+    if (str == "OP_XOR")    return OP_XOR;
+    if (str == "OP_STR_LEN")    return OP_STR_LEN;
+    if (str == "OP_STR_CHAR")   return OP_STR_CHAR;
+    if (str == "OP_STR_CONCAT") return OP_STR_CONCAT;
+    if (str == "SENSE_MOUSE_DOWN") return SENSE_MOUSE_DOWN;
+    if (str == "SENSE_MOUSE_X")    return SENSE_MOUSE_X;
+    if (str == "SENSE_MOUSE_Y")    return SENSE_MOUSE_Y;
+    if (str == "SENSE_TIMER")      return SENSE_TIMER;
+    if (str == "SENSE_RESET_TIMER")return SENSE_RESET_TIMER;
+    return CMD_NONE;
 }
 
 void save_block_recursive(std::ofstream& file, Block* b, int parentId, int slot) {

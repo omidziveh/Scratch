@@ -606,7 +606,13 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
 
         // Sensing:
         case SENSE_TOUCHING_MOUSE:
-        case SENSE_TOUCHING_EDGE: {
+        case SENSE_TOUCHING_EDGE:
+        case SENSE_MOUSE_DOWN:
+        case SENSE_MOUSE_X:
+        case SENSE_MOUSE_Y:
+        case SENSE_TIMER:
+        case SENSE_RESET_TIMER:
+        {
             ExecutionContext ctx;
             ctx.sprite = rt->targetSprite;
             ctx.stage = stage;
@@ -616,10 +622,29 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
             break;
         }
 
-        // Logical:
+        // Operators:
         case OP_ADD:
         case OP_SUB:
-        case OP_DIV: {
+        case OP_MUL:
+        case OP_DIV:
+        case OP_MOD:
+        case OP_ABS:
+        case OP_FLOOR:
+        case OP_CEIL:
+        case OP_SQRT:
+        case OP_SIN:
+        case OP_COS:
+        case OP_AND:
+        case OP_OR:
+        case OP_NOT:
+        case OP_XOR:
+        case OP_GT:
+        case OP_LT:
+        case OP_EQ:
+        case OP_STR_LEN:
+        case OP_STR_CHAR:
+        case OP_STR_CONCAT:
+        {
             ExecutionContext ctx;
             ctx.sprite = rt->targetSprite;
             ctx.stage = stage;
@@ -630,7 +655,7 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
         }
 
         default:
-            log_warning("Unknown block type encountered");
+            log_warning("Unknown block type encountered: " + std::to_string(b->type));
             break;
     }
     if (hasChanged) {

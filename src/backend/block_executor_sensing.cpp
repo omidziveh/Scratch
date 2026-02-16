@@ -5,6 +5,11 @@
 #include "../common/definitions.h"
 #include <string>
 #include <cstdlib>
+#include <cmath>
+#include <SDL2/SDL.h>
+
+extern float g_timer_value;
+static Uint32 g_timer_start_time = 0;
 
 bool execute_sensing_block(Block* block, ExecutionContext& ctx) {
     if (!block || !ctx.sprite || !ctx.stage) return false;
@@ -12,15 +17,38 @@ bool execute_sensing_block(Block* block, ExecutionContext& ctx) {
     switch (block->type) {
         case SENSE_TOUCHING_MOUSE: {
             ctx.lastCondition = is_sprite_touching_mouse(*ctx.sprite, *ctx.stage, ctx.mouseX, ctx.mouseY);
+            ctx.lastResult = ctx.lastCondition ? 1.0f : 0.0f;
             log_info("Sensing: touching mouse = " + std::string(ctx.lastCondition ? "true" : "false"));
             return true;
         }
         case SENSE_TOUCHING_EDGE: {
             ctx.lastCondition = is_sprite_touching_edge(*ctx.sprite, *ctx.stage);
-            if (ctx.lastCondition) {
-                bounce_off_edge(*ctx.sprite, *ctx.stage);
-                log_info("Sensing: sprite hit edge, bounced");
-            }
+            ctx.lastResult = ctx.lastCondition ? 1.0f : 0.0f;
+            return true;
+        }
+        case SENSE_MOUSE_DOWN: {
+            int mx, my;
+            Uint32 buttons = SDL_GetMouseState(&mx, &my);
+            ctx.lastCondition = (buttons & SDL_BUTTON_LMASK) != 0;
+            ctx.lastResult = ctx.lastCondition ? 1.0f : 0.0f;
+            return true;
+        }
+        case SENSE_MOUSE_X: {
+            ctx.lastResult = (float)(ctx.mouseX - (STAGE_X + STAGE_WIDTH / 2)); // Relative to center
+            return true;
+        }
+        case SENSE_MOUSE_Y: {
+            ctx.lastResult = (float)( (STAGE_Y + STAGE_HEIGHT / 2) - ctx.mouseY );
+            return true;
+        }
+        case SENSE_TIMER: {
+            Uint32 now = SDL_GetTicks();
+            ctx.lastResult = (float)(now - g_timer_start_time) / 1000.0f;
+            return true;
+        }
+        case SENSE_RESET_TIMER: {
+            g_timer_start_time = SDL_GetTicks();
+            log_info("Timer reset");
             return true;
         }
         default:
@@ -31,35 +59,63 @@ bool execute_sensing_block(Block* block, ExecutionContext& ctx) {
 bool execute_operator_block(Block* block, ExecutionContext& ctx) {
     if (!block) return false;
 
-    float a = 0.0f;
-    float b = 0.0f;
+    auto getFloat = [&](int idx) {
+        if (idx < (int)block->args.size()) {
+            return (float)std::atof(block->args[idx].c_str());
+        }
+        return 0.0f;
+    };
 
-    if (block->args.size() >= 1) a = std::atof(block->args[0].c_str());
-    if (block->args.size() >= 2) b = std::atof(block->args[1].c_str());
+    auto getString = [&](int idx) {
+        if (idx < (int)block->args.size()) return block->args[idx];
+        return std::string("");
+    };
 
     bool success = true;
 
     switch (block->type) {
-        case OP_ADD: {
-            ctx.lastResult = op_add(a, b);
-            log_info("Operator: " + std::to_string(a) + " + " + std::to_string(b) + " = " + std::to_string(ctx.lastResult));
+        // Math Binary
+        case OP_ADD: ctx.lastResult = op_add(getFloat(0), getFloat(1)); return true;
+        case OP_SUB: ctx.lastResult = op_sub(getFloat(0), getFloat(1)); return true;
+        case OP_MUL: ctx.lastResult = op_mul(getFloat(0), getFloat(1)); return true;
+        case OP_DIV: ctx.lastResult = op_div(getFloat(0), getFloat(1), success); return true;
+        case OP_MOD: ctx.lastResult = op_mod(getFloat(0), getFloat(1), success); return true;
+
+        // Math Unary
+        case OP_ABS:   ctx.lastResult = op_abs(getFloat(0)); return true;
+        case OP_FLOOR: ctx.lastResult = op_floor(getFloat(0)); return true;
+        case OP_CEIL:  ctx.lastResult = op_ceil(getFloat(0)); return true;
+        case OP_SQRT:  ctx.lastResult = op_sqrt(getFloat(0), success); return true;
+        case OP_SIN:   ctx.lastResult = op_sin(getFloat(0)); return true;
+        case OP_COS:   ctx.lastResult = op_cos(getFloat(0)); return true;
+
+        // Logic
+        case OP_AND: ctx.lastResult = op_and(getFloat(0), getFloat(1)); return true;
+        case OP_OR:  ctx.lastResult = op_or(getFloat(0), getFloat(1)); return true;
+        case OP_NOT: ctx.lastResult = op_not(getFloat(0)); return true;
+        case OP_XOR: ctx.lastResult = op_xor(getFloat(0), getFloat(1)); return true;
+
+        // Comparison
+        case OP_GT: ctx.lastResult = op_gt(getFloat(0), getFloat(1)); return true;
+        case OP_LT: ctx.lastResult = op_lt(getFloat(0), getFloat(1)); return true;
+        case OP_EQ: ctx.lastResult = op_eq(getFloat(0), getFloat(1)); return true;
+
+        // String
+        case OP_STR_LEN: {
+            ctx.lastResult = op_str_len(getString(0));
             return true;
         }
-        case OP_SUB: {
-            ctx.lastResult = op_sub(a, b);
-            log_info("Operator: " + std::to_string(a) + " - " + std::to_string(b) + " = " + std::to_string(ctx.lastResult));
+        case OP_STR_CHAR: {
+            ctx.lastStringResult = op_str_char(getString(0), getFloat(1));
+            ctx.lastResult = ctx.lastStringResult.empty() ? 0.0f : 1.0f; 
             return true;
         }
-        case OP_DIV: {
-            ctx.lastResult = op_div(a, b, success);
-            if (!success) {
-                log_error("Operator: division by zero blocked");
-                ctx.lastResult = 0.0f;
-            } else {
-                log_info("Operator: " + std::to_string(a) + " / " + std::to_string(b) + " = " + std::to_string(ctx.lastResult));
-            }
+        case OP_STR_CONCAT: {
+            ctx.lastStringResult = op_str_concat(getString(0), getString(1));
+            ctx.lastResult = (float)ctx.lastStringResult.length();
             return true;
         }
+        
         default:
             return false;
     }

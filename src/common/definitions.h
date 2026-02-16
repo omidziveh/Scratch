@@ -62,7 +62,8 @@ const int CONTROL_BLOCKS_COUNT = 8;
 const int LOOKS_BLOCKS_COUNT = 11;
 const int SOUND_BLOCKS_COUNT = 18;
 const int PEN_BLOCKS_COUNT = 22;
-const int OPERATORS_BLOCKS_COUNT = 28;
+const int SENSING_BLOCKS_COUNT = 28;
+const int OPERATORS_BLOCKS_COUNT = 33;
 
 
 struct Color {
@@ -177,28 +178,63 @@ enum BlockType {
     CMD_SAY,
     CMD_START,
     CMD_EVENT_CLICK,
+    
+    // Looks
     CMD_SWITCH_COSTUME,
     CMD_NEXT_COSTUME,
     CMD_SET_SIZE,
     CMD_CHANGE_SIZE,
     CMD_SHOW,
     CMD_HIDE,
+    
+    // Sound
     CMD_PLAY_SOUND,
     CMD_STOP_ALL_SOUNDS,
     CMD_CHANGE_VOLUME,
     CMD_SET_VOLUME,
+    
+    // Sensing
     SENSE_TOUCHING_MOUSE,
     SENSE_TOUCHING_EDGE,
+    SENSE_KEY_PRESSED,
+    SENSE_MOUSE_DOWN,
+    SENSE_MOUSE_X,
+    SENSE_MOUSE_Y,
+    SENSE_TIMER,
+    SENSE_RESET_TIMER,
+    
+    // --- Operators (Compulsory) ---
     OP_ADD,
     OP_SUB,
+    OP_MUL,
     OP_DIV,
+    OP_GT,
+    OP_LT,
+    OP_EQ,
+    OP_AND,
+    OP_OR,
+    OP_NOT,
+    OP_STR_LEN,
+    OP_STR_CHAR,
+    OP_STR_CONCAT,
+
+    // --- Operators (Optional) ---
+    OP_MOD,
+    OP_ABS,
+    OP_FLOOR,
+    OP_CEIL,
+    OP_SQRT,
+    OP_SIN,
+    OP_COS,
+    OP_XOR,
+    
+    // Pen
     CMD_PEN_DOWN,
     CMD_PEN_UP,
     CMD_PEN_CLEAR,
     CMD_PEN_SET_COLOR,
     CMD_PEN_SET_SIZE,
     CMD_PEN_STAMP
-
 };
 
 struct Block {
@@ -292,6 +328,7 @@ struct ExecutionContext {
     int     mouseY;
     float   lastResult;
     bool    lastCondition;
+    std::string lastStringResult;
 
     ExecutionContext()
         : sprite(nullptr)
@@ -300,6 +337,7 @@ struct ExecutionContext {
         , mouseY(0)
         , lastResult(0.0f)
         , lastCondition(false)
+        , lastStringResult("")
     {}
 };
 
@@ -311,6 +349,7 @@ enum BlockCategory {
     CAT_LOOKS,
     CAT_SOUND,
     CAT_PEN,
+    CAT_SENSING,
     CAT_OPERATORS
 };
 

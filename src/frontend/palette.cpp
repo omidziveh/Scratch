@@ -57,6 +57,7 @@ void init_categories() {
     g_categories.push_back({CAT_LOOKS,     "Looks",     COLOR_LOOKS,    LOOKS_BLOCKS_COUNT * BLOCK_HEIGHT});
     g_categories.push_back({CAT_SOUND,     "Sound",     COLOR_SOUND,    SOUND_BLOCKS_COUNT * BLOCK_HEIGHT});
     g_categories.push_back({CAT_PEN,       "Pen",       COLOR_PEN,      PEN_BLOCKS_COUNT * BLOCK_HEIGHT});
+    g_categories.push_back({CAT_SENSING,   "Sensing",   COLOR_SENSING,  SENSING_BLOCKS_COUNT * BLOCK_HEIGHT});
     g_categories.push_back({CAT_OPERATORS, "Operators", COLOR_OPERATOR, OPERATORS_BLOCKS_COUNT * BLOCK_HEIGHT});
 }
 
@@ -114,9 +115,27 @@ void init_palette(std::vector<PaletteItem>& items) {
         {CMD_PEN_SET_COLOR, "Set pen color to (0)"},
         {CMD_PEN_SET_SIZE,  "Set pen size to (1)"},
         {CMD_PEN_STAMP,     "Stamp"},
-        {OP_ADD,            "Add ( + )"},
-        {OP_SUB,            "Sub ( - )"},
-        {OP_DIV,            "Div ( / )"}
+        {SENSE_MOUSE_DOWN,  "mouse down?"},
+        {SENSE_MOUSE_X,     "mouse x"},
+        {SENSE_MOUSE_Y,     "mouse y"},
+        {SENSE_TIMER,       "timer"},
+        {SENSE_RESET_TIMER, "reset timer"},
+        {OP_ADD,        "( + )"},
+        {OP_SUB,        "( - )"},
+        {OP_MUL,        "( * )"},
+        {OP_DIV,        "( / )"},
+        {OP_GT,         "( > )"},
+        {OP_LT,         "( < )"},
+        {OP_EQ,         "( = )"},
+        {OP_AND,        "( and )"},
+        {OP_OR,         "( or )"},
+        {OP_NOT,        "not ( )"},
+        {OP_STR_LEN,    "length ( )"},
+        {OP_STR_CHAR,   "letter ( ) of ( )"},
+        {OP_STR_CONCAT, "join ( ) ( )"},
+        {OP_MOD,        "mod ( )"},
+        {OP_ABS,        "abs ( )"},
+        {OP_SQRT,       "sqrt ( )"}
     };
 
     int count = sizeof(defs) / sizeof(defs[0]);
