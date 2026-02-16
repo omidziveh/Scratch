@@ -28,6 +28,7 @@
 #include "frontend/pen.h"
 #include <set>
 #include "backend/logic.h"
+#include "backend/file_io.h"
 
 Sprite sprite;
 Runtime gRuntime;
@@ -271,10 +272,13 @@ int main(int argc, char* argv[]) {
 
     std::vector<PaletteItem> palette_items;
     init_palette(palette_items);
+    init_categories();
 
     int palette_scroll_offset = 0;
     int palette_max_scroll = get_palette_total_height(palette_items) - PALETTE_HEIGHT + 20;
     if (palette_max_scroll < 0) palette_max_scroll = 0;
+
+    int target_scroll_override = -1;
 
     std::vector<Block> blocks;
     int next_block_id = 1;
@@ -360,6 +364,23 @@ int main(int argc, char* argv[]) {
                             break;
                         }
 
+                        if (my >= CATEGORY_BAR_Y && my < CATEGORY_BAR_Y + CATEGORY_BAR_HEIGHT &&
+                            mx >= PALETTE_X && mx < STAGE_X) {
+                            
+                            const auto& cats = get_categories();
+                            int totalWidth = STAGE_X;
+                            int buttonWidth = totalWidth / (int)cats.size();
+                            int clickedIndex = (mx - PALETTE_X) / buttonWidth;
+                            
+                            if (clickedIndex >= 0 && clickedIndex < (int)cats.size()) {
+                                target_scroll_override = get_category_scroll_target(cats[clickedIndex].category);
+                                palette_scroll_offset = target_scroll_override;
+                                if (palette_scroll_offset < 0) palette_scroll_offset = 0;
+                                if (palette_scroll_offset > palette_max_scroll) palette_scroll_offset = palette_max_scroll;
+                            }
+                            break;
+                        }
+
                         bool clicked_arg = false;
                         for (auto& block : blocks) {
                             if (try_click_arg(block, mx, my, text_state)) {
@@ -440,11 +461,12 @@ int main(int argc, char* argv[]) {
                 break;
 
             case MENU_ACTION_SAVE:
-                save_project("project.scratch", blocks, sprite);
-                break;
+                save_to_file(get_first_block(&blocks[0]), "../saves/project.txt");
 
             case MENU_ACTION_LOAD:
-                load_project("project.scratch", blocks, sprite, next_block_id);
+                blocks.clear();
+                blocks.push_back(*load_from_file("../saves/project.txt")); // TODO...
+                // load_project("project.scratch", blocks, sprite, next_block_id);
                 g_execution_index = -1;
                 g_is_executing = false;
                 break;
@@ -487,6 +509,18 @@ int main(int argc, char* argv[]) {
         SDL_RenderClear(renderer);
 
         draw_toolbar(renderer);
+
+        const auto& cats = get_categories();
+        int selected_cat_index = 0;
+        for (size_t i = 0; i < cats.size(); i++) {
+            if (palette_scroll_offset >= cats[i].yPosition) {
+                selected_cat_index = (int)i;
+            }
+        }
+
+
+        draw_category_bar(renderer, cats, selected_cat_index);
+
         draw_palette(renderer, palette_items, palette_scroll_offset);
         draw_coding_area(renderer);
         draw_stage(renderer, sprite);

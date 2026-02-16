@@ -3,6 +3,74 @@
 #include "block_utils.h"
 #include "../common/globals.h"
 
+static std::vector<CategoryItem> g_categories;
+
+BlockCategory get_block_category(BlockType type) {
+    switch (type) {
+        case CMD_START: return CAT_EVENTS;
+        case CMD_MOVE:
+        case CMD_TURN:
+        case CMD_GOTO:
+        case CMD_SET_X:
+        case CMD_SET_Y:
+        case CMD_CHANGE_X:
+        case CMD_CHANGE_Y:
+            return CAT_MOTION;
+        case CMD_REPEAT:
+        case CMD_IF:
+        case CMD_WAIT:
+            return CAT_CONTROL;
+        case CMD_SAY:
+        case CMD_SWITCH_COSTUME:
+        case CMD_NEXT_COSTUME:
+        case CMD_SET_SIZE:
+        case CMD_CHANGE_SIZE:
+        case CMD_SHOW:
+        case CMD_HIDE:
+            return CAT_LOOKS;
+        case CMD_PLAY_SOUND:
+        case CMD_STOP_ALL_SOUNDS:
+        case CMD_CHANGE_VOLUME:
+        case CMD_SET_VOLUME:
+            return CAT_SOUND;
+        case CMD_PEN_DOWN:
+        case CMD_PEN_UP:
+        case CMD_PEN_CLEAR:
+        case CMD_PEN_SET_COLOR:
+        case CMD_PEN_SET_SIZE:
+        case CMD_PEN_STAMP:
+            return CAT_PEN;
+        case OP_ADD:
+        case OP_SUB:
+        case OP_DIV:
+            return CAT_OPERATORS;
+        default:
+            return CAT_NONE;
+    }
+}
+
+void init_categories() {
+    g_categories.clear();
+    g_categories.push_back({CAT_EVENTS,    "Events",    COLOR_EVENTS,   EVENT_BLOCKS_COUNT * BLOCK_HEIGHT});
+    g_categories.push_back({CAT_MOTION,    "Motion",    COLOR_MOTION,   MOTION_BLOCKS_COUNT * BLOCK_HEIGHT});
+    g_categories.push_back({CAT_CONTROL,   "Control",   COLOR_CONTROL,  CONTROL_BLOCKS_COUNT * BLOCK_HEIGHT});
+    g_categories.push_back({CAT_LOOKS,     "Looks",     COLOR_LOOKS,    LOOKS_BLOCKS_COUNT * BLOCK_HEIGHT});
+    g_categories.push_back({CAT_SOUND,     "Sound",     COLOR_SOUND,    SOUND_BLOCKS_COUNT * BLOCK_HEIGHT});
+    g_categories.push_back({CAT_PEN,       "Pen",       COLOR_PEN,      PEN_BLOCKS_COUNT * BLOCK_HEIGHT});
+    g_categories.push_back({CAT_OPERATORS, "Operators", COLOR_OPERATOR, OPERATORS_BLOCKS_COUNT * BLOCK_HEIGHT});
+}
+
+const std::vector<CategoryItem>& get_categories() {
+    return g_categories;
+}
+
+int get_category_scroll_target(BlockCategory cat) {
+    for (const auto& c : g_categories) {
+        if (c.category == cat) return (int)c.yPosition;
+    }
+    return 0;
+}
+
 void init_palette(std::vector<PaletteItem>& items) {
     items.clear();
 
@@ -52,11 +120,29 @@ void init_palette(std::vector<PaletteItem>& items) {
     };
 
     int count = sizeof(defs) / sizeof(defs[0]);
+    init_categories();
+
+    BlockCategory currentCat = CAT_NONE;
+    float firstY = 0;
+
     for (int i = 0; i < count; i++) {
         SDL_Color color = block_get_color(defs[i].type);
         PaletteItem item(defs[i].type, defs[i].label, color,
                          startX, startY + i * gap, w, h);
         items.push_back(item);
+
+        BlockCategory itemCat = get_block_category(defs[i].type);
+        if (itemCat != currentCat) {
+            currentCat = itemCat;
+            float relativeY = (startY + i * gap) - PALETTE_Y;
+            
+            for (auto& cat : g_categories) {
+                if (cat.category == currentCat) {
+                    cat.yPosition = relativeY;
+                    break;
+                }
+            }
+        }
     }
 }
 
@@ -64,7 +150,7 @@ int get_palette_total_height(const std::vector<PaletteItem>& items) {
     if (items.empty()) return 0;
     float min_y = items[0].y;
     float max_y = items.back().y + items.back().height;
-    return (int)(max_y - min_y + 40);
+    return (int)(max_y - min_y + 150);
 }
 
 void draw_palette(SDL_Renderer* renderer, const std::vector<PaletteItem>& items, int scroll_offset) {

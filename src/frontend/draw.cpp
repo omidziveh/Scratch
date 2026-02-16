@@ -8,6 +8,7 @@
 #include <cmath>
 #include <algorithm>
 #include "../utils/logger.h"
+#include "palette.h"
 
 
 SDL_Texture* load_texture(SDL_Renderer* renderer, const std::string& path) {
@@ -237,5 +238,29 @@ void draw_arg_boxes(SDL_Renderer* renderer, const Block& block, const TextInputS
             }
             draw_cursor(renderer, cursor_x, box.y + 2, box.h - 4, {0, 0, 0, 255});
         }
+    }
+}
+
+void draw_category_bar(SDL_Renderer* renderer, const std::vector<CategoryItem>& categories, int selected_index) {
+    int totalWidth = STAGE_X; 
+    int buttonWidth = totalWidth / (int)categories.size();
+    
+    for (size_t i = 0; i < categories.size(); i++) {
+        const auto& cat = categories[i];
+        int x = PALETTE_X + i * buttonWidth;
+        int y = CATEGORY_BAR_Y;
+        
+        SDL_Rect rect = {x, y, buttonWidth, CATEGORY_BAR_HEIGHT};
+        
+        SDL_Color col = cat.color;
+        if ((int)i == selected_index) {
+            col.r = std::min(255, col.r + 30);
+            col.g = std::min(255, col.g + 30);
+            col.b = std::min(255, col.b + 30);
+        }
+        
+        SDL_SetRenderDrawColor(renderer, col.r, col.g, col.b, col.a);
+        SDL_RenderFillRect(renderer, &rect);
+        stringRGBA(renderer, x + 5, y + 15, cat.name.c_str(), 255, 255, 255, 255);
     }
 }

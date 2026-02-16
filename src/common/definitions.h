@@ -51,7 +51,19 @@ const int ARG_BOX_MARGIN_X = 8;
 const int ARG_BOX_Y_OFFSET = 10;
 const Uint32 CURSOR_BLINK_MS = 500;
 
+const int CATEGORY_BAR_Y = 30;
+const int CATEGORY_BAR_HEIGHT = 40;
+
 const int MENU_BAR_OFFSET = 30;
+
+const int EVENT_BLOCKS_COUNT = 0;
+const int MOTION_BLOCKS_COUNT = 1;
+const int CONTROL_BLOCKS_COUNT = 8;
+const int LOOKS_BLOCKS_COUNT = 11;
+const int SOUND_BLOCKS_COUNT = 18;
+const int PEN_BLOCKS_COUNT = 22;
+const int OPERATORS_BLOCKS_COUNT = 28;
+
 
 struct Color {
     Uint8 r, g, b, a;
@@ -286,6 +298,17 @@ struct ExecutionContext {
         , lastResult(0.0f)
         , lastCondition(false)
     {}
+};
+
+enum BlockCategory {
+    CAT_NONE = 0,
+    CAT_EVENTS,
+    CAT_MOTION,
+    CAT_CONTROL,
+    CAT_LOOKS,
+    CAT_SOUND,
+    CAT_PEN,
+    CAT_OPERATORS
 };
 
 #endif

@@ -69,11 +69,19 @@ SDL_Color block_get_color(BlockType type) {
         case CMD_CHANGE_VOLUME:
         case CMD_SET_VOLUME:
             return COLOR_SOUND;
+
+        case CMD_PEN_CLEAR:
+        case CMD_PEN_DOWN:
+        case CMD_PEN_SET_COLOR:
+        case CMD_PEN_SET_SIZE:
+        case CMD_PEN_STAMP:
+        case CMD_PEN_UP:
+            return COLOR_PEN;
         
         case OP_ADD:
         case OP_SUB:
         case OP_DIV:
-            return COLOR_GREEN;
+            return COLOR_OPERATOR;
         
         default:
             return COLOR_GRAY;

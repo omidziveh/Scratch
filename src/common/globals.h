@@ -22,13 +22,14 @@ const SDL_Color COLOR_LOOKS      = {153, 102, 255, 255};
 const SDL_Color COLOR_EVENTS     = {255, 213, 0,   255};
 const SDL_Color COLOR_SOUND      = {207, 99,  207, 255};
 const SDL_Color COLOR_PEN        = {0,   171, 132, 255};
-const SDL_Color COLOR_OPERATOR   = {};
+const SDL_Color COLOR_OPERATOR   = {76,  151, 64,  255};
 
 const SDL_Color COLOR_TOOLBAR_BG    = {60,  60,  60,  255};
 const SDL_Color COLOR_PALETTE_BG    = {45,  45,  45,  255};
 const SDL_Color COLOR_CODING_BG     = {30,  30,  30,  255};
 const SDL_Color COLOR_STAGE_BG      = {255, 255, 255, 255};
 const SDL_Color COLOR_STAGE_BORDER  = {180, 180, 180, 255};
+const SDL_Color COLOR_CATEGORY_BG   = {35,  35,  35,  255};
 
 extern int g_execution_index;
 extern bool g_is_executing;
