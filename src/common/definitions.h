@@ -135,6 +135,9 @@ struct Sprite {
     Uint8 penG;
     Uint8 penB;
     int penSize;
+    std::string sayText;
+    Uint32 sayStartTime;
+    float sayDuration; 
     Sprite()
         : x(STAGE_X + STAGE_WIDTH / 2.0f)
         , y(STAGE_Y + STAGE_HEIGHT / 2.0f)

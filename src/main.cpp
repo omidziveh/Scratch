@@ -29,6 +29,11 @@
 #include <set>
 #include "backend/logic.h"
 #include "backend/file_io.h"
+#include "frontend/background_menu.h"
+#include "frontend/costume_editor.h"
+#include "frontend/character_panel.h"
+#include "frontend/confirm_dialog.h"
+#include "frontend/block_highlight.h"
 
 Sprite sprite;
 Runtime gRuntime;
@@ -46,9 +51,6 @@ void init_program(SDL_Renderer& renderer) {
         log_warning("Failed to load cat.png - sprite will be invisible");
     }
 }
-
-
-
 
 static void save_project(const char* filename,
                          const std::vector<Block>& blocks,
@@ -192,12 +194,11 @@ int main(int argc, char* argv[]) {
     (void)argc;
     (void)argv;
 
-    int g_execution_index     = -1;
-    bool g_is_executing       = false;
-    bool g_step_mode          = false;
-    bool g_waiting_for_step   = false;
+    int  g_execution_index   = -1;
+    bool g_is_executing      = false;
+    bool g_step_mode         = false;
+    bool g_waiting_for_step  = false;
 
-    // ==========================================================
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0) {
         std::cerr << "SDL_Init Error: " << SDL_GetError() << std::endl;
         return 1;
@@ -238,20 +239,21 @@ int main(int argc, char* argv[]) {
         SDL_Quit();
         return 1;
     }
-    // ==========================================================
 
     init_program(*renderer);
 
     {
-        int COSTUME_COUNT = 5;
+        const int COSTUME_COUNT = 5;
         char* costume_files[COSTUME_COUNT];
         for (int i = 0; i < COSTUME_COUNT; i++) {
-            std::string path = "../assets/cat" + std::to_string(i+1) + ".png";
+            std::string path = "../assets/cat" + std::to_string(i + 1) + ".png";
             costume_files[i] = strdup(path.c_str());
         }
-        // const char* costume_files[] = { "../assets/cat.png", "../assets/cat2.png" };
-        const char* costume_names[] = { "costume1", "costume2" };
-        int num_costumes = 2;
+
+        const char* costume_names[] = {
+            "costume1", "costume2", "costume3", "costume4", "costume5"
+        };
+        int num_costumes = COSTUME_COUNT;
 
         for (int i = 0; i < num_costumes; i++) {
             SDL_Texture* tex = load_texture(renderer, costume_files[i]);
@@ -259,7 +261,14 @@ int main(int argc, char* argv[]) {
                 int w = 0, h = 0;
                 SDL_QueryTexture(tex, nullptr, nullptr, &w, &h);
                 sprite.costumes.push_back(Costume(costume_names[i], tex, w, h));
+                log_info("Loaded costume: " + std::string(costume_names[i]));
+            } else {
+                log_warning("Failed to load costume: " + std::string(costume_files[i]));
             }
+        }
+
+        for (int i = 0; i < COSTUME_COUNT; i++) {
+            free(costume_files[i]);
         }
 
         if (!sprite.costumes.empty()) {
@@ -283,8 +292,6 @@ int main(int argc, char* argv[]) {
     std::vector<Block> blocks;
     int next_block_id = 1;
 
-
-    Stage stage;
     stage.renderer = renderer;
 
     sprite.x = STAGE_X + STAGE_WIDTH / 2;
@@ -293,7 +300,7 @@ int main(int argc, char* argv[]) {
     TextInputState text_state;
 
     int  mouse_x   = 0, mouse_y   = 0;
-    bool hover_run = false;
+    bool hover_run  = false;
     bool hover_stop = false;
 
     bool running = true;
@@ -310,7 +317,7 @@ int main(int argc, char* argv[]) {
                     running = false;
                     break;
 
-                case SDL_MOUSEWHEEL: 
+                case SDL_MOUSEWHEEL: {
                     int mx, my;
                     SDL_GetMouseState(&mx, &my);
 
@@ -324,7 +331,7 @@ int main(int argc, char* argv[]) {
                             palette_scroll_offset = palette_max_scroll;
                     }
                     break;
-                
+                }
 
                 case SDL_MOUSEBUTTONDOWN:
                     if (event.button.button == SDL_BUTTON_LEFT) {
@@ -342,7 +349,8 @@ int main(int argc, char* argv[]) {
                         }
 
                         if (mx >= TOOLBAR_WIDTH - 90 && mx <= TOOLBAR_WIDTH - 90 + 30 &&
-                            my >= TOOLBAR_Y + 5 && my <= TOOLBAR_Y + 5 + 30) {
+                            my >= TOOLBAR_Y + 5  && my <= TOOLBAR_Y + 5 + 30) {
+
                             activeRuntimes.clear();
                             for (Block& b : blocks) {
                                 if (b.type == CMD_START && b.next) {
@@ -352,31 +360,39 @@ int main(int argc, char* argv[]) {
                                     activeRuntimes.push_back(rt);
                                 }
                             }
+                            log_info("RUN: Started " +
+                                     std::to_string(activeRuntimes.size()) + " runtime(s)");
                             break;
                         }
 
                         if (mx >= TOOLBAR_WIDTH - 50 && mx <= TOOLBAR_WIDTH - 50 + 30 &&
-                            my >= TOOLBAR_Y + 5 && my <= TOOLBAR_Y + 5 + 30) {
-                                for (Runtime& rt : activeRuntimes) {
-                                    runtime_stop(&rt);
-                                }
-                                activeRuntimes.clear();
+                            my >= TOOLBAR_Y + 5  && my <= TOOLBAR_Y + 5 + 30) {
+
+                            for (Runtime& rt : activeRuntimes) {
+                                runtime_stop(&rt);
+                            }
+                            activeRuntimes.clear();
+                            log_info("STOP: All runtimes stopped");
                             break;
                         }
 
-                        if (my >= CATEGORY_BAR_Y && my < CATEGORY_BAR_Y + CATEGORY_BAR_HEIGHT &&
+                        if (my >= CATEGORY_BAR_Y &&
+                            my <  CATEGORY_BAR_Y + CATEGORY_BAR_HEIGHT &&
                             mx >= PALETTE_X && mx < STAGE_X) {
-                            
+
                             const auto& cats = get_categories();
-                            int totalWidth = STAGE_X;
+                            int totalWidth  = STAGE_X;
                             int buttonWidth = totalWidth / (int)cats.size();
                             int clickedIndex = (mx - PALETTE_X) / buttonWidth;
-                            
+
                             if (clickedIndex >= 0 && clickedIndex < (int)cats.size()) {
-                                target_scroll_override = get_category_scroll_target(cats[clickedIndex].category);
+                                target_scroll_override =
+                                    get_category_scroll_target(cats[clickedIndex].category);
                                 palette_scroll_offset = target_scroll_override;
-                                if (palette_scroll_offset < 0) palette_scroll_offset = 0;
-                                if (palette_scroll_offset > palette_max_scroll) palette_scroll_offset = palette_max_scroll;
+                                if (palette_scroll_offset < 0)
+                                    palette_scroll_offset = 0;
+                                if (palette_scroll_offset > palette_max_scroll)
+                                    palette_scroll_offset = palette_max_scroll;
                             }
                             break;
                         }
@@ -414,11 +430,11 @@ int main(int argc, char* argv[]) {
 
                     menu_handle_mouse_move(mx, my);
 
-                    hover_run = (mx >= TOOLBAR_WIDTH - 90 && mx <= TOOLBAR_WIDTH - 90 + 30 &&
-                                 my >= TOOLBAR_Y + 5 && my <= TOOLBAR_Y + 5 + 30);
+                    hover_run  = (mx >= TOOLBAR_WIDTH - 90 && mx <= TOOLBAR_WIDTH - 90 + 30 &&
+                                  my >= TOOLBAR_Y + 5  && my <= TOOLBAR_Y + 5 + 30);
 
                     hover_stop = (mx >= TOOLBAR_WIDTH - 50 && mx <= TOOLBAR_WIDTH - 50 + 30 &&
-                                  my >= TOOLBAR_Y + 5 && my <= TOOLBAR_Y + 5 + 30);
+                                  my >= TOOLBAR_Y + 5  && my <= TOOLBAR_Y + 5 + 30);
 
                     handle_mouse_motion(event, blocks);
                     break;
@@ -442,13 +458,26 @@ int main(int argc, char* argv[]) {
                                 rt.stepMode = !rt.stepMode;
                                 rt.waitingForStep = rt.stepMode;
                             }
+                            g_step_mode = !g_step_mode;
+                            log_info("Step mode: " +
+                                     std::string(g_step_mode ? "ON" : "OFF"));
                         }
                         if (event.key.keysym.sym == SDLK_SPACE) {
                             if (g_step_mode && g_waiting_for_step) {
                                 g_waiting_for_step = false;
                             }
+                            for (Runtime& rt : activeRuntimes) {
+                                if (rt.stepMode && rt.waitingForStep) {
+                                    rt.waitingForStep = false;
+                                }
+                            }
+                        }
+                        if (event.key.keysym.sym == SDLK_DELETE) {
                         }
                     }
+                    break;
+
+                default:
                     break;
             }
         }
@@ -456,19 +485,29 @@ int main(int argc, char* argv[]) {
         MenuAction action = menu_consume_action();
         switch (action) {
             case MENU_ACTION_NEW:
+                activeRuntimes.clear();
                 new_project(blocks, sprite, next_block_id,
                             g_execution_index, g_is_executing, renderer);
                 break;
 
             case MENU_ACTION_SAVE:
-                save_to_file(get_first_block(&blocks[0]), "../saves/project.txt");
+                if (!blocks.empty()) {
+                    save_project("project.scratch", blocks, sprite);
+                } else {
+                    log_warning("SAVE: No blocks to save");
+                }
+                break;
 
             case MENU_ACTION_LOAD:
-                blocks.clear();
-                blocks.push_back(*load_from_file("../saves/project.txt")); // TODO...
-                // load_project("project.scratch", blocks, sprite, next_block_id);
-                g_execution_index = -1;
-                g_is_executing = false;
+                activeRuntimes.clear();
+                if (load_project("project.scratch", blocks, sprite, next_block_id)) {
+                    g_execution_index = -1;
+                    g_is_executing = false;
+                    log_info("LOAD: Project loaded successfully with " +
+                             std::to_string(blocks.size()) + " blocks");
+                } else {
+                    log_warning("LOAD: Failed to load project");
+                }
                 break;
 
             case MENU_ACTION_EXIT:
@@ -484,7 +523,9 @@ int main(int argc, char* argv[]) {
                          " Sprite=(" + std::to_string((int)sprite.x) + "," +
                          std::to_string((int)sprite.y) + ")" +
                          " Angle=" + std::to_string((int)sprite.angle) +
-                         " PenDown=" + std::to_string(sprite.isPenDown));
+                         " PenDown=" + std::to_string(sprite.isPenDown) +
+                         " Costumes=" + std::to_string(sprite.costumes.size()) +
+                         " ActiveRuntimes=" + std::to_string(activeRuntimes.size()));
                 break;
 
             case MENU_ACTION_ABOUT:
@@ -501,8 +542,14 @@ int main(int argc, char* argv[]) {
 
         int mouseX, mouseY;
         SDL_GetMouseState(&mouseX, &mouseY);
-        for (Runtime& rt : activeRuntimes) {
-            runtime_tick(&rt, &stage, mouseX, mouseY);
+
+        for (auto it = activeRuntimes.begin(); it != activeRuntimes.end(); ) {
+            runtime_tick(&(*it), &stage, mouseX, mouseY);
+            if (it->state == RUNTIME_FINISHED || it->state == RUNTIME_STOPPED) {
+                it = activeRuntimes.erase(it);
+            } else {
+                ++it;
+            }
         }
 
         SDL_SetRenderDrawColor(renderer, 30, 30, 30, 255);
@@ -518,13 +565,10 @@ int main(int argc, char* argv[]) {
             }
         }
 
-
         draw_category_bar(renderer, cats, selected_cat_index);
-
         draw_palette(renderer, palette_items, palette_scroll_offset);
         draw_coding_area(renderer);
         draw_stage(renderer, sprite);
-
         pen_render(renderer);
 
         for (const auto& block : blocks) {
@@ -533,7 +577,6 @@ int main(int argc, char* argv[]) {
             draw_block(renderer, block, label);
             draw_arg_boxes(renderer, block, text_state);
         }
-
 
         if (hover_run) {
             SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
@@ -545,7 +588,7 @@ int main(int argc, char* argv[]) {
 
         if (hover_stop) {
             SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-            SDL_SetRenderDrawColor(renderer, 255, 255, 255, 0);
+            SDL_SetRenderDrawColor(renderer, 255, 255, 255, 50);
             SDL_Rect stop_rect = { TOOLBAR_WIDTH - 50, TOOLBAR_Y + 5, 30, 30 };
             SDL_RenderFillRect(renderer, &stop_rect);
             SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
@@ -555,27 +598,39 @@ int main(int argc, char* argv[]) {
             syslog_render(renderer);
         }
 
-        
         menu_render(renderer);
-        
-        render_palette_hover(renderer, palette_items, mouse_x, mouse_y, palette_scroll_offset);
+
+        render_palette_hover(renderer, palette_items, mouse_x, mouse_y,
+                             palette_scroll_offset);
+
         SDL_RenderPresent(renderer);
     }
+
+    log_info("Application shutting down...");
+
+    for (Runtime& rt : activeRuntimes) {
+        runtime_stop(&rt);
+    }
+    activeRuntimes.clear();
 
     pen_shutdown();
 
     for (auto& c : sprite.costumes) {
         if (c.texture) {
             SDL_DestroyTexture(c.texture);
+            c.texture = nullptr;
         }
     }
+    sprite.costumes.clear();
+
+    sprite.texture = nullptr;
 
     close_logger();
+    sound_cleanup();
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     IMG_Quit();
     SDL_Quit();
-    sound_cleanup();
 
     return 0;
 }
