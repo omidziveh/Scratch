@@ -25,6 +25,13 @@ std::string blocktype_to_string(BlockType type) {
         case CMD_CHANGE_Y: return "CHANGE_Y";
         case CMD_START:    return "START";
         case CMD_NONE:     return "NONE";
+        case CMD_PEN_DOWN: return "PEN_DOWN";
+        case CMD_PEN_UP: return "PEN_UP";
+        case CMD_PEN_CLEAR: return "PEN_CLEAR";
+        case CMD_PEN_SET_COLOR: return "PEN_SET_COLOR";
+        case CMD_PEN_SET_SIZE: return "PEN_SET_SIZE";
+        case CMD_PEN_STAMP: return "PEN_STAMP";
+
     }
     return "UNKNOWN";
 }
@@ -55,6 +62,13 @@ BlockType string_to_blocktype(const std::string& str) {
     if (str == "WAIT")     return CMD_WAIT;
     if (str == "SAY")      return CMD_SAY;
     if (str == "START")    return CMD_START;
+    if (str == "PEN_DOWN") return CMD_PEN_DOWN;
+    if (str == "PEN_UP") return CMD_PEN_UP;
+    if (str == "PEN_CLEAR") return CMD_PEN_CLEAR;
+    if (str == "PEN_SET_COLOR") return CMD_PEN_SET_COLOR;
+    if (str == "PEN_SET_SIZE") return CMD_PEN_SET_SIZE;
+    if (str == "PEN_STAMP") return CMD_PEN_STAMP;
+
     return CMD_MOVE;
 }
 
