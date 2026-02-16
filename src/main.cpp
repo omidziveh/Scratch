@@ -242,7 +242,13 @@ int main(int argc, char* argv[]) {
     init_program(*renderer);
 
     {
-        const char* costume_files[] = { "../assets/cat.png", "../assets/cat2.png" };
+        int COSTUME_COUNT = 5;
+        char* costume_files[COSTUME_COUNT];
+        for (int i = 0; i < COSTUME_COUNT; i++) {
+            std::string path = "../assets/cat" + std::to_string(i+1) + ".png";
+            costume_files[i] = strdup(path.c_str());
+        }
+        // const char* costume_files[] = { "../assets/cat.png", "../assets/cat2.png" };
         const char* costume_names[] = { "costume1", "costume2" };
         int num_costumes = 2;
 

@@ -45,7 +45,10 @@ void init_palette(std::vector<PaletteItem>& items) {
         {CMD_PEN_CLEAR,     "Clear pen"},
         {CMD_PEN_SET_COLOR, "Set pen color to (0)"},
         {CMD_PEN_SET_SIZE,  "Set pen size to (1)"},
-        {CMD_PEN_STAMP,     "Stamp"}
+        {CMD_PEN_STAMP,     "Stamp"},
+        {OP_ADD,            "Add ( + )"},
+        {OP_SUB,            "Sub ( - )"},
+        {OP_DIV,            "Div ( / )"}
     };
 
     int count = sizeof(defs) / sizeof(defs[0]);

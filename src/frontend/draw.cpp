@@ -63,11 +63,12 @@ void draw_block(SDL_Renderer* renderer, const Block& block, const std::string& l
     int bx = (int)block.x;
     int by = (int)block.y;
     int bw = (int)block.width;
-    int bh = (int)block.height;
+    int bh = BLOCK_HEIGHT;
 
     Uint8 r = block.color.r;
     Uint8 g = block.color.g;
     Uint8 b = block.color.b;
+
     if (block.is_running) {
         r = (Uint8)std::min(255, (int)r + 60);
         g = (Uint8)std::min(255, (int)g + 60);
@@ -88,13 +89,45 @@ void draw_block(SDL_Renderer* renderer, const Block& block, const std::string& l
         dr, dg, db, 255);
 
     draw_text(renderer, bx + 8, by + 12, label, COLOR_WHITE);
+
+    if (block.type == CMD_IF || block.type == CMD_REPEAT) {
+        int totalH = get_total_height((Block*)&block);
+        int bodyY = by + bh;
+        int bodyH = totalH - bh;
+
+        if (bodyH > 0) {
+            boxRGBA(renderer, bx, bodyY, bx + 8, bodyY + bodyH, r, g, b, 255);
+            roundedBoxRGBA(renderer, bx, bodyY + bodyH - 20, bx + bw, bodyY + bodyH, 6, r, g, b, 255);
+            roundedRectangleRGBA(renderer, bx, bodyY + bodyH - 20, bx + bw, bodyY + bodyH, 6, dr, dg, db, 255);
+        }
+    }
+}
+
+static void draw_block_tree(SDL_Renderer* renderer, Block* block, const TextInputState& state) {
+    if (!block) return;
+    
+    std::string label = block_get_label(block->type);
+
+    block->height = get_total_height(block);
+
+    draw_block_glow(renderer, *block);
+    draw_block(renderer, *block, label);
+    draw_arg_boxes(renderer, *block, state);
+
+    if (block->inner) {
+        draw_block_tree(renderer, block->inner, state);
+    }
+    if (block->next) {
+        draw_block_tree(renderer, block->next, state);
+    }
 }
 
 void draw_all_blocks(SDL_Renderer* renderer, const std::vector<Block>& blocks, const TextInputState& state) {
-    for (const auto& block : blocks) {
-        std::string label = block_get_label(block.type);
-        draw_block(renderer, block, label);
-        draw_arg_boxes(renderer, block, state);
+    std::vector<Block>& mutable_blocks = const_cast<std::vector<Block>&>(blocks);
+    for (auto& block : mutable_blocks) {
+        if (block.parent == nullptr) {
+            draw_block_tree(renderer, &block, state);
+        }
     }
 }
 

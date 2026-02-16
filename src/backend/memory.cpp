@@ -1,4 +1,5 @@
 #include "memory.h"
+#include "../utils/logger.h"
 
 static int blockIdCounter = 1;
 
@@ -31,24 +32,12 @@ Block* create_block(BlockType t) {
             break;
         case CMD_SAY:
             b->args.push_back("Hello!");
-            b->args.push_back("2");
             break;
         case CMD_WAIT:
             b->args.push_back("1");
             break;
         case CMD_REPEAT:
             b->args.push_back("10");
-            break;
-        case CMD_PLAY_SOUND:
-            b->args.push_back("pop");
-            break;
-        case CMD_STOP_ALL_SOUNDS:
-            break;
-        case CMD_CHANGE_VOLUME:
-            b->args.push_back("10");
-            break;
-        case CMD_SET_VOLUME:
-            b->args.push_back("100");
             break;
         default:
             break;
@@ -65,24 +54,13 @@ void delete_block(Block* b) {
 void delete_chain(Block* b) {
     if (!b) return;
 
-    if (b->inner) {
-        delete_chain(b->inner);
-        b->inner = nullptr;
-    }
-
-    if (b->next) {
-        delete_chain(b->next);
-        b->next = nullptr;
-    }
+    delete_chain(b->inner);
+    delete_chain(b->next);
 
     delete b;
 }
 
 int count_blocks(Block* b) {
     if (!b) return 0;
-
-    int count = 1;
-    if (b->inner) count += count_blocks(b->inner);
-    if (b->next) count += count_blocks(b->next);
-    return count;
+    return 1 + count_blocks(b->inner) + count_blocks(b->next);
 }

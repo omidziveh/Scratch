@@ -8,3 +8,4 @@ std::string blocktype_to_string(BlockType type);
 BlockType string_to_blocktype(const std::string& str);
 void save_sprite(const Sprite& sprite, std::string filename);
 Sprite load_sprite(std::string filename);
+void save_block_recursive(std::ofstream& file, Block* b, int parentId, int slot);

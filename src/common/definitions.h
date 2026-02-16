@@ -135,7 +135,7 @@ struct Sprite {
         , currentCostumeIndex(0)
         , texture(nullptr)
         , name("Cat")
-        , scale(0.05f)
+        , scale(0.5f)
         , volume(100)
         , prevPenX(STAGE_X + STAGE_WIDTH / 2.0f)
         , prevPenY(STAGE_Y + STAGE_HEIGHT / 2.0f)
@@ -196,6 +196,7 @@ struct Block {
     float drag_offset_x;
     float drag_offset_y;
     std::vector<std::string> args;
+    std::vector<std::string> argBlocks;
     SDL_Color color;
 
     Block* parent;

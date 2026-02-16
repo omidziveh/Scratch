@@ -22,6 +22,7 @@ const SDL_Color COLOR_LOOKS      = {153, 102, 255, 255};
 const SDL_Color COLOR_EVENTS     = {255, 213, 0,   255};
 const SDL_Color COLOR_SOUND      = {207, 99,  207, 255};
 const SDL_Color COLOR_PEN        = {0,   171, 132, 255};
+const SDL_Color COLOR_OPERATOR   = {};
 
 const SDL_Color COLOR_TOOLBAR_BG    = {60,  60,  60,  255};
 const SDL_Color COLOR_PALETTE_BG    = {45,  45,  45,  255};
