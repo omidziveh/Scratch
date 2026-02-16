@@ -7,6 +7,8 @@
 #include <iostream>
 #include <cmath>
 #include <algorithm>
+#include "../utils/logger.h"
+#include "palette.h"
 
 
 SDL_Texture* load_texture(SDL_Renderer* renderer, const std::string& path) {
@@ -38,6 +40,7 @@ void draw_block_glow(SDL_Renderer* renderer, const Block& block) {
     if (!block.is_running)
         return;
 
+    log_info(" glowing block: " + std::to_string(block.id));
     int bx = (int)block.x;
     int by = (int)block.y;
     int bw = (int)block.width;
@@ -51,7 +54,7 @@ void draw_block_glow(SDL_Renderer* renderer, const Block& block) {
         Uint8 layer_alpha = (Uint8)(alpha * (1.0f - (float)i / 5.0f));
         roundedRectangleRGBA(renderer,
             bx - i, by - i, bx + bw + i, by + bh + i,
-            6 + i,
+            8 + i,
             255, 255, 100, layer_alpha);
     }
 }
@@ -61,11 +64,12 @@ void draw_block(SDL_Renderer* renderer, const Block& block, const std::string& l
     int bx = (int)block.x;
     int by = (int)block.y;
     int bw = (int)block.width;
-    int bh = (int)block.height;
+    int bh = BLOCK_HEIGHT;
 
     Uint8 r = block.color.r;
     Uint8 g = block.color.g;
     Uint8 b = block.color.b;
+
     if (block.is_running) {
         r = (Uint8)std::min(255, (int)r + 60);
         g = (Uint8)std::min(255, (int)g + 60);
@@ -82,25 +86,57 @@ void draw_block(SDL_Renderer* renderer, const Block& block, const std::string& l
     Uint8 db = (Uint8)(b * 0.7f);
     roundedRectangleRGBA(renderer,
         bx, by, bx + bw, by + bh,
-        6,
+        8,
         dr, dg, db, 255);
 
     draw_text(renderer, bx + 8, by + 12, label, COLOR_WHITE);
+
+    if (block.type == CMD_IF || block.type == CMD_REPEAT) {
+        int totalH = get_total_height((Block*)&block);
+        int bodyY = by + bh;
+        int bodyH = totalH - bh;
+
+        if (bodyH > 0) {
+            boxRGBA(renderer, bx, bodyY, bx + 8, bodyY + bodyH, r, g, b, 255);
+            roundedBoxRGBA(renderer, bx, bodyY + bodyH - 20, bx + bw, bodyY + bodyH, 6, r, g, b, 255);
+            roundedRectangleRGBA(renderer, bx, bodyY + bodyH - 20, bx + bw, bodyY + bodyH, 6, dr, dg, db, 255);
+        }
+    }
+}
+
+static void draw_block_tree(SDL_Renderer* renderer, Block* block, const TextInputState& state) {
+    if (!block) return;
+    
+    std::string label = block_get_label(block->type);
+
+    block->height = get_total_height(block);
+
+    draw_block_glow(renderer, *block);
+    draw_block(renderer, *block, label);
+    draw_arg_boxes(renderer, *block, state);
+
+    if (block->inner) {
+        draw_block_tree(renderer, block->inner, state);
+    }
+    if (block->next) {
+        draw_block_tree(renderer, block->next, state);
+    }
 }
 
 void draw_all_blocks(SDL_Renderer* renderer, const std::vector<Block>& blocks, const TextInputState& state) {
-    for (const auto& block : blocks) {
-        std::string label = block_get_label(block.type);
-        draw_block(renderer, block, label);
-        draw_arg_boxes(renderer, block, state);
+    std::vector<Block>& mutable_blocks = const_cast<std::vector<Block>&>(blocks);
+    for (auto& block : mutable_blocks) {
+        if (block.parent == nullptr) {
+            draw_block_tree(renderer, &block, state);
+        }
     }
 }
 
 
 void draw_toolbar(SDL_Renderer* renderer) {
     draw_filled_rect(renderer, TOOLBAR_X, TOOLBAR_Y, TOOLBAR_WIDTH, TOOLBAR_HEIGHT, COLOR_TOOLBAR_BG);
-    draw_filled_rect(renderer, TOOLBAR_WIDTH - 90, 5, 30, 30, COLOR_GREEN);
-    draw_filled_rect(renderer, TOOLBAR_WIDTH - 50, 5, 30, 30, COLOR_RED);
+    draw_filled_rect(renderer, TOOLBAR_WIDTH - 90, TOOLBAR_Y + 5, 30, 30, COLOR_GREEN);
+    draw_filled_rect(renderer, TOOLBAR_WIDTH - 50, TOOLBAR_Y + 5, 30, 30, COLOR_RED);
 }
 
 void draw_coding_area(SDL_Renderer* renderer) {
@@ -133,9 +169,11 @@ void draw_sprite(SDL_Renderer* renderer, Sprite& sprite) {
     dest.w = draw_w;
     dest.h = draw_h;
 
+    SDL_Point center = {w / 2, h / 2};
+
     SDL_Rect stageClip = {STAGE_X, STAGE_Y, STAGE_WIDTH, STAGE_HEIGHT};
     SDL_RenderSetClipRect(renderer, &stageClip);
-    SDL_RenderCopyEx(renderer, sprite.texture, nullptr, &dest, sprite.direction, nullptr, SDL_FLIP_NONE);
+    SDL_RenderCopyEx(renderer, sprite.texture, nullptr, &dest, sprite.angle, nullptr, SDL_FLIP_NONE);
     SDL_RenderSetClipRect(renderer, nullptr);
 }
 
@@ -200,5 +238,29 @@ void draw_arg_boxes(SDL_Renderer* renderer, const Block& block, const TextInputS
             }
             draw_cursor(renderer, cursor_x, box.y + 2, box.h - 4, {0, 0, 0, 255});
         }
+    }
+}
+
+void draw_category_bar(SDL_Renderer* renderer, const std::vector<CategoryItem>& categories, int selected_index) {
+    int totalWidth = STAGE_X; 
+    int buttonWidth = totalWidth / (int)categories.size();
+    
+    for (size_t i = 0; i < categories.size(); i++) {
+        const auto& cat = categories[i];
+        int x = PALETTE_X + i * buttonWidth;
+        int y = CATEGORY_BAR_Y;
+        
+        SDL_Rect rect = {x, y, buttonWidth, CATEGORY_BAR_HEIGHT};
+        
+        SDL_Color col = cat.color;
+        if ((int)i == selected_index) {
+            col.r = std::min(255, col.r + 30);
+            col.g = std::min(255, col.g + 30);
+            col.b = std::min(255, col.b + 30);
+        }
+        
+        SDL_SetRenderDrawColor(renderer, col.r, col.g, col.b, col.a);
+        SDL_RenderFillRect(renderer, &rect);
+        stringRGBA(renderer, x + 5, y + 15, cat.name.c_str(), 255, 255, 255, 255);
     }
 }

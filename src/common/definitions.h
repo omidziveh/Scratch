@@ -22,26 +22,26 @@ const int WINDOW_WIDTH  = 1280;
 const int WINDOW_HEIGHT = 720;
 
 const int STAGE_X      = 800;
-const int STAGE_Y      = 40;
+const int STAGE_Y      = 70;
 const int STAGE_WIDTH  = 460;
 const int STAGE_HEIGHT = 340;
 
 const int PALETTE_X      = 0;
-const int PALETTE_Y      = 40;
+const int PALETTE_Y      = 70;
 const int PALETTE_WIDTH  = 200;
 const int PALETTE_HEIGHT = 680;
 
 const int CODING_AREA_X      = 200;
-const int CODING_AREA_Y      = 40;
+const int CODING_AREA_Y      = 70;
 const int CODING_AREA_WIDTH  = 600;
 const int CODING_AREA_HEIGHT = 680;
 
 const int TOOLBAR_X      = 0;
-const int TOOLBAR_Y      = 0;
+const int TOOLBAR_Y      = 30;
 const int TOOLBAR_WIDTH  = 1280;
 const int TOOLBAR_HEIGHT = 40;
 
-const int BLOCK_WIDTH  = 160;
+const int BLOCK_WIDTH  = 200;
 const int BLOCK_HEIGHT = 40;
 const int SNAP_DISTANCE = 20;
 
@@ -51,7 +51,19 @@ const int ARG_BOX_MARGIN_X = 8;
 const int ARG_BOX_Y_OFFSET = 10;
 const Uint32 CURSOR_BLINK_MS = 500;
 
-const int MENU_BAR_OFFSET = 28;
+const int CATEGORY_BAR_Y = 30;
+const int CATEGORY_BAR_HEIGHT = 40;
+
+const int MENU_BAR_OFFSET = 30;
+
+const int EVENT_BLOCKS_COUNT = 0;
+const int MOTION_BLOCKS_COUNT = 1;
+const int CONTROL_BLOCKS_COUNT = 8;
+const int LOOKS_BLOCKS_COUNT = 11;
+const int SOUND_BLOCKS_COUNT = 18;
+const int PEN_BLOCKS_COUNT = 22;
+const int OPERATORS_BLOCKS_COUNT = 28;
+
 
 struct Color {
     Uint8 r, g, b, a;
@@ -135,7 +147,7 @@ struct Sprite {
         , currentCostumeIndex(0)
         , texture(nullptr)
         , name("Cat")
-        , scale(0.05f)
+        , scale(0.5f)
         , volume(100)
         , prevPenX(STAGE_X + STAGE_WIDTH / 2.0f)
         , prevPenY(STAGE_Y + STAGE_HEIGHT / 2.0f)
@@ -196,10 +208,10 @@ struct Block {
     float drag_offset_x;
     float drag_offset_y;
     std::vector<std::string> args;
+    std::vector<std::string> argBlocks;
     SDL_Color color;
 
     Block* parent;
-    Block* child;
     bool is_snapped;
     Block* next;
     Block* inner;
@@ -217,7 +229,6 @@ struct Block {
         , drag_offset_x(0), drag_offset_y(0)
         , color({100, 100, 255, 255})
         , parent(nullptr)
-        , child(nullptr)
         , is_snapped(false)
         , next(nullptr)
         , inner(nullptr)
@@ -268,6 +279,36 @@ struct TextInputState {
         , blink_timer(0)
         , cursor_visible(true)
     {}
+};
+
+
+struct ExecutionContext {
+    Sprite* sprite;
+    Stage*  stage;
+    int     mouseX;
+    int     mouseY;
+    float   lastResult;
+    bool    lastCondition;
+
+    ExecutionContext()
+        : sprite(nullptr)
+        , stage(nullptr)
+        , mouseX(0)
+        , mouseY(0)
+        , lastResult(0.0f)
+        , lastCondition(false)
+    {}
+};
+
+enum BlockCategory {
+    CAT_NONE = 0,
+    CAT_EVENTS,
+    CAT_MOTION,
+    CAT_CONTROL,
+    CAT_LOOKS,
+    CAT_SOUND,
+    CAT_PEN,
+    CAT_OPERATORS
 };
 
 #endif

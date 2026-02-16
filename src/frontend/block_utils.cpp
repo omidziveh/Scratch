@@ -32,6 +32,9 @@ std::string block_get_label(BlockType type) {
         case CMD_PEN_SET_COLOR: return "set pen color";
         case CMD_PEN_SET_SIZE: return "set pen size";
         case CMD_PEN_STAMP: return "stamp";
+        case OP_ADD:        return "( + )";
+        case OP_SUB:        return "( - )";
+        case OP_DIV:        return "( / )"; 
 
         default:           return "Unknown";
     }
@@ -66,6 +69,19 @@ SDL_Color block_get_color(BlockType type) {
         case CMD_CHANGE_VOLUME:
         case CMD_SET_VOLUME:
             return COLOR_SOUND;
+
+        case CMD_PEN_CLEAR:
+        case CMD_PEN_DOWN:
+        case CMD_PEN_SET_COLOR:
+        case CMD_PEN_SET_SIZE:
+        case CMD_PEN_STAMP:
+        case CMD_PEN_UP:
+            return COLOR_PEN;
+        
+        case OP_ADD:
+        case OP_SUB:
+        case OP_DIV:
+            return COLOR_OPERATOR;
         
         default:
             return COLOR_GRAY;
@@ -110,6 +126,9 @@ int get_arg_count(BlockType type) {
             return 1;
 
         case CMD_GOTO:
+        case OP_DIV:
+        case OP_ADD:
+        case OP_SUB:
             return 2;
 
         case CMD_START:
@@ -135,8 +154,8 @@ SDL_Rect get_arg_box_rect(const Block& block, int arg_index) {
 
     const int ARG_BOX_WIDTH  = 40;
     const int ARG_BOX_HEIGHT = 16;
-    const int ARG_PADDING_X  = 8;
-    const int ARG_PADDING_Y  = 28;   
+    const int ARG_PADDING_X  = 30;
+    const int ARG_PADDING_Y  = 7;
     const int ARG_SPACING    = 6;
 
     rect.x = (int)block.x + ARG_PADDING_X + arg_index * (ARG_BOX_WIDTH + ARG_SPACING);
@@ -150,4 +169,20 @@ SDL_Rect get_arg_box_rect(const Block& block, int arg_index) {
     }
 
     return rect;
+}
+
+int get_total_height(Block* block) {
+    if (!block) return 0;
+    
+    int h = BLOCK_HEIGHT;
+
+    if (block->type == CMD_IF || block-> type == CMD_REPEAT) {
+        if (block->inner) {
+            Block* child = block->inner;
+            h += get_total_height(child);
+            child = child->next;
+        }
+        h += 10;
+    }
+    return h;
 }

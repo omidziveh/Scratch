@@ -24,7 +24,31 @@
 #include "utils/system_logger.h"
 #include "backend/block_executor_looks.h"
 #include "backend/sound.h"
+#include "backend/runtime.h"
 #include "frontend/pen.h"
+#include <set>
+#include "backend/logic.h"
+#include "backend/file_io.h"
+
+Sprite sprite;
+Runtime gRuntime;
+Stage stage;
+
+void init_program(SDL_Renderer& renderer) {
+    syslog_init();
+    menu_init();
+    pen_init(&renderer);
+    init_logger("debug.log");
+    log_info("Application started");
+    sound_load("meow", "../assets/meow.wav");
+    sprite.texture = load_texture(&renderer, "../assets/cat.png");
+    if (!sprite.texture) {
+        log_warning("Failed to load cat.png - sprite will be invisible");
+    }
+}
+
+
+
 
 static void save_project(const char* filename,
                          const std::vector<Block>& blocks,
@@ -173,6 +197,7 @@ int main(int argc, char* argv[]) {
     bool g_step_mode          = false;
     bool g_waiting_for_step   = false;
 
+    // ==========================================================
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0) {
         std::cerr << "SDL_Init Error: " << SDL_GetError() << std::endl;
         return 1;
@@ -213,24 +238,18 @@ int main(int argc, char* argv[]) {
         SDL_Quit();
         return 1;
     }
+    // ==========================================================
 
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-
-    pen_init(renderer);
-
-    init_logger("debug.log");
-    log_info("Application started");
-
-    sound_load("meow", "../assets/meow.wav");
-
-    Sprite sprite;
-    sprite.texture = load_texture(renderer, "../assets/cat.png");
-    if (!sprite.texture) {
-        log_warning("Failed to load cat.png - sprite will be invisible");
-    }
+    init_program(*renderer);
 
     {
-        const char* costume_files[] = { "../assets/cat.png", "../assets/cat2.png" };
+        int COSTUME_COUNT = 5;
+        char* costume_files[COSTUME_COUNT];
+        for (int i = 0; i < COSTUME_COUNT; i++) {
+            std::string path = "../assets/cat" + std::to_string(i+1) + ".png";
+            costume_files[i] = strdup(path.c_str());
+        }
+        // const char* costume_files[] = { "../assets/cat.png", "../assets/cat2.png" };
         const char* costume_names[] = { "costume1", "costume2" };
         int num_costumes = 2;
 
@@ -253,13 +272,23 @@ int main(int argc, char* argv[]) {
 
     std::vector<PaletteItem> palette_items;
     init_palette(palette_items);
+    init_categories();
 
     int palette_scroll_offset = 0;
     int palette_max_scroll = get_palette_total_height(palette_items) - PALETTE_HEIGHT + 20;
     if (palette_max_scroll < 0) palette_max_scroll = 0;
 
+    int target_scroll_override = -1;
+
     std::vector<Block> blocks;
     int next_block_id = 1;
+
+
+    Stage stage;
+    stage.renderer = renderer;
+
+    sprite.x = STAGE_X + STAGE_WIDTH / 2;
+    sprite.y = STAGE_Y + STAGE_HEIGHT / 2;
 
     TextInputState text_state;
 
@@ -270,6 +299,8 @@ int main(int argc, char* argv[]) {
     bool running = true;
     SDL_Event event;
 
+    std::vector<Runtime> activeRuntimes;
+
     while (running) {
 
         while (SDL_PollEvent(&event)) {
@@ -279,7 +310,7 @@ int main(int argc, char* argv[]) {
                     running = false;
                     break;
 
-                case SDL_MOUSEWHEEL: {
+                case SDL_MOUSEWHEEL: 
                     int mx, my;
                     SDL_GetMouseState(&mx, &my);
 
@@ -293,7 +324,7 @@ int main(int argc, char* argv[]) {
                             palette_scroll_offset = palette_max_scroll;
                     }
                     break;
-                }
+                
 
                 case SDL_MOUSEBUTTONDOWN:
                     if (event.button.button == SDL_BUTTON_LEFT) {
@@ -311,18 +342,41 @@ int main(int argc, char* argv[]) {
                         }
 
                         if (mx >= TOOLBAR_WIDTH - 90 && mx <= TOOLBAR_WIDTH - 90 + 30 &&
-                            my >= 5 && my <= 5 + 30) {
-                            g_execution_index = 0;
-                            g_is_executing = true;
+                            my >= TOOLBAR_Y + 5 && my <= TOOLBAR_Y + 5 + 30) {
+                            activeRuntimes.clear();
+                            for (Block& b : blocks) {
+                                if (b.type == CMD_START && b.next) {
+                                    Runtime rt;
+                                    runtime_init(&rt, b.next, &sprite);
+                                    runtime_start(&rt);
+                                    activeRuntimes.push_back(rt);
+                                }
+                            }
                             break;
                         }
 
                         if (mx >= TOOLBAR_WIDTH - 50 && mx <= TOOLBAR_WIDTH - 50 + 30 &&
-                            my >= 5 && my <= 5 + 30) {
-                            g_is_executing = false;
-                            g_execution_index = -1;
-                            for (auto& b : blocks) {
-                                b.is_running = false;
+                            my >= TOOLBAR_Y + 5 && my <= TOOLBAR_Y + 5 + 30) {
+                                for (Runtime& rt : activeRuntimes) {
+                                    runtime_stop(&rt);
+                                }
+                                activeRuntimes.clear();
+                            break;
+                        }
+
+                        if (my >= CATEGORY_BAR_Y && my < CATEGORY_BAR_Y + CATEGORY_BAR_HEIGHT &&
+                            mx >= PALETTE_X && mx < STAGE_X) {
+                            
+                            const auto& cats = get_categories();
+                            int totalWidth = STAGE_X;
+                            int buttonWidth = totalWidth / (int)cats.size();
+                            int clickedIndex = (mx - PALETTE_X) / buttonWidth;
+                            
+                            if (clickedIndex >= 0 && clickedIndex < (int)cats.size()) {
+                                target_scroll_override = get_category_scroll_target(cats[clickedIndex].category);
+                                palette_scroll_offset = target_scroll_override;
+                                if (palette_scroll_offset < 0) palette_scroll_offset = 0;
+                                if (palette_scroll_offset > palette_max_scroll) palette_scroll_offset = palette_max_scroll;
                             }
                             break;
                         }
@@ -361,9 +415,10 @@ int main(int argc, char* argv[]) {
                     menu_handle_mouse_move(mx, my);
 
                     hover_run = (mx >= TOOLBAR_WIDTH - 90 && mx <= TOOLBAR_WIDTH - 90 + 30 &&
-                                 my >= 5 && my <= 5 + 30);
+                                 my >= TOOLBAR_Y + 5 && my <= TOOLBAR_Y + 5 + 30);
+
                     hover_stop = (mx >= TOOLBAR_WIDTH - 50 && mx <= TOOLBAR_WIDTH - 50 + 30 &&
-                                  my >= 5 && my <= 5 + 30);
+                                  my >= TOOLBAR_Y + 5 && my <= TOOLBAR_Y + 5 + 30);
 
                     handle_mouse_motion(event, blocks);
                     break;
@@ -382,6 +437,17 @@ int main(int argc, char* argv[]) {
                         if (event.key.keysym.sym == SDLK_l) {
                             syslog_toggle();
                         }
+                        if (event.key.keysym.sym == SDLK_F12) {
+                            for (Runtime& rt : activeRuntimes) {
+                                rt.stepMode = !rt.stepMode;
+                                rt.waitingForStep = rt.stepMode;
+                            }
+                        }
+                        if (event.key.keysym.sym == SDLK_SPACE) {
+                            if (g_step_mode && g_waiting_for_step) {
+                                g_waiting_for_step = false;
+                            }
+                        }
                     }
                     break;
             }
@@ -395,11 +461,12 @@ int main(int argc, char* argv[]) {
                 break;
 
             case MENU_ACTION_SAVE:
-                save_project("project.scratch", blocks, sprite);
-                break;
+                save_to_file(get_first_block(&blocks[0]), "../saves/project.txt");
 
             case MENU_ACTION_LOAD:
-                load_project("project.scratch", blocks, sprite, next_block_id);
+                blocks.clear();
+                blocks.push_back(*load_from_file("../saves/project.txt")); // TODO...
+                // load_project("project.scratch", blocks, sprite, next_block_id);
                 g_execution_index = -1;
                 g_is_executing = false;
                 break;
@@ -432,171 +499,28 @@ int main(int argc, char* argv[]) {
         tick_cursor(text_state);
         logger_tick();
 
-        if (g_is_executing &&
-            g_execution_index >= 0 &&
-            g_execution_index < (int)blocks.size())
-        {
-            if (g_step_mode && g_waiting_for_step) {
-            } else {
-                for (auto& b : blocks) {
-                    b.is_running = false;
-                }
-
-                Block& current = blocks[g_execution_index];
-                current.is_running = true;
-                current.glow_start_time = SDL_GetTicks();
-
-                ExecutionContext exec_ctx;
-                exec_ctx.sprite = &sprite;
-
-                float oldX = sprite.x;
-                float oldY = sprite.y;
-
-                switch (current.type) {
-
-                    case CMD_MOVE: {
-                        float steps = 10.0f;
-                        if (!current.args.empty())
-                            steps = (float)std::atof(current.args[0].c_str());
-                        float rad = sprite.angle * (float)M_PI / 180.0f;
-                        sprite.x += steps * std::cos(rad);
-                        sprite.y += steps * std::sin(rad);
-                        break;
-                    }
-
-                    case CMD_TURN: {
-                        float deg = 15.0f;
-                        if (!current.args.empty())
-                            deg = (float)std::atof(current.args[0].c_str());
-                        sprite.angle += deg;
-                        break;
-                    }
-
-                    case CMD_GOTO: {
-                        float gx = 0.0f, gy = 0.0f;
-                        if (current.args.size() >= 1)
-                            gx = (float)std::atof(current.args[0].c_str());
-                        if (current.args.size() >= 2)
-                            gy = (float)std::atof(current.args[1].c_str());
-                        sprite.x = STAGE_X + STAGE_WIDTH / 2.0f + gx;
-                        sprite.y = STAGE_Y + STAGE_HEIGHT / 2.0f - gy;
-                        break;
-                    }
-
-                    case CMD_SET_X: {
-                        float nx = 0.0f;
-                        if (!current.args.empty())
-                            nx = (float)std::atof(current.args[0].c_str());
-                        sprite.x = STAGE_X + STAGE_WIDTH / 2.0f + nx;
-                        break;
-                    }
-
-                    case CMD_SET_Y: {
-                        float ny = 0.0f;
-                        if (!current.args.empty())
-                            ny = (float)std::atof(current.args[0].c_str());
-                        sprite.y = STAGE_Y + STAGE_HEIGHT / 2.0f - ny;
-                        break;
-                    }
-
-                    case CMD_CHANGE_X: {
-                        float dx = 0.0f;
-                        if (!current.args.empty())
-                            dx = (float)std::atof(current.args[0].c_str());
-                        sprite.x += dx;
-                        break;
-                    }
-
-                    case CMD_CHANGE_Y: {
-                        float dy = 0.0f;
-                        if (!current.args.empty())
-                            dy = (float)std::atof(current.args[0].c_str());
-                        sprite.y -= dy;
-                        break;
-                    }
-
-                    case CMD_SWITCH_COSTUME:
-                    case CMD_NEXT_COSTUME:
-                    case CMD_SET_SIZE:
-                    case CMD_CHANGE_SIZE:
-                    case CMD_SHOW:
-                    case CMD_HIDE:
-                        execute_looks_block(&current, exec_ctx);
-                        break;
-
-                    case CMD_PLAY_SOUND:
-                        if (!current.args.empty())
-                            play_sound(current.args[0], exec_ctx.sprite->volume);
-                        break;
-
-                    case CMD_PEN_DOWN:
-                        sprite.isPenDown = 1;
-                        sprite.prevPenX  = sprite.x;
-                        sprite.prevPenY  = sprite.y;
-                        break;
-
-                    case CMD_PEN_UP:
-                        sprite.isPenDown = 0;
-                        break;
-
-                    case CMD_PEN_CLEAR:
-                        pen_clear(renderer);
-                        break;
-
-                    case CMD_PEN_SET_COLOR:
-                        if (current.args.size() >= 3) {
-                            sprite.penR = (Uint8)std::atoi(current.args[0].c_str());
-                            sprite.penG = (Uint8)std::atoi(current.args[1].c_str());
-                            sprite.penB = (Uint8)std::atoi(current.args[2].c_str());
-                            pen_set_color(sprite.penR, sprite.penG, sprite.penB);
-                        }
-                        break;
-
-                    case CMD_PEN_SET_SIZE:
-                        if (!current.args.empty()) {
-                            sprite.penSize = std::atoi(current.args[0].c_str());
-                            if (sprite.penSize < 1) sprite.penSize = 1;
-                            pen_set_size(sprite.penSize);
-                        }
-                        break;
-
-                    case CMD_PEN_STAMP:
-                        pen_stamp(renderer, sprite);
-                        break;
-
-                    default:
-                        break;
-                }
-
-                if (sprite.isPenDown &&
-                    (sprite.x != oldX || sprite.y != oldY)) {
-                    pen_draw_line(renderer, oldX, oldY,
-                                 sprite.x, sprite.y, sprite);
-                }
-
-                pen_update(renderer, sprite);
-
-                sprite.prevPenX = sprite.x;
-                sprite.prevPenY = sprite.y;
-
-                g_execution_index++;
-
-                if (g_execution_index >= (int)blocks.size()) {
-                    blocks[g_execution_index - 1].is_running = false;
-                    g_execution_index = -1;
-                    g_is_executing = false;
-                }
-
-                if (g_step_mode) {
-                    g_waiting_for_step = true;
-                }
-            }
+        int mouseX, mouseY;
+        SDL_GetMouseState(&mouseX, &mouseY);
+        for (Runtime& rt : activeRuntimes) {
+            runtime_tick(&rt, &stage, mouseX, mouseY);
         }
 
         SDL_SetRenderDrawColor(renderer, 30, 30, 30, 255);
         SDL_RenderClear(renderer);
 
         draw_toolbar(renderer);
+
+        const auto& cats = get_categories();
+        int selected_cat_index = 0;
+        for (size_t i = 0; i < cats.size(); i++) {
+            if (palette_scroll_offset >= cats[i].yPosition) {
+                selected_cat_index = (int)i;
+            }
+        }
+
+
+        draw_category_bar(renderer, cats, selected_cat_index);
+
         draw_palette(renderer, palette_items, palette_scroll_offset);
         draw_coding_area(renderer);
         draw_stage(renderer, sprite);
@@ -610,26 +534,31 @@ int main(int argc, char* argv[]) {
             draw_arg_boxes(renderer, block, text_state);
         }
 
-        render_palette_hover(renderer, palette_items, mouse_x, mouse_y);
 
         if (hover_run) {
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
             SDL_SetRenderDrawColor(renderer, 255, 255, 255, 50);
-            SDL_Rect run_rect = { TOOLBAR_WIDTH - 90, 5, 30, 30 };
+            SDL_Rect run_rect = { TOOLBAR_WIDTH - 90, TOOLBAR_Y + 5, 30, 30 };
             SDL_RenderFillRect(renderer, &run_rect);
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
         }
 
         if (hover_stop) {
-            SDL_SetRenderDrawColor(renderer, 255, 255, 255, 50);
-            SDL_Rect stop_rect = { TOOLBAR_WIDTH - 50, 5, 30, 30 };
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+            SDL_SetRenderDrawColor(renderer, 255, 255, 255, 0);
+            SDL_Rect stop_rect = { TOOLBAR_WIDTH - 50, TOOLBAR_Y + 5, 30, 30 };
             SDL_RenderFillRect(renderer, &stop_rect);
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
         }
 
         if (syslog_is_visible()) {
             syslog_render(renderer);
         }
 
+        
         menu_render(renderer);
-
+        
+        render_palette_hover(renderer, palette_items, mouse_x, mouse_y, palette_scroll_offset);
         SDL_RenderPresent(renderer);
     }
 

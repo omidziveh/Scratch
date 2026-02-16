@@ -3,6 +3,7 @@
 #include "../utils/logger.h"
 #include <fstream>
 #include <sstream>
+#include <map>
 
 std::string blocktype_to_string(BlockType type) {
     switch (type) {
@@ -25,15 +26,18 @@ std::string blocktype_to_string(BlockType type) {
         case CMD_CHANGE_Y: return "CHANGE_Y";
         case CMD_START:    return "START";
         case CMD_NONE:     return "NONE";
-        case CMD_PEN_DOWN: return "PEN_DOWN";
-        case CMD_PEN_UP: return "PEN_UP";
-        case CMD_PEN_CLEAR: return "PEN_CLEAR";
-        case CMD_PEN_SET_COLOR: return "PEN_SET_COLOR";
-        case CMD_PEN_SET_SIZE: return "PEN_SET_SIZE";
-        case CMD_PEN_STAMP: return "PEN_STAMP";
-
+        case CMD_SWITCH_COSTUME: return "SWITCH_COSTUME";
+        case CMD_NEXT_COSTUME:   return "NEXT_COSTUME";
+        case CMD_SET_SIZE:       return "SET_SIZE";
+        case CMD_CHANGE_SIZE:    return "CHANGE_SIZE";
+        case CMD_SHOW:           return "SHOW";
+        case CMD_HIDE:           return "HIDE";
+        case CMD_PLAY_SOUND:     return "PLAY_SOUND";
+        case CMD_STOP_ALL_SOUNDS: return "STOP_ALL_SOUNDS";
+        case CMD_CHANGE_VOLUME:  return "CHANGE_VOLUME";
+        case CMD_SET_VOLUME:     return "SET_VOLUME";
+        default: return "UNKNOWN";
     }
-    return "UNKNOWN";
 }
 
 BlockType string_to_blocktype(const std::string& str) {
@@ -62,14 +66,27 @@ BlockType string_to_blocktype(const std::string& str) {
     if (str == "WAIT")     return CMD_WAIT;
     if (str == "SAY")      return CMD_SAY;
     if (str == "START")    return CMD_START;
-    if (str == "PEN_DOWN") return CMD_PEN_DOWN;
-    if (str == "PEN_UP") return CMD_PEN_UP;
-    if (str == "PEN_CLEAR") return CMD_PEN_CLEAR;
-    if (str == "PEN_SET_COLOR") return CMD_PEN_SET_COLOR;
-    if (str == "PEN_SET_SIZE") return CMD_PEN_SET_SIZE;
-    if (str == "PEN_STAMP") return CMD_PEN_STAMP;
-
     return CMD_MOVE;
+}
+
+void save_block_recursive(std::ofstream& file, Block* b, int parentId, int slot) {
+    if (!b) return;
+
+    file << b->id << " "
+         << blocktype_to_string(b->type) << " "
+         << b->x << " " << b->y << " "
+         << b->width << " " << b->height << " "
+         << parentId << " " << slot << " "
+         << b->args.size();
+
+    for (const auto& arg : b->args) {
+        file << " " << arg;
+    }
+    file << "\n";
+
+    // Slot 0 = Inner, Slot 1 = Next
+    save_block_recursive(file, b->inner, b->id, 0);
+    save_block_recursive(file, b->next, b->id, 1);
 }
 
 bool save_to_file(Block* head, std::string filename) {
@@ -79,21 +96,7 @@ bool save_to_file(Block* head, std::string filename) {
         return false;
     }
 
-    Block* current = head;
-    while (current) {
-        file << current->id << " "
-             << blocktype_to_string(current->type) << " "
-             << current->x << " " << current->y << " "
-             << current->width << " " << current->height << " "
-             << current->args.size();
-
-        for (const auto& arg : current->args) {
-            file << " " << arg;
-        }
-        file << "\n";
-
-        current = current->next;
-    }
+    save_block_recursive(file, head, -1, 1);
 
     file.close();
     log_success("Saved to " + filename);
@@ -107,19 +110,19 @@ Block* load_from_file(std::string filename) {
         return nullptr;
     }
 
-    Block* head = nullptr;
-    Block* tail = nullptr;
-    std::string line;
+    std::map<int, Block*> blocks;
+    std::vector<std::tuple<int, int, int>> links; // childId, parentId, slot
 
+    std::string line;
     while (std::getline(file, line)) {
         std::stringstream ss(line);
 
         int id;
         std::string typeStr;
         float x, y, w, h;
-        int argCount;
+        int parentId, slot, argCount;
 
-        ss >> id >> typeStr >> x >> y >> w >> h >> argCount;
+        ss >> id >> typeStr >> x >> y >> w >> h >> parentId >> slot >> argCount;
 
         Block* b = create_block(string_to_blocktype(typeStr));
         b->id = id;
@@ -135,18 +138,40 @@ Block* load_from_file(std::string filename) {
             b->args.push_back(arg);
         }
 
-        if (!head) {
-            head = b;
-            tail = b;
-        } else {
-            tail->next = b;
-            tail = b;
+        blocks[id] = b;
+        if (parentId != -1) {
+            links.push_back({id, parentId, slot});
+        }
+    }
+
+    for (auto& link : links) {
+        int childId = std::get<0>(link);
+        int parentId = std::get<1>(link);
+        int slot = std::get<2>(link);
+
+        if (blocks.find(childId) != blocks.end() && blocks.find(parentId) != blocks.end()) {
+            Block* child = blocks[childId];
+            Block* parent = blocks[parentId];
+            
+            child->parent = parent;
+            if (slot == 0) parent->inner = child;
+            else parent->next = child;
         }
     }
 
     file.close();
+    
+    if (!blocks.empty()) {
+        auto last = blocks.rbegin();
+        reset_block_counter(last->first + 1);
+    }
+
     log_success("Loaded from " + filename);
-    return head;
+    
+    for (auto& pair : blocks) {
+        if (pair.second->parent == nullptr) return pair.second;
+    }
+    return nullptr;
 }
 
 void save_sprite(const Sprite& sprite, std::string filename) {

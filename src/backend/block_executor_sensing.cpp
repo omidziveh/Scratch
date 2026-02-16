@@ -2,6 +2,7 @@
 #include "sensing.h"
 #include "operators.h"
 #include "../utils/logger.h"
+#include "../common/definitions.h"
 #include <string>
 #include <cstdlib>
 

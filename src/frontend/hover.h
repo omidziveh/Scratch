@@ -7,6 +7,6 @@
 
 void render_palette_hover(SDL_Renderer* renderer,
                           const std::vector<PaletteItem>& items,
-                          int mouse_x, int mouse_y);
+                          int mouse_x, int mouse_y, int scroll_offset);
 
 #endif

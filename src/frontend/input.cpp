@@ -6,6 +6,9 @@
 #include <iostream>
 #include <algorithm>
 #include "text_input.h"
+#include "../backend/logic.h"
+#include "../backend/memory.h"
+#include <set>
 
 
 bool is_point_in_rect(int px, int py, float rx, float ry, float rw, float rh) {
@@ -14,8 +17,8 @@ bool is_point_in_rect(int px, int py, float rx, float ry, float rw, float rh) {
 
 static void reposition_chain(Block& head) {
     Block* current = &head;
-    while (current->child) {
-        Block* c = current->child;
+    while (current->next) {
+        Block* c = current->next;
         c->x = current->x;
         c->y = current->y + current->height;
         current = c;
@@ -34,7 +37,9 @@ static void unsnap_from_parent(std::vector<Block>& blocks, Block& block) {
 
     Block* p = find_block_by_id(blocks, block.parent->id);
     if (p) {
-        p->child = nullptr;
+        p->next->parent = nullptr;
+        p->next->parent = nullptr;
+        p->next = nullptr;
         p->next = nullptr;
     }
     block.parent = nullptr;
@@ -48,12 +53,20 @@ static void bring_to_front(std::vector<Block>& blocks, int index) {
     blocks.push_back(temp);
 }
 
-static void collect_chain_ids(std::vector<Block>& blocks, Block& head, std::vector<int>& ids) {
-    ids.push_back(head.id);
-    if (head.child) {
-        Block* c = find_block_by_id(blocks, head.child->id);
-        if (c) collect_chain_ids(blocks, *c, ids);
-    }
+static void collect_chain_ids_recursive(Block* head, std::set<int>& ids) {
+    if(!head) return;
+
+    ids.insert(head->id);
+    collect_chain_ids_recursive(head->next, ids);
+    collect_chain_ids_recursive(head->inner, ids);
+}
+
+static void move_block_tree(Block* head, float dx, float dy) {
+    if (!head) return;
+    head->x += dx;
+    head->y += dy;
+    move_block_tree(head->next, dx, dy);
+    move_block_tree(head->inner, dx, dy);
 }
 
 void handle_mouse_down(SDL_Event& event, std::vector<Block>& blocks,
@@ -69,14 +82,14 @@ void handle_mouse_down(SDL_Event& event, std::vector<Block>& blocks,
             Block new_block;
             new_block.id = next_block_id++;
             new_block.type = item.type;
-            new_block.x = (float)mx;
-            new_block.y = (float)my;
+            new_block.x = (float)item.x;
+            new_block.y = (float)item_y;
             new_block.width = item.width;
             new_block.height = item.height;
             new_block.color = item.color;
             new_block.dragging = true;
-            new_block.drag_offset_x = item.width / 2.0f;
-            new_block.drag_offset_y = item.height / 2.0f;
+            new_block.drag_offset_x = mx - item.x;
+            new_block.drag_offset_y = my - item_y;
 
             if (new_block.type == CMD_MOVE || new_block.type == CMD_TURN ||
                 new_block.type == CMD_GOTO || new_block.type == CMD_SET_X ||
@@ -99,6 +112,7 @@ void handle_mouse_down(SDL_Event& event, std::vector<Block>& blocks,
             } else if (new_block.type == OP_ADD || new_block.type == OP_SUB || new_block.type == OP_DIV) {
                 new_block.args.push_back("0");
                 new_block.args.push_back("0");
+                new_block.color = COLOR_GREEN;
             }
 
             blocks.push_back(new_block);
@@ -108,12 +122,14 @@ void handle_mouse_down(SDL_Event& event, std::vector<Block>& blocks,
     }
 
     for (int i = (int)blocks.size() - 1; i >= 0; i--) {
-        if (is_point_in_rect(mx, my, blocks[i].x, blocks[i].y,
-                             blocks[i].width, blocks[i].height)) {
+        Block& b = blocks[i];
 
-            int target_id = blocks[i].id;
+        b.height = get_total_height(&b);
 
-            unsnap_from_parent(blocks, blocks[i]);
+        if (is_point_in_rect(mx, my, b.x, b.y, b.width, b.height)) {
+            int target_id = b.id;
+
+            unsnap_from_parent(blocks, b);
 
             Block* blk = find_block_by_id(blocks, target_id);
             if (!blk) return;
@@ -122,32 +138,11 @@ void handle_mouse_down(SDL_Event& event, std::vector<Block>& blocks,
             blk->drag_offset_x = mx - blk->x;
             blk->drag_offset_y = my - blk->y;
 
-            std::vector<int> chain_ids;
-            collect_chain_ids(blocks, *blk, chain_ids);
-
-            std::vector<Block> chain_blocks;
-            for (int cid : chain_ids) {
-                for (auto it = blocks.begin(); it != blocks.end(); ++it) {
-                    if (it->id == cid) {
-                        chain_blocks.push_back(*it);
-                        blocks.erase(it);
-                        break;
-                    }
-                }
-            }
-
-            for (auto& cb : chain_blocks) {
-                blocks.push_back(cb);
-            }
-
-            Block* head = find_block_by_id(blocks, target_id);
-            if (head) {
-                head->dragging = true;
-                head->drag_offset_x = mx - head->x;
-                head->drag_offset_y = my - head->y;
-            }
-
-            log_debug("Started dragging block #" + std::to_string(target_id));
+            std::vector<int> ids;
+            ids.push_back(blk->id);
+            
+            Block temp = *blk;
+            blk->dragging = true; 
             return;
         }
     }
@@ -171,16 +166,16 @@ void handle_mouse_up(SDL_Event& event, std::vector<Block>& blocks) {
 
     if (dropped->x < PALETTE_WIDTH) {
         log_info("Block #" + std::to_string(dropped->id) + " returned to palette - deleting");
+        std::set<int> ids_to_remove;
 
-        std::vector<int> to_remove;
-        collect_chain_ids(blocks, *dropped, to_remove);
+        collect_chain_ids_recursive(dropped, ids_to_remove);
 
-        blocks.erase(
-            std::remove_if(blocks.begin(), blocks.end(),
-                [&to_remove](const Block& b) {
-                    return std::find(to_remove.begin(), to_remove.end(), b.id) != to_remove.end();
-                }),
-            blocks.end());
+        auto it = std::remove_if(blocks.begin(), blocks.end(), 
+            [&ids_to_remove](const Block& b) {
+                return ids_to_remove.count(b.id) > 0;
+            });
+        
+        blocks.erase(it, blocks.end());
         return;
     }
 
@@ -206,72 +201,77 @@ void handle_mouse_motion(SDL_Event& event, std::vector<Block>& blocks) {
         float dx = block.x - prev_x;
         float dy = block.y - prev_y;
 
-        Block* child = block.child;
-        while (child) {
-            child->x += dx;
-            child->y += dy;
-            child = child->child;
-        }
+        move_block_tree(block.inner, dx, dy);
+        move_block_tree(block.next, dx, dy);
         break;
     }
 }
 
 void try_snap_blocks(std::vector<Block>& blocks, Block& dropped_block) {
     int dropped_id = dropped_block.id;
-    float best_dist = (float)SNAP_DISTANCE;
-    int best_target_id = -1;
+    
+    dropped_block.height = get_total_height(&dropped_block);
 
     for (auto& target : blocks) {
         if (target.id == dropped_id) continue;
-        if (target.child != nullptr) continue;
+        
+        target.height = get_total_height(&target);
 
-        float snap_x = target.x;
-        float snap_y = target.y + target.height;
+        // NEXT:
+        if (!target.next) {
+            float snap_x = target.x;
+            float snap_y = target.y + get_total_height(&target);
 
-        float dx = std::abs(dropped_block.x - snap_x);
-        float dy = std::abs(dropped_block.y - snap_y);
-        float dist = std::sqrt(dx * dx + dy * dy);
+            float dx = std::abs(dropped_block.x - snap_x);
+            float dy = std::abs(dropped_block.y - snap_y);
+            float dist = std::sqrt(dx * dx + dy * dy);
 
-        if (dist < best_dist) {
-            best_dist = dist;
-            best_target_id = target.id;
+            if (dist < SNAP_DISTANCE * 2) {
+                Block* dropped = find_block_by_id(blocks, dropped_id);
+                if (!dropped) return;
+
+                dropped->x = snap_x;
+                dropped->y = snap_y;
+                connect_blocks(&target, dropped);
+                log_info("Snapped as NEXT");
+                return;
+            }
+        }
+
+        // INNER:
+        if ((target.type == CMD_IF || target.type == CMD_REPEAT) && !target.inner) {
+            float snap_x = target.x + 20;
+            float snap_y = target.y + BLOCK_HEIGHT;
+
+            float dx = std::abs(dropped_block.x - snap_x);
+            float dy = std::abs(dropped_block.y - snap_y);
+            bool x_match = std::abs(dropped_block.x - (target.x + 20)) < 30;
+            bool y_match = (dropped_block.y > target.y + BLOCK_HEIGHT - 10) && 
+                           (dropped_block.y < target.y + get_total_height(&target));
+
+            if (x_match && y_match) {
+                Block* dropped = find_block_by_id(blocks, dropped_id);
+                if (!dropped) return;
+
+                float offset_x = (target.x + 20) - dropped->x;
+                float offset_y = (target.y + BLOCK_HEIGHT) - dropped->y;
+                
+                dropped->x += offset_x;
+                dropped->y += offset_y;
+
+                move_block_tree(dropped->inner, offset_x, offset_y);
+                move_block_tree(dropped->next, offset_x, offset_y);
+
+                connect_inner(&target, dropped);
+                log_info("Snapped as INNER");
+                return;
+            }
         }
     }
-
-    if (best_target_id < 0) return;
-
-    Block* target = find_block_by_id(blocks, best_target_id);
-    Block* dropped = find_block_by_id(blocks, dropped_id);
-    if (!target || !dropped) return;
-
-    float offset_x = target->x - dropped->x;
-    float offset_y = (target->y + target->height) - dropped->y;
-
-    dropped->x += offset_x;
-    dropped->y += offset_y;
-    dropped->is_snapped = true;
-    dropped->parent = target;
-    target->child = dropped;
-    target->next = dropped;
-    dropped->next = nullptr;
-
-    Block* ch = dropped->child;
-    while (ch) {
-        ch->x += offset_x;
-        ch->y += offset_y;
-        ch = ch->child;
-    }
-
-    log_info("Snapped block #" + std::to_string(dropped->id) +
-             " to block #" + std::to_string(target->id));
 }
 
 void unsnap_block(Block& block) {
-    if (block.parent) {
-        block.parent->child = nullptr;
-        block.parent->next = nullptr;
-        block.parent = nullptr;
-    }
+    disconnect_from_parent(&block);
     block.is_snapped = false;
     log_debug("Unsnapped block #" + std::to_string(block.id));
 }

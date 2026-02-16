@@ -6,6 +6,7 @@
 #include <vector>
 #include "text_input.h"
 #include "../common/definitions.h"
+#include "palette.h"
 
 SDL_Texture* load_texture(SDL_Renderer* renderer, const std::string& path);
 
@@ -27,5 +28,7 @@ void draw_text(SDL_Renderer* renderer, int x, int y, const std::string& text, SD
 
 void draw_arg_boxes(SDL_Renderer* renderer, const Block& block, const TextInputState& state);
 void draw_cursor(SDL_Renderer* renderer, int x, int y, int height, SDL_Color color);
+
+void draw_category_bar(SDL_Renderer* renderer, const std::vector<CategoryItem>& categories, int selected_index);
 
 #endif
