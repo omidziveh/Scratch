@@ -1,5 +1,6 @@
 #ifndef MENU_H
 #define MENU_H
+#include "../common/definitions.h" 
 
 #include <SDL2/SDL.h>
 #include <string>

@@ -3,7 +3,7 @@
 
 #include <string>
 #include <unordered_map>
-
+#include "../common/definitions.h" 
 #ifdef __linux__
 #include <SDL2/SDL_mixer.h>
 #else

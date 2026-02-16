@@ -1,5 +1,6 @@
 #ifndef CHARACTER_PANEL_H
 #define CHARACTER_PANEL_H
+#include "../common/definitions.h" 
 
 #include <SDL2/SDL.h>
 #include <string>

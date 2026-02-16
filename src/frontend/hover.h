@@ -1,10 +1,10 @@
 #ifndef HOVER_H
 #define HOVER_H
-
+#include "../common/definitions.h"
 #include <SDL2/SDL.h>
 #include "../gfx/SDL2_gfxPrimitives.h"
 #include <vector>
-#include "../common/definitions.h"
+
 
 void render_palette_hover(SDL_Renderer* renderer,
                           const std::vector<PaletteItem>& items,

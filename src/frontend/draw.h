@@ -1,11 +1,11 @@
 #ifndef DRAW_H
 #define DRAW_H
-
+#include "../common/definitions.h"
 #include <SDL2/SDL.h>
 #include <string>
 #include <vector>
 #include "text_input.h"
-#include "../common/definitions.h"
+
 #include "palette.h"
 
 SDL_Texture* load_texture(SDL_Renderer* renderer, const std::string& path);

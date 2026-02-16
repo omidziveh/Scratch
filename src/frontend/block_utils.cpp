@@ -144,7 +144,6 @@ int get_arg_count(BlockType type) {
             return 0;
     }
 }
-
 SDL_Rect get_arg_box_rect(const Block& block, int arg_index) {
     SDL_Rect rect = {0, 0, 0, 0};
 
@@ -171,14 +170,15 @@ SDL_Rect get_arg_box_rect(const Block& block, int arg_index) {
     return rect;
 }
 
+
 int get_total_height(Block* block) {
     if (!block) return 0;
-    
+
     int h = BLOCK_HEIGHT;
 
-    if (block->type == CMD_IF || block-> type == CMD_REPEAT) {
-        if (block->inner) {
-            Block* child = block->inner;
+    if (block->type == CMD_IF || block->type == CMD_REPEAT) {
+        Block* child = block->inner;
+        while (child) {
             h += get_total_height(child);
             child = child->next;
         }

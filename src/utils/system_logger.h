@@ -1,5 +1,6 @@
 #ifndef SYSTEM_LOGGER_H
 #define SYSTEM_LOGGER_H
+#include "../common/definitions.h" 
 
 #include <string>
 #include <SDL2/SDL.h>

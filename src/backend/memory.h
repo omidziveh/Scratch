@@ -7,3 +7,4 @@ void delete_chain(Block* b);
 int count_blocks(Block* b);
 void reset_block_counter(int newValue = 1);
 int get_block_counter();
+void safe_delete_chain(Block* b, Block* parent_block);

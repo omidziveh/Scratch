@@ -4,6 +4,10 @@
 void draw_block_execution_highlight(SDL_Renderer* renderer, Block* block, Uint32 current_time) {
     if (!block || !block->is_running) return;
 
+    if (block->glow_start_time == 0) {
+        block->glow_start_time = current_time;
+    }
+
     SDL_Rect rect = {(int)block->x, (int)block->y, (int)block->width, (int)block->height};
 
     Uint32 elapsed = current_time - block->glow_start_time;
