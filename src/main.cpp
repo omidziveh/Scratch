@@ -475,6 +475,29 @@ int main(int argc, char* argv[]) {
                         if (mx >= TOOLBAR_WIDTH - 90 && mx <= TOOLBAR_WIDTH - 90 + 30 &&
                             my >= TOOLBAR_Y + 5  && my <= TOOLBAR_Y + 5 + 30) {
 
+                            bool is_any_running = false;
+                            for (Runtime& rt : activeRuntimes) {
+                                if (rt.state == RUNTIME_RUNNING) {
+                                    is_any_running = true;
+                                    break;
+                                }
+                            }
+
+                            if (is_any_running) {
+                                for (Runtime& rt : activeRuntimes) {
+                                    runtime_pause(&rt);
+                                }
+                                log_info("RUNTIME: Paused");
+                            } else {
+                                bool was_paused = false;
+                                for (Runtime& rt : activeRuntimes) {
+                                    if (rt.state == RUNTIME_PAUSED) {
+                                        runtime_resume(&rt);
+                                        was_paused = true;
+                                    }
+                                }
+
+                                if (!was_paused) {
                             activeRuntimes.clear();
                             for (Block& b : blocks) {
                                 if (b.type == CMD_START && b.next) {
@@ -486,6 +509,10 @@ int main(int argc, char* argv[]) {
                             }
                             log_info("RUN: Started " +
                                      std::to_string(activeRuntimes.size()) + " runtime(s)");
+                                } else {
+                                    log_info("RUNTIME: Resumed");
+                                }
+                            }
                             break;
                         }
 
@@ -711,7 +738,15 @@ int main(int argc, char* argv[]) {
         SDL_SetRenderDrawColor(renderer, 30, 30, 30, 255);
         SDL_RenderClear(renderer);
 
-        draw_toolbar(renderer);
+        bool is_program_running = false;
+        for (const Runtime& rt : activeRuntimes) {
+            if (rt.state == RUNTIME_RUNNING) {
+                is_program_running = true;
+                break;
+            }
+        }
+
+        draw_toolbar(renderer, is_program_running);
 
         const auto& cats = get_categories();
         int selected_cat_index = 0;

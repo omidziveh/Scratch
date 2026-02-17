@@ -347,7 +347,7 @@ void draw_all_blocks(SDL_Renderer* renderer, const std::list<Block>& blocks, con
     }
 }
 
-void draw_toolbar(SDL_Renderer* renderer) {
+void draw_toolbar(SDL_Renderer* renderer, bool is_running) {
     for (int row = TOOLBAR_Y; row < TOOLBAR_Y + TOOLBAR_HEIGHT; row++) {
         float t = (float)(row - TOOLBAR_Y) / (float)TOOLBAR_HEIGHT;
         float curve = t * t;
@@ -364,6 +364,20 @@ void draw_toolbar(SDL_Renderer* renderer) {
     int btnR = 15;
 
     filledCircleRGBA(renderer, startCX + 2, startCY + 3, btnR + 2, 0, 0, 0, 50);
+
+    if (is_running) {
+        // --- PAUSE BUTTON (Yellow/Orange) ---
+        filledCircleRGBA(renderer, startCX, startCY, btnR + 2, 200, 140, 30, 255);
+        filledCircleRGBA(renderer, startCX, startCY, btnR, 255, 180, 40, 255);
+        filledCircleRGBA(renderer, startCX, startCY - 4, btnR - 5, 255, 220, 100, 55);
+        aacircleRGBA(renderer, startCX, startCY, btnR + 2, 180, 120, 20, 255);
+        aacircleRGBA(renderer, startCX, startCY, btnR, 255, 200, 80, 120);
+
+        // Draw Pause Symbol (Two vertical bars)
+        boxRGBA(renderer, startCX - 6, startCY - 7, startCX - 1, startCY + 7, 255, 255, 255, 245);
+        boxRGBA(renderer, startCX + 1, startCY - 7, startCX + 6, startCY + 7, 255, 255, 255, 245);
+    } else {
+        // --- PLAY BUTTON (Green) ---
     filledCircleRGBA(renderer, startCX, startCY, btnR + 2, 40, 155, 40, 255);
     filledCircleRGBA(renderer, startCX, startCY, btnR, 75, 200, 75, 255);
     filledCircleRGBA(renderer, startCX, startCY - 4, btnR - 5, 120, 230, 120, 55);
@@ -380,6 +394,7 @@ void draw_toolbar(SDL_Renderer* renderer) {
         startCX - 5, startCY + 8,
         startCX + 8, startCY,
         255, 255, 255, 80);
+    }
 
     int stopCX = TOOLBAR_WIDTH - 40;
     int stopCY = TOOLBAR_Y + TOOLBAR_HEIGHT / 2;

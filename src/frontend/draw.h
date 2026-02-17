@@ -18,7 +18,7 @@ void draw_block(SDL_Renderer* renderer, const Block& block, const std::string& l
 void draw_all_blocks(SDL_Renderer* renderer, const std::list<Block>& blocks, const TextInputState& state);
 void draw_block_glow(SDL_Renderer* renderer, const Block& block);
 
-void draw_toolbar(SDL_Renderer* renderer);
+void draw_toolbar(SDL_Renderer* renderer, bool is_running);
 void draw_coding_area(SDL_Renderer* renderer);
 void draw_stage(SDL_Renderer* renderer, Sprite& sprite);
 void draw_stage_border(SDL_Renderer* renderer);
