@@ -3,11 +3,13 @@
 #include "../utils/logger.h"
 #include "../gfx/SDL2_gfxPrimitives.h"
 #include <algorithm>
+#include <../common/globals.h>
 
 #ifdef _WIN32
 #include <windows.h>
 #include <commdlg.h>
 #endif
+#include "draw.h"
 
 SoundManagerState g_sound_manager;
 
@@ -108,7 +110,7 @@ static void sm_render_panel(SDL_Renderer* renderer) {
     
     roundedBoxRGBA(renderer, px, py, px + pw, py + 35, 8, SM_HEADER_BG.r, SM_HEADER_BG.g, SM_HEADER_BG.b, 255);
     boxRGBA(renderer, px, py + 20, px + pw, py + 35, SM_HEADER_BG.r, SM_HEADER_BG.g, SM_HEADER_BG.b, 255);
-    stringRGBA(renderer, px + 40, py + 12, "Sounds", 255, 255, 255, 255);
+    draw_text(renderer, px + 40, py + 12, "Sounds", COLOR_WHITE);
     
     int content_y = py + 40;
     int content_h = ph - 40 - SOUND_MANAGER_ADD_BTN_HEIGHT - 10;
@@ -144,7 +146,7 @@ static void sm_render_panel(SDL_Renderer* renderer) {
             thickLineRGBA(renderer, del_x + 8, play_y + 8, del_x + 20, play_y + 20, 2, 255, 255, 255, 255);
             thickLineRGBA(renderer, del_x + 20, play_y + 8, del_x + 8, play_y + 20, 2, 255, 255, 255, 255);
             
-            stringRGBA(renderer, play_x + SOUND_MANAGER_BUTTON_SIZE + 12, item_y + SOUND_MANAGER_ITEM_HEIGHT/2 - 4, item->name.c_str(), 255, 255, 255, 255);
+            draw_text(renderer, play_x + SOUND_MANAGER_BUTTON_SIZE + 12, item_y + SOUND_MANAGER_ITEM_HEIGHT/2 - 4, item->name.c_str(), COLOR_WHITE);
         }
         item_y += SOUND_MANAGER_ITEM_HEIGHT + 5;
     }
@@ -153,7 +155,7 @@ static void sm_render_panel(SDL_Renderer* renderer) {
     
     int add_btn_y = py + ph - SOUND_MANAGER_ADD_BTN_HEIGHT - 5;
     roundedBoxRGBA(renderer, px + 10, add_btn_y, px + pw - 10, add_btn_y + SOUND_MANAGER_ADD_BTN_HEIGHT, 6, SM_BTN_ADD.r, SM_BTN_ADD.g, SM_BTN_ADD.b, 255);
-    stringRGBA(renderer, px + 35, add_btn_y + 12, "+ Add Sound", 255, 255, 255, 255);
+    draw_text(renderer, px + 35, add_btn_y + 12, "+ Add Sound", COLOR_WHITE);
 }
 
 static void sm_render_library_dialog(SDL_Renderer* renderer) {
@@ -166,7 +168,7 @@ static void sm_render_library_dialog(SDL_Renderer* renderer) {
     boxRGBA(renderer, 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, 0, 0, 0, 150);
     
     roundedBoxRGBA(renderer, dialog_x, dialog_y, dialog_x + dialog_w, dialog_y + dialog_h, 10, SM_DIALOG_BG.r, SM_DIALOG_BG.g, SM_DIALOG_BG.b, SM_DIALOG_BG.a);
-    stringRGBA(renderer, dialog_x + 20, dialog_y + 14, "Sound Library", 255, 255, 255, 255);
+    draw_text(renderer, dialog_x + 20, dialog_y + 14, "Sound Library", COLOR_WHITE);
     
     std::vector<std::string> categories = sound_library_get_categories();
     int cat_x = dialog_x + 10;
@@ -176,7 +178,7 @@ static void sm_render_library_dialog(SDL_Renderer* renderer) {
         int btn_y = cat_y + (int)i * 35;
         SDL_Color col = (g_sound_manager.selected_category == categories[i]) ? SM_CATEGORY_SELECTED : SM_CATEGORY_BG;
         roundedBoxRGBA(renderer, cat_x, btn_y, cat_x + 100, btn_y + 30, 4, col.r, col.g, col.b, 255);
-        stringRGBA(renderer, cat_x + 10, btn_y + 10, categories[i].c_str(), 255, 255, 255, 255);
+        draw_text(renderer, cat_x + 10, btn_y + 10, categories[i].c_str(), COLOR_WHITE);
     }
     
     int list_x = dialog_x + 120;
@@ -197,7 +199,7 @@ static void sm_render_library_dialog(SDL_Renderer* renderer) {
         if (item_y + 35 > list_y && item_y < list_y + list_h) {
             SDL_Color item_bg = ((int)i == g_sound_manager.library_selected_index) ? SM_ITEM_SELECTED : SM_ITEM_BG;
             roundedBoxRGBA(renderer, list_x + 5, item_y, list_x + list_w - 5, item_y + 32, 4, item_bg.r, item_bg.g, item_bg.b, 255);
-            stringRGBA(renderer, list_x + 45, item_y + 10, filtered[i].name.c_str(), 255, 255, 255, 255);
+            draw_text(renderer, list_x + 45, item_y + 10, filtered[i].name.c_str(), COLOR_WHITE);
         }
         item_y += 38;
     }
@@ -209,7 +211,7 @@ static void sm_render_library_dialog(SDL_Renderer* renderer) {
     
     SDL_Color add_col = (g_sound_manager.library_selected_index >= 0) ? SM_BTN_ADD : SDL_Color{60,60,60,255};
     roundedBoxRGBA(renderer, add_btn_x, btn_y, add_btn_x + 100, btn_y + 35, 5, add_col.r, add_col.g, add_col.b, 255);
-    stringRGBA(renderer, add_btn_x + 35, btn_y + 12, "Add", 255, 255, 255, 255);
+    draw_text(renderer, add_btn_x + 35, btn_y + 12, "Add", COLOR_WHITE);
 }
 
 static void sm_render_add_menu(SDL_Renderer* renderer) {
@@ -231,11 +233,11 @@ static void sm_render_add_menu(SDL_Renderer* renderer) {
     if (sm_point_in_rect(g_sound_manager.hover_index, g_sound_manager.hover_index, menu_x+5, opt1_y, menu_w-10, 32)) {
          roundedBoxRGBA(renderer, menu_x+5, opt1_y, menu_x+menu_w-5, opt1_y+32, 4, SM_MENU_HOVER.r, SM_MENU_HOVER.g, SM_MENU_HOVER.b, 255);
     }
-    stringRGBA(renderer, menu_x + 15, opt1_y + 10, "Choose from Library", 255, 255, 255, 255);
+    draw_text(renderer, menu_x + 15, opt1_y + 10, "Choose from Library", COLOR_WHITE);
     
     // Option 2: Upload Sound
     int opt2_y = menu_y + 44;
-    stringRGBA(renderer, menu_x + 15, opt2_y + 10, "Upload Sound", 255, 255, 255, 255);
+    draw_text(renderer, menu_x + 15, opt2_y + 10, "Upload Sound", COLOR_WHITE);
 }
 
 void sound_manager_render() {
