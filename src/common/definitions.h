@@ -66,7 +66,7 @@ const int SOUND_BLOCKS_COUNT = 18;
 const int PEN_BLOCKS_COUNT = 22;
 const int SENSING_BLOCKS_COUNT = 28;
 const int OPERATORS_BLOCKS_COUNT = 33;
-const int VARIABLE_BLOCKS_COUNT = 57;
+const int VARIABLE_BLOCKS_COUNT = 50;
 
 struct Color {
     Uint8 r, g, b, a;

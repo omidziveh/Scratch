@@ -42,6 +42,7 @@ Stage stage;
 TTF_Font* g_font = nullptr;
 ConfirmDialog g_dialog;
 MenuAction g_pending_action = MENU_ACTION_NONE;
+CostumeEditor g_costume_editor;
 
 void init_program(SDL_Renderer& renderer) {
     syslog_init();
@@ -55,6 +56,7 @@ void init_program(SDL_Renderer& renderer) {
         log_warning("Failed to load cat.png - sprite will be invisible");
     }
     cdialog_init(&g_dialog, WINDOW_WIDTH, WINDOW_HEIGHT);
+    ceditor_init(&g_costume_editor, &renderer, 50, 50);
 }
 
 static void save_project(const char* filename,
@@ -323,7 +325,7 @@ int main(int argc, char* argv[]) {
     init_program(*renderer);
 
     {
-        const int COSTUME_COUNT = 5;
+        const int COSTUME_COUNT = 10;
         char* costume_files[COSTUME_COUNT];
         for (int i = 0; i < COSTUME_COUNT; i++) {
             std::string path = "../assets/cat" + std::to_string(i + 1) + ".png";
@@ -331,7 +333,8 @@ int main(int argc, char* argv[]) {
         }
 
         const char* costume_names[] = {
-            "costume1", "costume2", "costume3", "costume4", "costume5"
+            "costume1", "costume2", "costume3", "costume4", "costume5", 
+            "costume6", "costume7", "costume8", "costume9", "costume10"
         };
         int num_costumes = COSTUME_COUNT;
 
@@ -420,6 +423,11 @@ int main(int argc, char* argv[]) {
                     if (event.button.button == SDL_BUTTON_LEFT) {
                         int mx = event.button.x;
                         int my = event.button.y;
+
+                        if (g_costume_editor.is_open) {
+                            ceditor_handle_mouse_down(&g_costume_editor, mx, my, renderer);
+                            break;
+                        }
 
                         if (g_dialog.is_open) {
                             CDialogResult res = cdialog_handle_click(&g_dialog, mx, my);
@@ -555,8 +563,12 @@ int main(int argc, char* argv[]) {
 
                 case SDL_MOUSEBUTTONUP:
                     if (event.button.button == SDL_BUTTON_LEFT) {
-                        menu_handle_mouse_up(event.button.x, event.button.y);
-                        handle_mouse_up(event, blocks);
+                        if (g_costume_editor.is_open) {
+                            ceditor_handle_mouse_up(&g_costume_editor, event.button.x, event.button.y, renderer);
+                        } else {
+                            menu_handle_mouse_up(event.button.x, event.button.y);
+                            handle_mouse_up(event, blocks);
+                        }
                     }
                     break;
 
@@ -566,51 +578,68 @@ int main(int argc, char* argv[]) {
                     mouse_x = mx;
                     mouse_y = my;
 
-                    menu_handle_mouse_move(mx, my);
+                    if (g_costume_editor.is_open) {
+                        ceditor_handle_mouse_move(&g_costume_editor, mx, my, renderer);
+                    } else {
+                        menu_handle_mouse_move(mx, my);
 
-                    hover_run  = (mx >= TOOLBAR_WIDTH - 90 && mx <= TOOLBAR_WIDTH - 90 + 30 &&
-                                  my >= TOOLBAR_Y + 5  && my <= TOOLBAR_Y + 5 + 30);
+                        hover_run  = (mx >= TOOLBAR_WIDTH - 90 && mx <= TOOLBAR_WIDTH - 90 + 30 &&
+                                    my >= TOOLBAR_Y + 5  && my <= TOOLBAR_Y + 5 + 30);
 
-                    hover_stop = (mx >= TOOLBAR_WIDTH - 50 && mx <= TOOLBAR_WIDTH - 50 + 30 &&
-                                  my >= TOOLBAR_Y + 5  && my <= TOOLBAR_Y + 5 + 30);
+                        hover_stop = (mx >= TOOLBAR_WIDTH - 50 && mx <= TOOLBAR_WIDTH - 50 + 30 &&
+                                    my >= TOOLBAR_Y + 5  && my <= TOOLBAR_Y + 5 + 30);
 
-                    handle_mouse_motion(event, blocks);
+                        handle_mouse_motion(event, blocks);
+                    }
                     break;
                 }
 
                 case SDL_TEXTINPUT:
-                    if (text_state.active) {
-                        on_text_input(text_state, event.text.text);
+                    if (!g_costume_editor.is_open) {
+                        if (text_state.active) {
+                            on_text_input(text_state, event.text.text);
+                        }
                     }
                     break;
 
                 case SDL_KEYDOWN:
-                    if (text_state.active) {
-                        on_key_input(text_state, event.key.keysym.sym, blocks);
+                    if (g_costume_editor.is_open) {
+                        ceditor_handle_key(&g_costume_editor, event.key.keysym.sym, renderer);
                     } else {
-                        if (event.key.keysym.sym == SDLK_l) {
-                            syslog_toggle();
-                        }
-                        if (event.key.keysym.sym == SDLK_F12) {
-                            for (Runtime& rt : activeRuntimes) {
-                                rt.stepMode = !rt.stepMode;
-                                rt.waitingForStep = rt.stepMode;
+                        if (text_state.active) {
+                            on_key_input(text_state, event.key.keysym.sym, blocks);
+                        } else {
+                                if (event.key.keysym.sym == SDLK_e) {
+                                    if (sprite.currentCostumeIndex >= 0 && sprite.currentCostumeIndex < (int)sprite.costumes.size()) {
+                                        ceditor_open(&g_costume_editor, sprite.currentCostumeIndex, sprite.costumes[sprite.currentCostumeIndex].texture, renderer);
+                                    } else if (sprite.texture) {
+                                        ceditor_open(&g_costume_editor, 0, sprite.texture, renderer);
+                                    }
+                                }
+                            if (event.key.keysym.sym == SDLK_l) {
+                                syslog_toggle();
                             }
-                            g_step_mode = !g_step_mode;
-                            log_info("Step mode: " +
-                                     std::string(g_step_mode ? "ON" : "OFF"));
-                        }
-                        if (event.key.keysym.sym == SDLK_SPACE) {
-                            if (g_step_mode && g_waiting_for_step) {
-                                g_waiting_for_step = false;
+                            if (event.key.keysym.sym == SDLK_F12) {
+                                for (Runtime& rt : activeRuntimes) {
+                                    rt.stepMode = !rt.stepMode;
+                                    rt.waitingForStep = rt.stepMode;
+                                }
+                                g_step_mode = !g_step_mode;
+                                log_info("Step mode: " +
+                                        std::string(g_step_mode ? "ON" : "OFF"));
                             }
-                            for (Runtime& rt : activeRuntimes) {
-                                if (rt.stepMode && rt.waitingForStep) {
-                                    rt.waitingForStep = false;
+                            if (event.key.keysym.sym == SDLK_SPACE) {
+                                if (g_step_mode && g_waiting_for_step) {
+                                    g_waiting_for_step = false;
+                                }
+                                for (Runtime& rt : activeRuntimes) {
+                                    if (rt.stepMode && rt.waitingForStep) {
+                                        rt.waitingForStep = false;
+                                    }
                                 }
                             }
-                        }
-                        if (event.key.keysym.sym == SDLK_DELETE) {
+                            if (event.key.keysym.sym == SDLK_DELETE) {
+                            }
                         }
                     }
                     break;
@@ -619,20 +648,21 @@ int main(int argc, char* argv[]) {
                     break;
             }
         }
+        
+        if (!g_costume_editor.is_open && g_costume_editor.target_costume_index != -1) {
+            SDL_Texture* result = ceditor_get_result(&g_costume_editor);
+            if (result) {
+                if (g_costume_editor.target_costume_index >= 0 && g_costume_editor.target_costume_index < (int)sprite.costumes.size()) {
+                    sprite.costumes[g_costume_editor.target_costume_index].texture = result;
+                    sprite.texture = result;
+                }
+            }
+            g_costume_editor.target_costume_index = -1;
+        }
 
         MenuAction action = menu_consume_action();
         switch (action) {
             case MENU_ACTION_NEW:
-                // activeRuntimes.clear();
-                // blocks.clear();
-                // next_block_id = 1;
-                // g_execution_index = -1;
-                // g_is_executing = false;
-                // sprite.variables.clear();
-                // sprite.x = STAGE_X + STAGE_WIDTH / 2.0f;
-                // sprite.y = STAGE_Y + STAGE_HEIGHT / 2.0f;
-                // sprite.angle = 0;
-                // log_info("NEW: New project created");
                 g_pending_action = MENU_ACTION_NEW;
                 cdialog_show(&g_dialog, "New Project", "Create new project?");
                 break;
@@ -655,52 +685,11 @@ int main(int argc, char* argv[]) {
                 break;
 
             case MENU_ACTION_LOAD:
-                // activeRuntimes.clear();
-                // blocks.clear();
-                // {
-                //     Block* loadedHead = load_project("project.scratch", sprite);
-                //     if (loadedHead) {
-                //         std::vector<Block*> stack;
-                //         stack.push_back(loadedHead);
-                //         while(!stack.empty()) {
-                //             Block* curr = stack.back();
-                //             stack.pop_back();
-                            
-                //             blocks.push_back(*curr);
-                //             Block& added = blocks.back();
-                            
-                //             if(next_block_id <= curr->id) next_block_id = curr->id + 1;
-                            
-                //             if(curr->inner) stack.push_back(curr->inner);
-                //             if(curr->next) stack.push_back(curr->next);
-                //         }
-                        
-                //         std::map<int, int> idToIndex;
-                //         for(int i=0; i<(int)blocks.size(); i++) idToIndex[blocks[i].id] = i;
-                        
-                //         for(auto& b : blocks) {
-                //             if(b.inner) {
-                //                 if(idToIndex.count(b.inner->id)) b.inner = &blocks[idToIndex[b.inner->id]];
-                //             }
-                //             if(b.next) {
-                //                 if(idToIndex.count(b.next->id)) b.next = &blocks[idToIndex[b.next->id]];
-                //             }
-                //             if(b.parent) {
-                //                 if(idToIndex.count(b.parent->id)) b.parent = &blocks[idToIndex[b.parent->id]];
-                //             }
-                //         }
-                        
-                //     g_execution_index = -1;
-                //     g_is_executing = false;
-                //         log_info("LOAD: Project loaded successfully");
-                //     }
-                // }
                 g_pending_action = MENU_ACTION_LOAD;
                 cdialog_show(&g_dialog, "Load Project", "Load project? Unsaved changes will be lost.");
                 break;
 
             case MENU_ACTION_EXIT:
-                // running = false;
                 g_pending_action = MENU_ACTION_EXIT;
                 cdialog_show(&g_dialog, "Exit", "Are you sure you want to exit?");
                 break;
@@ -794,6 +783,10 @@ int main(int argc, char* argv[]) {
                              palette_scroll_offset);
 
         cdialog_render(&g_dialog, renderer);
+        
+        if (g_costume_editor.is_open) {
+            ceditor_render(&g_costume_editor, renderer);
+        }
 
         SDL_RenderPresent(renderer);
     }
@@ -805,6 +798,7 @@ int main(int argc, char* argv[]) {
     }
     activeRuntimes.clear();
 
+    ceditor_destroy(&g_costume_editor);
     pen_shutdown();
 
     for (auto& c : sprite.costumes) {

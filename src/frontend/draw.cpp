@@ -233,7 +233,7 @@ void draw_block(SDL_Renderer* renderer, const Block& block, const std::string& l
         roundedRectangleRGBA(renderer, bx, by, bx + bw, by + bh, 12,
                              dark.r, dark.g, dark.b, 255);
 
-        draw_text_shadowed(renderer, bx + 10, by + 5, textToDraw, {255, 255, 255, 255});
+        draw_text_shadowed(renderer, bx + 10, by + 5, textToDraw, COLOR_WHITE);
         return;
     }
 
@@ -253,7 +253,7 @@ void draw_block(SDL_Renderer* renderer, const Block& block, const std::string& l
                          dark.r, dark.g, dark.b, 200);
 
     std::string headerText = get_header_label(block.type);
-    draw_text_shadowed(renderer, bx + 10, by + 10, headerText, {255, 255, 255, 250});
+    draw_text_shadowed(renderer, bx + 10, by + 10, headerText, COLOR_WHITE);
 
     int totalH = get_total_height((Block*)&block);
     int bodyY = by + bh;
@@ -552,7 +552,7 @@ void draw_arg_boxes(SDL_Renderer* renderer, const Block& block, const TextInputS
                 valText = valText.substr(0, (maxW / 8));
             }
 
-            draw_text_shadowed(renderer, box.x + 7, box.y + 5, valText.c_str(), {255, 255, 255, 250});
+            draw_text_shadowed(renderer, box.x + 7, box.y + 5, valText.c_str(), COLOR_WHITE);
 
         } else {
             bool is_editing = (state.active && state.block_id == block.id && state.arg_index == i);
@@ -656,7 +656,7 @@ void draw_category_bar(SDL_Renderer* renderer, const std::vector<CategoryItem>& 
 
             int tw = measure_text_width(cat.name);
             int tx = x + (buttonWidth - tw) / 2;
-            draw_text_shadowed(renderer, tx, y + 11, cat.name.c_str(), {255, 255, 255, 255});
+            draw_text_shadowed(renderer, tx, y + 11, cat.name.c_str(), COLOR_WHITE);
 
         } else {
             roundedBoxRGBA(renderer,

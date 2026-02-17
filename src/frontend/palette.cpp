@@ -191,6 +191,7 @@ void draw_palette(SDL_Renderer* renderer, const std::vector<PaletteItem>& items,
         if (draw_y > (float)(PALETTE_Y + PALETTE_HEIGHT)) continue;
 
         Block temp;
+        temp.type = item.type;
         temp.x = item.x;
         temp.y = draw_y;
         temp.width = item.width;

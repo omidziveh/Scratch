@@ -42,7 +42,7 @@ std::string block_get_label(BlockType type) {
         case OP_SUB:        return "( - )";
         case OP_MUL:        return "( * )";
         case OP_DIV:        return "( / )";
-        case OP_MOD:        return "mod ( % )";
+        case OP_MOD:        return "( % )";
         case OP_ABS:        return "abs ( 0 )";
         case OP_FLOOR:      return "floor ( 0 )";
         case OP_CEIL:       return "ceiling ( 0 )";
@@ -72,6 +72,37 @@ std::string block_get_label(BlockType type) {
 }
 
 std::string get_header_label(BlockType type) {
+    switch (type) {
+        case OP_ADD:    return "+";
+        case OP_SUB:    return "-";
+        case OP_MUL:    return "*";
+        case OP_DIV:    return "/";
+        case OP_MOD:    return "%";
+        case OP_GT:     return ">";
+        case OP_LT:     return "<";
+        case OP_EQ:     return "=";
+        case OP_AND:    return "and";
+        case OP_OR:     return "or";
+        case OP_XOR:    return "xor";
+        case OP_ABS:    return "abs";
+        case OP_FLOOR:  return "floor";
+        case OP_CEIL:   return "ceil";
+        case OP_SQRT:   return "sqrt";
+        case OP_SIN:    return "sin";
+        case OP_COS:    return "cos";
+        case OP_NOT:    return "not";
+        case OP_STR_LEN: return "length";
+        case OP_STR_CHAR: return "letter";
+        case OP_STR_CONCAT: return "join";
+        
+        case SENSE_MOUSE_DOWN: return "mouse down?";
+        case SENSE_MOUSE_X:    return "mouse x";
+        case SENSE_MOUSE_Y:    return "mouse y";
+        case SENSE_TIMER:      return "timer";
+        default: break;
+    }
+
+    // Default behavior for non-operator blocks
     std::string full = block_get_label(type);
     std::string result;
     bool inArg = false;
@@ -80,23 +111,13 @@ std::string get_header_label(BlockType type) {
             inArg = true;
         } else if (c == ')' || c == ']' || c == '>') {
             inArg = false;
-            if (!result.empty() && result.back() == ' ') {}
         } else if (!inArg) {
             result += c;
         }
     }
-    std::string clean;
-    bool prevSpace = false;
-    for(char c : result) {
-        if (c == ' ') {
-            if (!prevSpace) clean += c;
-            prevSpace = true;
-        } else {
-            clean += c;
-            prevSpace = false;
-        }
-    }
-    return clean;
+    
+    if (!result.empty() && result.back() == ' ') result.pop_back();
+    return result;
 }
 
 std::string get_arg_label(BlockType type, int index) {
@@ -104,28 +125,21 @@ std::string get_arg_label(BlockType type, int index) {
     std::string currentArg;
     int argIdx = -1;
     bool inArg = false;
-    std::string label;
 
     for (size_t i = 0; i < full.length(); ++i) {
         char c = full[i];
         if (c == '(' || c == '[' || c == '<') {
             argIdx++;
             inArg = true;
-            std::string prefix;
-            int j = (int)i - 1;
-            while (j >= 0 && full[j] != '(' && full[j] != '[' && full[j] != '<' && full[j] != ')') {
-                prefix = full[j] + prefix;
-                j--;
+            if (argIdx == index) {
+                std::string val;
+                size_t j = i + 1;
+                while (j < full.length() && full[j] != ')' && full[j] != ']' && full[j] != '>') {
+                    val += full[j];
+                    j++;
             }
-            size_t start = prefix.find_first_not_of(" ");
-            size_t end = prefix.find_last_not_of(" ");
-            if (start != std::string::npos) {
-                prefix = prefix.substr(start, end - start + 1);
-            } else {
-                prefix = "";
+                return val;
             }
-            
-            if (argIdx == index) return prefix;
         } else if (c == ')' || c == ']' || c == '>') {
             inArg = false;
         }
@@ -212,6 +226,17 @@ std::vector<std::string> get_default_args(BlockType type) {
         case CMD_SET_VAR:     return {"score", "0"};
         case CMD_CHANGE_VAR:  return {"score", "1"};
 
+        case OP_ADD: case OP_SUB: case OP_MUL: case OP_DIV: case OP_MOD:
+        case OP_GT: case OP_LT: case OP_EQ: case OP_AND: case OP_OR: case OP_XOR:
+             return {"0", "0"};
+             
+        case OP_ABS: case OP_FLOOR: case OP_CEIL: case OP_SQRT: case OP_SIN: case OP_COS:
+        case OP_NOT: case OP_STR_LEN:
+             return {"0"};
+             
+        case OP_STR_CONCAT: return {"", ""};
+        case OP_STR_CHAR: return {"1", ""};
+
         default:           return {};
     }
 }
@@ -241,6 +266,8 @@ int get_arg_count(BlockType type) {
         case OP_NOT:
         case OP_STR_LEN:
         case CMD_IF:
+        case CMD_PEN_SET_COLOR:
+        case CMD_PEN_SET_SIZE:
             return 1;
 
         case CMD_GOTO:
@@ -256,6 +283,7 @@ int get_arg_count(BlockType type) {
         case OP_OR:
         case OP_XOR:
         case OP_STR_CONCAT:
+        case OP_STR_CHAR:
         case CMD_SET_VAR:
         case CMD_CHANGE_VAR:
             return 2;
@@ -279,14 +307,29 @@ SDL_Rect get_arg_box_rect(const Block& block, int arg_index) {
     if (arg_index < 0 || arg_index >= count)
         return rect;
     
+    int argWidth = 50;
+    int argHeight = 20;
+    int margin = 5;
+
     if (is_reporter_block(block.type)) {
+        rect.w = argWidth;
+        rect.h = argHeight;
+        rect.y = (int)block.y + (block.height - argHeight) / 2;
+
+        if (count == 1) {
+            rect.x = (int)block.x + (int)block.width - margin - argWidth;
+        } 
+        else if (count == 2) {
+            if (arg_index == 0) {
+                rect.x = (int)block.x + margin;
+            } else {
+                rect.x = (int)block.x + (int)block.width - margin - argWidth;
+            }
+        }
         return rect;
     }
 
-    int argWidth = 80;
-    int argHeight = 25;
-    int margin = 5;
-
+    // Stack blocks: Arguments are OUTSIDE (to the right of) the block
     rect.y = (int)block.y + (BLOCK_HEIGHT - argHeight) / 2;
     rect.x = (int)block.x + (int)block.width + 5;
     
@@ -302,7 +345,7 @@ SDL_Rect get_arg_box_rect(const Block& block, int arg_index) {
 int get_total_height(Block* block) {
     if (!block) return 0;
     if (is_reporter_block(block->type)) {
-        return 25;
+        return 26;
     }
 
     int h = BLOCK_HEIGHT;
