@@ -18,10 +18,8 @@ find_package(SDL2 REQUIRED)
 find_package(SDL2_ttf REQUIRED)
 find_package(SDL2_image REQUIRED)
 
-# 3. Collect all source files
 file(GLOB SOURCES "src/*.cpp" "src/backend/*.cpp" "src/frontend/*.cpp" "src/common/*.cpp" "src/utils/*.cpp" "src/gfx/*.c")
 
-# 4. Add Windows resource file (for .exe icon)
 if(WIN32)
     list(APPEND SOURCES "${CMAKE_SOURCE_DIR}/app.rc")
 endif()
