@@ -36,6 +36,8 @@
 #include "frontend/confirm_dialog.h"
 #include "frontend/block_highlight.h"
 #include <map>
+#include "frontend/sound_manager.h"
+#include "frontend/sound_manager_integration.h"
 
 Sprite sprite;
 Runtime gRuntime;
@@ -58,6 +60,8 @@ void init_program(SDL_Renderer& renderer) {
     }
     cdialog_init(&g_dialog, WINDOW_WIDTH, WINDOW_HEIGHT);
     ceditor_init(&g_costume_editor, &renderer, 50, 50);
+    sound_manager_init(&renderer, 10, 100, 200, 400);
+    sound_manager_set_visible(true);
 }
 
 static void save_project(const char* filename,
@@ -407,6 +411,10 @@ int main(int argc, char* argv[]) {
     while (running) {
 
         while (SDL_PollEvent(&event)) {
+            if (sound_manager_handle_event(&event)) {
+                continue;
+            }
+            
             switch (event.type) {
 
                 case SDL_QUIT:
@@ -797,6 +805,8 @@ int main(int argc, char* argv[]) {
             ceditor_render(&g_costume_editor, renderer);
         }
 
+        sound_manager_render();
+
         SDL_RenderPresent(renderer);
     }
 
@@ -807,6 +817,7 @@ int main(int argc, char* argv[]) {
     }
     activeRuntimes.clear();
 
+    sound_manager_cleanup();
     ceditor_destroy(&g_costume_editor);
     pen_shutdown();
 
