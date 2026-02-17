@@ -40,6 +40,8 @@ Sprite sprite;
 Runtime gRuntime;
 Stage stage;
 TTF_Font* g_font = nullptr;
+ConfirmDialog g_dialog;
+MenuAction g_pending_action = MENU_ACTION_NONE;
 
 void init_program(SDL_Renderer& renderer) {
     syslog_init();
@@ -52,6 +54,7 @@ void init_program(SDL_Renderer& renderer) {
     if (!sprite.texture) {
         log_warning("Failed to load cat.png - sprite will be invisible");
     }
+    cdialog_init(&g_dialog, WINDOW_WIDTH, WINDOW_HEIGHT);
 }
 
 static void save_project(const char* filename,
@@ -293,7 +296,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     {
-    SDL_Surface* icon_surface = IMG_Load("../assets/icon.png");
+    SDL_Surface* icon_surface = IMG_Load("../assets/logo.png");
     if (icon_surface) {
         SDL_SetWindowIcon(window, icon_surface);
         SDL_FreeSurface(icon_surface);
@@ -417,6 +420,61 @@ int main(int argc, char* argv[]) {
                     if (event.button.button == SDL_BUTTON_LEFT) {
                         int mx = event.button.x;
                         int my = event.button.y;
+
+                        if (g_dialog.is_open) {
+                            CDialogResult res = cdialog_handle_click(&g_dialog, mx, my);
+                            if (res == CDLG_YES) {
+                                if (g_pending_action == MENU_ACTION_NEW) {
+                                    activeRuntimes.clear();
+                                    new_project(blocks, sprite, next_block_id, g_execution_index, g_is_executing, renderer);
+                                } else if (g_pending_action == MENU_ACTION_EXIT) {
+                                    running = false;
+                                } else if (g_pending_action == MENU_ACTION_LOAD) {
+                                    activeRuntimes.clear();
+                                    blocks.clear();
+                                    {
+                                        Block* loadedHead = load_project("project.scratch", sprite);
+                                        if (loadedHead) {
+                                            std::vector<Block*> stack;
+                                            stack.push_back(loadedHead);
+                                            while(!stack.empty()) {
+                                                Block* curr = stack.back();
+                                                stack.pop_back();
+                                                
+                                                blocks.push_back(*curr);
+                                                Block& added = blocks.back();
+                                                
+                                                if(next_block_id <= curr->id) next_block_id = curr->id + 1;
+                                                
+                                                if(curr->inner) stack.push_back(curr->inner);
+                                                if(curr->next) stack.push_back(curr->next);
+                                            }
+                                            
+                                            std::map<int, int> idToIndex;
+                                            for(int i=0; i<(int)blocks.size(); i++) idToIndex[blocks[i].id] = i;
+                                            
+                                            for(auto& b : blocks) {
+                                                if(b.inner) {
+                                                    if(idToIndex.count(b.inner->id)) b.inner = &blocks[idToIndex[b.inner->id]];
+                                                }
+                                                if(b.next) {
+                                                    if(idToIndex.count(b.next->id)) b.next = &blocks[idToIndex[b.next->id]];
+                                                }
+                                                if(b.parent) {
+                                                    if(idToIndex.count(b.parent->id)) b.parent = &blocks[idToIndex[b.parent->id]];
+                                                }
+                                            }
+                                            
+                                            g_execution_index = -1;
+                                            g_is_executing = false;
+                                            log_info("LOAD: Project loaded successfully");
+                                        }
+                                    }
+                                }
+                            }
+                            g_pending_action = MENU_ACTION_NONE;
+                            break;
+                        }
 
                         if (my < MENU_BAR_OFFSET) {
                             menu_handle_mouse_down(mx, my);
@@ -565,16 +623,18 @@ int main(int argc, char* argv[]) {
         MenuAction action = menu_consume_action();
         switch (action) {
             case MENU_ACTION_NEW:
-                activeRuntimes.clear();
-                blocks.clear();
-                next_block_id = 1;
-                g_execution_index = -1;
-                g_is_executing = false;
-                sprite.variables.clear();
-                sprite.x = STAGE_X + STAGE_WIDTH / 2.0f;
-                sprite.y = STAGE_Y + STAGE_HEIGHT / 2.0f;
-                sprite.angle = 0;
-                log_info("NEW: New project created");
+                // activeRuntimes.clear();
+                // blocks.clear();
+                // next_block_id = 1;
+                // g_execution_index = -1;
+                // g_is_executing = false;
+                // sprite.variables.clear();
+                // sprite.x = STAGE_X + STAGE_WIDTH / 2.0f;
+                // sprite.y = STAGE_Y + STAGE_HEIGHT / 2.0f;
+                // sprite.angle = 0;
+                // log_info("NEW: New project created");
+                g_pending_action = MENU_ACTION_NEW;
+                cdialog_show(&g_dialog, "New Project", "Create new project?");
                 break;
 
             case MENU_ACTION_SAVE:
@@ -595,50 +655,54 @@ int main(int argc, char* argv[]) {
                 break;
 
             case MENU_ACTION_LOAD:
-                activeRuntimes.clear();
-                blocks.clear();
-                {
-                    Block* loadedHead = load_project("project.scratch", sprite);
-                    if (loadedHead) {
-                        std::vector<Block*> stack;
-                        stack.push_back(loadedHead);
-                        while(!stack.empty()) {
-                            Block* curr = stack.back();
-                            stack.pop_back();
+                // activeRuntimes.clear();
+                // blocks.clear();
+                // {
+                //     Block* loadedHead = load_project("project.scratch", sprite);
+                //     if (loadedHead) {
+                //         std::vector<Block*> stack;
+                //         stack.push_back(loadedHead);
+                //         while(!stack.empty()) {
+                //             Block* curr = stack.back();
+                //             stack.pop_back();
                             
-                            blocks.push_back(*curr);
-                            Block& added = blocks.back();
+                //             blocks.push_back(*curr);
+                //             Block& added = blocks.back();
                             
-                            if(next_block_id <= curr->id) next_block_id = curr->id + 1;
+                //             if(next_block_id <= curr->id) next_block_id = curr->id + 1;
                             
-                            if(curr->inner) stack.push_back(curr->inner);
-                            if(curr->next) stack.push_back(curr->next);
-                        }
+                //             if(curr->inner) stack.push_back(curr->inner);
+                //             if(curr->next) stack.push_back(curr->next);
+                //         }
                         
-                        std::map<int, int> idToIndex;
-                        for(int i=0; i<(int)blocks.size(); i++) idToIndex[blocks[i].id] = i;
+                //         std::map<int, int> idToIndex;
+                //         for(int i=0; i<(int)blocks.size(); i++) idToIndex[blocks[i].id] = i;
                         
-                        for(auto& b : blocks) {
-                            if(b.inner) {
-                                if(idToIndex.count(b.inner->id)) b.inner = &blocks[idToIndex[b.inner->id]];
-                            }
-                            if(b.next) {
-                                if(idToIndex.count(b.next->id)) b.next = &blocks[idToIndex[b.next->id]];
-                            }
-                            if(b.parent) {
-                                if(idToIndex.count(b.parent->id)) b.parent = &blocks[idToIndex[b.parent->id]];
-                            }
-                        }
+                //         for(auto& b : blocks) {
+                //             if(b.inner) {
+                //                 if(idToIndex.count(b.inner->id)) b.inner = &blocks[idToIndex[b.inner->id]];
+                //             }
+                //             if(b.next) {
+                //                 if(idToIndex.count(b.next->id)) b.next = &blocks[idToIndex[b.next->id]];
+                //             }
+                //             if(b.parent) {
+                //                 if(idToIndex.count(b.parent->id)) b.parent = &blocks[idToIndex[b.parent->id]];
+                //             }
+                //         }
                         
-                    g_execution_index = -1;
-                    g_is_executing = false;
-                        log_info("LOAD: Project loaded successfully");
-                    }
-                }
+                //     g_execution_index = -1;
+                //     g_is_executing = false;
+                //         log_info("LOAD: Project loaded successfully");
+                //     }
+                // }
+                g_pending_action = MENU_ACTION_LOAD;
+                cdialog_show(&g_dialog, "Load Project", "Load project? Unsaved changes will be lost.");
                 break;
 
             case MENU_ACTION_EXIT:
-                running = false;
+                // running = false;
+                g_pending_action = MENU_ACTION_EXIT;
+                cdialog_show(&g_dialog, "Exit", "Are you sure you want to exit?");
                 break;
 
             case MENU_ACTION_SYSTEM_LOGGER:
@@ -728,6 +792,8 @@ int main(int argc, char* argv[]) {
 
         render_palette_hover(renderer, palette_items, mouse_x, mouse_y,
                              palette_scroll_offset);
+
+        cdialog_render(&g_dialog, renderer);
 
         SDL_RenderPresent(renderer);
     }

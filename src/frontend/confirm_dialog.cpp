@@ -55,7 +55,7 @@ void cdialog_render(ConfirmDialog* dialog, SDL_Renderer* renderer) {
     SDL_RenderFillRect(renderer, &title_bar);
     draw_text(renderer, dx + 12, dy + 9, dialog->title, COLOR_WHITE);
 
-    draw_text(renderer, dx + 20, dy + 55, dialog->message, COLOR_GRAY);
+    draw_text(renderer, dx + 20, dy + 55, dialog->message, COLOR_BLACK);
 
     SDL_Rect yes_btn = {dx + 30, dy + CDIALOG_H - 42, 80, 28};
     SDL_SetRenderDrawColor(renderer, 76, 175, 80, 255);
