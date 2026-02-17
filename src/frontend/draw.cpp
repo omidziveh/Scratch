@@ -234,6 +234,11 @@ void draw_block(SDL_Renderer* renderer, const Block& block, const std::string& l
                              dark.r, dark.g, dark.b, 255);
 
         draw_text_shadowed(renderer, bx + 10, by + 5, textToDraw, COLOR_WHITE);
+
+        if (block.has_executed && !block.is_running) {
+            draw_text(renderer, bx + bw - 15, by + 3, "v", COLOR_GREEN);
+        }
+
         return;
     }
 
@@ -305,6 +310,10 @@ void draw_block(SDL_Renderer* renderer, const Block& block, const std::string& l
             SDL_RenderDrawLine(renderer, bx + 14, lineY, bx + bw - 14, lineY);
         }
     }
+
+    if (block.has_executed && !block.is_running) {
+        draw_text(renderer, bx + bw - 15, by + 3, "v", COLOR_DARKGREEN);
+    }
 }
 
 static void draw_block_tree(SDL_Renderer* renderer, Block* block, const TextInputState& state) {
@@ -373,7 +382,6 @@ void draw_toolbar(SDL_Renderer* renderer, bool is_running) {
         aacircleRGBA(renderer, startCX, startCY, btnR + 2, 180, 120, 20, 255);
         aacircleRGBA(renderer, startCX, startCY, btnR, 255, 200, 80, 120);
 
-        // Draw Pause Symbol (Two vertical bars)
         boxRGBA(renderer, startCX - 6, startCY - 7, startCX - 1, startCY + 7, 255, 255, 255, 245);
         boxRGBA(renderer, startCX + 1, startCY - 7, startCX + 6, startCY + 7, 255, 255, 255, 245);
     } else {

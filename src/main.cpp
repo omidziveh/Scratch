@@ -500,6 +500,7 @@ int main(int argc, char* argv[]) {
                                 if (!was_paused) {
                             activeRuntimes.clear();
                             for (Block& b : blocks) {
+                                b.has_executed = false;
                                 if (b.type == CMD_START && b.next) {
                                     Runtime rt;
                                     runtime_init(&rt, b.next, &sprite);

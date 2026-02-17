@@ -408,6 +408,7 @@ void pen_stamp(SDL_Renderer* renderer, Sprite* sprite) {
 void execute_block(Runtime* rt, Block* b, Stage* stage) {
     if (!b || !rt->targetSprite) return;
 
+    b->has_executed = true;
     b->is_running = true;
     b->glow_start_time = SDL_GetTicks();
 

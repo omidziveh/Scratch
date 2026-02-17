@@ -272,6 +272,7 @@ struct Block {
     Block* inner;
 
     bool is_running;
+    bool has_executed;
     Uint32 glow_start_time;
 
     Block()
@@ -288,6 +289,7 @@ struct Block {
         , next(nullptr)
         , inner(nullptr)
         , is_running(false)
+        , has_executed(false)
         , glow_start_time(0)
     {}
 };
