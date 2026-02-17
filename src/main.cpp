@@ -281,7 +281,7 @@ int main(int argc, char* argv[]) {
     }
 
     SDL_Window* window = SDL_CreateWindow(
-        "Block Coding",
+        "Blocky",
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
         WINDOW_WIDTH, WINDOW_HEIGHT,
         SDL_WINDOW_SHOWN
@@ -292,7 +292,16 @@ int main(int argc, char* argv[]) {
         SDL_Quit();
         return 1;
     }
-
+    {
+    SDL_Surface* icon_surface = IMG_Load("../assets/icon.png");
+    if (icon_surface) {
+        SDL_SetWindowIcon(window, icon_surface);
+        SDL_FreeSurface(icon_surface);
+        std::cout << "Window icon loaded successfully." << std::endl;
+    } else {
+        std::cerr << "Warning: Could not load icon: " << IMG_GetError() << std::endl;
+    }
+    }
     SDL_Renderer* renderer = SDL_CreateRenderer(window, -1,
         SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     if (!renderer) {
@@ -645,7 +654,7 @@ int main(int argc, char* argv[]) {
                 break;
 
             case MENU_ACTION_ABOUT:
-                log_info("ABOUT: Block Coding v1.0 - Scratch Clone built with SDL2");
+                log_info("ABOUT: Blocky v1.0 - Scratch Clone built with SDL2");
                 break;
 
             case MENU_ACTION_NONE:

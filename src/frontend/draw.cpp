@@ -47,17 +47,22 @@ void draw_block_glow(SDL_Renderer* renderer, const Block& block) {
     int bh = (int)block.height;
 
     Uint32 elapsed = SDL_GetTicks() - block.glow_start_time;
-    float pulse = 0.5f + 0.5f * sinf(elapsed * 0.005f);
-    Uint8 alpha = (Uint8)(80 + pulse * 120);
+    float pulse = 0.5f + 0.5f * sinf(elapsed * 0.004f);
+    Uint8 alpha = (Uint8)(60 + pulse * 140);
 
-    for (int i = 4; i >= 1; i--) {
-        Uint8 layer_alpha = (Uint8)(alpha * (1.0f - (float)i / 5.0f));
+    for (int i = 6; i >= 1; i--) {
+        Uint8 layer_alpha = (Uint8)(alpha * (1.0f - (float)i / 7.0f));
+        roundedBoxRGBA(renderer,
+            bx - i, by - i, bx + bw + i, by + bh + i,
+            8 + i,
+            255, 230, 60, (Uint8)(layer_alpha * 0.3f));
         roundedRectangleRGBA(renderer,
             bx - i, by - i, bx + bw + i, by + bh + i,
             8 + i,
             255, 255, 100, layer_alpha);
     }
 }
+
 
 void draw_text(SDL_Renderer* renderer, int x, int y, const std::string& text, SDL_Color color) {
     if (!g_font) return;
@@ -168,25 +173,97 @@ void draw_all_blocks(SDL_Renderer* renderer, const std::vector<Block>& blocks, c
 
 
 void draw_toolbar(SDL_Renderer* renderer) {
-    draw_filled_rect(renderer, TOOLBAR_X, TOOLBAR_Y, TOOLBAR_WIDTH, TOOLBAR_HEIGHT, COLOR_TOOLBAR_BG);
-    draw_filled_rect(renderer, TOOLBAR_WIDTH - 90, TOOLBAR_Y + 5, 30, 30, COLOR_GREEN);
-    draw_filled_rect(renderer, TOOLBAR_WIDTH - 50, TOOLBAR_Y + 5, 30, 30, COLOR_RED);
+    for (int row = TOOLBAR_Y; row < TOOLBAR_Y + TOOLBAR_HEIGHT; row++) {
+        float t = (float)(row - TOOLBAR_Y) / (float)TOOLBAR_HEIGHT;
+        Uint8 shade = (Uint8)(52 + t * 14);  // از 52 تا 66 - گرادیان ملایم
+        SDL_SetRenderDrawColor(renderer, shade, shade, (Uint8)(shade + 5), 255);
+        SDL_RenderDrawLine(renderer, TOOLBAR_X, row, TOOLBAR_X + TOOLBAR_WIDTH, row);
+    }
+
+    hlineRGBA(renderer,
+        TOOLBAR_X, TOOLBAR_X + TOOLBAR_WIDTH,
+        TOOLBAR_Y + TOOLBAR_HEIGHT - 1,
+        75, 75, 90, 255);
+
+    int startCX = TOOLBAR_WIDTH - 75;
+    int startCY = TOOLBAR_Y + TOOLBAR_HEIGHT / 2;
+    int btnRadius = 13;
+
+    filledCircleRGBA(renderer, startCX + 1, startCY + 1, btnRadius, 0, 0, 0, 40);
+    filledCircleRGBA(renderer, startCX, startCY, btnRadius, 75, 195, 75, 255);
+    aacircleRGBA(renderer, startCX, startCY, btnRadius, 55, 160, 55, 255);
+    filledTrigonRGBA(renderer,
+        startCX - 4, startCY - 6,
+        startCX - 4, startCY + 6,
+        startCX + 7, startCY,
+        255, 255, 255, 230);
+
+    int stopCX = TOOLBAR_WIDTH - 40;
+    int stopCY = TOOLBAR_Y + TOOLBAR_HEIGHT / 2;
+
+    filledCircleRGBA(renderer, stopCX + 1, stopCY + 1, btnRadius, 0, 0, 0, 40);
+    filledCircleRGBA(renderer, stopCX, stopCY, btnRadius, 220, 65, 55, 255);
+    aacircleRGBA(renderer, stopCX, stopCY, btnRadius, 180, 50, 40, 255);
+    boxRGBA(renderer,
+        stopCX - 5, stopCY - 5,
+        stopCX + 5, stopCY + 5,
+        255, 255, 255, 230);
 }
 
 void draw_coding_area(SDL_Renderer* renderer) {
-    draw_filled_rect(renderer, CODING_AREA_X, CODING_AREA_Y, CODING_AREA_WIDTH, CODING_AREA_HEIGHT, COLOR_CODING_BG);
-    draw_rect_outline(renderer, CODING_AREA_X, CODING_AREA_Y, CODING_AREA_WIDTH, CODING_AREA_HEIGHT, COLOR_DARK_GRAY);
+    SDL_Color bgColor = {30, 30, 40, 255};
+    draw_filled_rect(renderer, CODING_AREA_X, CODING_AREA_Y,
+                     CODING_AREA_WIDTH, CODING_AREA_HEIGHT, bgColor);
+
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    int dotSpacing = 22;
+    for (int gx = CODING_AREA_X + 11; gx < CODING_AREA_X + CODING_AREA_WIDTH; gx += dotSpacing) {
+        for (int gy = CODING_AREA_Y + 11; gy < CODING_AREA_Y + CODING_AREA_HEIGHT; gy += dotSpacing) {
+            pixelRGBA(renderer, gx, gy, 65, 65, 80, 70);
+        }
+    }
+
+    rectangleRGBA(renderer,
+        CODING_AREA_X, CODING_AREA_Y,
+        CODING_AREA_X + CODING_AREA_WIDTH, CODING_AREA_Y + CODING_AREA_HEIGHT,
+        50, 50, 60, 200);
 }
 
+
 void draw_stage(SDL_Renderer* renderer, Sprite& sprite) {
-    draw_filled_rect(renderer, STAGE_X, STAGE_Y, STAGE_WIDTH, STAGE_HEIGHT, COLOR_STAGE_BG);
+    int sx = STAGE_X;
+    int sy = STAGE_Y;
+    int sw = STAGE_WIDTH;
+    int sh = STAGE_HEIGHT;
+    int radius = 8;
+
+    roundedBoxRGBA(renderer,
+        sx + 3, sy + 3, sx + sw + 3, sy + sh + 3,
+        radius, 0, 0, 0, 45);
+
+    roundedBoxRGBA(renderer,
+        sx, sy, sx + sw, sy + sh,
+        radius,
+        COLOR_STAGE_BG.r, COLOR_STAGE_BG.g, COLOR_STAGE_BG.b, 255);
+
     draw_stage_border(renderer);
+
     draw_sprite(renderer, sprite);
 }
 
 void draw_stage_border(SDL_Renderer* renderer) {
-    draw_rect_outline(renderer, STAGE_X, STAGE_Y, STAGE_WIDTH, STAGE_HEIGHT, COLOR_STAGE_BORDER);
+    int sx = STAGE_X;
+    int sy = STAGE_Y;
+    int sw = STAGE_WIDTH;
+    int sh = STAGE_HEIGHT;
+
+    roundedRectangleRGBA(renderer,
+        sx, sy, sx + sw, sy + sh,
+        8,
+        COLOR_STAGE_BORDER.r, COLOR_STAGE_BORDER.g,
+        COLOR_STAGE_BORDER.b, COLOR_STAGE_BORDER.a);
 }
+
 
 void draw_sprite(SDL_Renderer* renderer, Sprite& sprite) {
     if (!sprite.visible || !sprite.texture) return;

@@ -19,8 +19,13 @@ find_package(SDL2_ttf REQUIRED)
 find_package(SDL2_image REQUIRED)
 
 # 3. Collect all source files
-# This includes your main.cpp and the SDL2_gfx .c files you added
 file(GLOB SOURCES "src/*.cpp" "src/backend/*.cpp" "src/frontend/*.cpp" "src/common/*.cpp" "src/utils/*.cpp" "src/gfx/*.c")
+
+# 4. Add Windows resource file (for .exe icon)
+if(WIN32)
+    list(APPEND SOURCES "${CMAKE_SOURCE_DIR}/app.rc")
+endif()
+
 message(STATUS "Found source files:")
 foreach(SOURCE_FILE ${SOURCES})
     message(STATUS "  ${SOURCE_FILE}")
@@ -28,14 +33,14 @@ endforeach()
 
 add_executable(${PROJECT_NAME} ${SOURCES})
 
-# 4. Include Headers
+# 5. Include Headers
 target_include_directories(${PROJECT_NAME} PRIVATE "src/gfx")
 
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${SDL2_INCLUDE_DIRS}
     ${SDL2_TTF_INCLUDE_DIRS}
     ${SDL2_IMAGE_INCLUDE_DIRS}
-    "${SDL2_PATH}/include/SDL2"  # Fixes legacy #include "SDL.h" inside gfx files
+    "${SDL2_PATH}/include/SDL2"
 )
 
 if(WIN32)
