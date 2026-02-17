@@ -4,6 +4,7 @@
 #include <SDL2/SDL.h>
 #include <string>
 #include <vector>
+#include <list>
 #include "text_input.h"
 
 #include "palette.h"
@@ -14,7 +15,7 @@ void draw_filled_rect(SDL_Renderer* renderer, int x, int y, int w, int h, SDL_Co
 void draw_rect_outline(SDL_Renderer* renderer, int x, int y, int w, int h, SDL_Color color);
 
 void draw_block(SDL_Renderer* renderer, const Block& block, const std::string& label);
-void draw_all_blocks(SDL_Renderer* renderer, const std::vector<Block>& blocks);
+void draw_all_blocks(SDL_Renderer* renderer, const std::list<Block>& blocks, const TextInputState& state);
 void draw_block_glow(SDL_Renderer* renderer, const Block& block);
 
 void draw_toolbar(SDL_Renderer* renderer);

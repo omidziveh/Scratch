@@ -338,8 +338,8 @@ static void draw_block_tree(SDL_Renderer* renderer, Block* block, const TextInpu
     }
 }
 
-void draw_all_blocks(SDL_Renderer* renderer, const std::vector<Block>& blocks, const TextInputState& state) {
-    std::vector<Block>& mutable_blocks = const_cast<std::vector<Block>&>(blocks);
+void draw_all_blocks(SDL_Renderer* renderer, const std::list<Block>& blocks, const TextInputState& state) {
+    std::list<Block>& mutable_blocks = const_cast<std::list<Block>&>(blocks);
     for (auto& block : mutable_blocks) {
         if (block.parent == nullptr) {
             draw_block_tree(renderer, &block, state);

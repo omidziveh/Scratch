@@ -54,6 +54,7 @@ float resolve_argument(Runtime* rt, const std::string& arg) {
 }
 
 void sprite_set_variable(Sprite* sprite, const std::string& name, const std::string& value) {
+    if (!sprite) return;
     for (auto& var : sprite->variables) {
         if (var.name == name) {
             var.value = value;
@@ -92,7 +93,7 @@ void runtime_init(Runtime* rt, Block* head, Sprite* sprite) {
     rt->waitTicksRemaining = 0;
     rt->tickRate = (float)DEFAULT_TICK_RATE;
     rt->totalTicksExecuted = 0;
-    rt->maxTicksAllowed = DEFAULT_MAX_TICKS;
+    rt->maxTicksAllowed = 1000000;
     rt->stepMode = false;
     rt->breakpointHit = false;
     rt->waitingForStep = false;
@@ -218,9 +219,6 @@ void runtime_set_step_mode(Runtime* rt, bool enabled) {
     rt->stepMode = enabled;
     if (enabled) {
         rt->waitingForStep = true;
-        if (rt->state == RUNTIME_RUNNING) {
-            rt->state = RUNTIME_RUNNING;
-        }
     } else {
         rt->waitingForStep = false;
     }
@@ -752,19 +750,22 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
 void advance_to_next_block(Runtime* rt) {
     if (!rt->currentBlock) return;
 
-    Block* current = rt->currentBlock;
+    Block* cur = rt->currentBlock;
+    cur->is_running = false;
 
-    current->is_running = false;
+    bool isLoopHeader = (cur->type == CMD_REPEAT || cur->type == CMD_IF);
 
-    if ((current->type == CMD_REPEAT || current->type == CMD_IF) && current->inner) {
-        if (!rt->loopStack.empty() && rt->loopStack.back().loopBlock == current) {
-            rt->currentBlock = current->inner;
+    if (isLoopHeader && !rt->loopStack.empty() && rt->loopStack.back().loopBlock == cur) {
+        if (cur->inner) {
+            rt->currentBlock = cur->inner;
             return;
+        } else {
+            rt->loopStack.pop_back();
         }
     }
 
-    if (current->next) {
-        rt->currentBlock = current->next;
+    if (cur->next) {
+        rt->currentBlock = cur->next;
         return;
     }
 
@@ -780,8 +781,14 @@ void advance_to_next_block(Runtime* rt) {
                 rt->state = RUNTIME_STOPPED;
                 return;
             }
-            rt->currentBlock = ctx.loopBlock->inner;
-            return;
+            
+            if (ctx.loopBlock->inner) {
+                rt->currentBlock = ctx.loopBlock->inner;
+                return;
+            } else {
+                rt->currentBlock = nullptr;
+                return;
+            }
         }
 
         Block* parentBlock = ctx.loopBlock;

@@ -6,6 +6,7 @@
 #endif
 #include <iostream>
 #include <vector>
+#include <list>
 #include <cmath>
 #include <fstream>
 #include <cstdlib>
@@ -60,7 +61,7 @@ void init_program(SDL_Renderer& renderer) {
 }
 
 static void save_project(const char* filename,
-                         const std::vector<Block>& blocks,
+                         const std::list<Block>& blocks,
                          const Sprite& sprite)
 {
     std::ofstream file(filename, std::ios::binary);
@@ -111,7 +112,7 @@ static void save_project(const char* filename,
 }
 
 static bool load_project(const char* filename,
-                          std::vector<Block>& blocks,
+                          std::list<Block>& blocks,
                           Sprite& sprite,
                           int& next_block_id)
 {
@@ -126,6 +127,10 @@ static bool load_project(const char* filename,
 
     int count = 0;
     file.read(reinterpret_cast<char*>(&count), sizeof(count));
+    std::map<int, Block*> idToPointer;
+    std::vector<std::pair<Block*, int>> pendingConnectionsNext;
+    std::vector<std::pair<Block*, int>> pendingConnectionsInner;
+    std::vector<std::pair<Block*, int>> pendingConnectionsParent;
 
     for (int i = 0; i < count; i++) {
         Block b;
@@ -136,6 +141,9 @@ static bool load_project(const char* filename,
 
         b.is_running = false;
         b.glow_start_time = 0;
+        b.next = nullptr;
+        b.inner = nullptr;
+        b.parent = nullptr;
 
         int argCount = 0;
         file.read(reinterpret_cast<char*>(&argCount), sizeof(argCount));
@@ -148,9 +156,11 @@ static bool load_project(const char* filename,
         }
 
         blocks.push_back(b);
+        Block& added = blocks.back();
+        idToPointer[added.id] = &added;
 
-        if (b.id >= next_block_id) {
-            next_block_id = b.id + 1;
+        if (added.id >= next_block_id) {
+            next_block_id = added.id + 1;
         }
     }
 
@@ -191,7 +201,7 @@ static bool load_project(const char* filename,
     return true;
 }
 
-static void new_project(std::vector<Block>& blocks,
+static void new_project(std::list<Block>& blocks,
                          Sprite& sprite,
                          int& next_block_id,
                          int& execution_index,
@@ -375,7 +385,7 @@ int main(int argc, char* argv[]) {
 
 
     Block* program_head = nullptr;
-    std::vector<Block> blocks;
+    std::list<Block> blocks;
     int next_block_id = 1;
 
     stage.renderer = renderer;
@@ -441,42 +451,10 @@ int main(int argc, char* argv[]) {
                                     activeRuntimes.clear();
                                     blocks.clear();
                                     {
-                                        Block* loadedHead = load_project("project.scratch", sprite);
-                                        if (loadedHead) {
-                                            std::vector<Block*> stack;
-                                            stack.push_back(loadedHead);
-                                            while(!stack.empty()) {
-                                                Block* curr = stack.back();
-                                                stack.pop_back();
-                                                
-                                                blocks.push_back(*curr);
-                                                Block& added = blocks.back();
-                                                
-                                                if(next_block_id <= curr->id) next_block_id = curr->id + 1;
-                                                
-                                                if(curr->inner) stack.push_back(curr->inner);
-                                                if(curr->next) stack.push_back(curr->next);
-                                            }
-                                            
-                                            std::map<int, int> idToIndex;
-                                            for(int i=0; i<(int)blocks.size(); i++) idToIndex[blocks[i].id] = i;
-                                            
-                                            for(auto& b : blocks) {
-                                                if(b.inner) {
-                                                    if(idToIndex.count(b.inner->id)) b.inner = &blocks[idToIndex[b.inner->id]];
-                                                }
-                                                if(b.next) {
-                                                    if(idToIndex.count(b.next->id)) b.next = &blocks[idToIndex[b.next->id]];
-                                                }
-                                                if(b.parent) {
-                                                    if(idToIndex.count(b.parent->id)) b.parent = &blocks[idToIndex[b.parent->id]];
-                                                }
-                                            }
-                                            
-                                            g_execution_index = -1;
-                                            g_is_executing = false;
-                                            log_info("LOAD: Project loaded successfully");
-                                        }
+                                        load_project("project.scratch", blocks, sprite, next_block_id);
+                                        g_execution_index = -1;
+                                        g_is_executing = false;
+                                        log_info("LOAD: Project loaded successfully");
                                     }
                                 }
                             }
@@ -677,7 +655,7 @@ int main(int argc, char* argv[]) {
                         }
                     }
                     if(headToSave) {
-                        save_project("project.scratch", headToSave, sprite);
+                        save_project("project.scratch", blocks, sprite);
                     }
                 } else {
                     log_warning("SAVE: No blocks to save");
@@ -750,12 +728,7 @@ int main(int argc, char* argv[]) {
         pen_render(renderer);
         draw_variables(renderer, sprite);
 
-        for (const auto& block : blocks) {
-            std::string label = block_get_label(block.type);
-            draw_block_glow(renderer, block);
-            draw_block(renderer, block, label);
-            draw_arg_boxes(renderer, block, text_state);
-        }
+        draw_all_blocks(renderer, blocks, text_state);
 
         if (hover_run) {
             SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
