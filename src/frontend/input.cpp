@@ -11,6 +11,44 @@
 #include <set>
 
 
+static void try_snap_to_argument(std::vector<Block>& blocks, Block& dropped) {
+    for (auto& target : blocks) {
+        if (target.id == dropped.id) continue;
+
+        int argCount = get_arg_count(target.type);
+        for (int i = 0; i < argCount; i++) {
+            SDL_Rect r = get_arg_box_rect(target, i);
+
+            float cx = dropped.x + dropped.width / 2;
+            float cy = dropped.y + dropped.height / 2;
+
+            if (cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h) {
+                
+                bool compatible = (dropped.type >= OP_ADD && dropped.type <= OP_XOR) || 
+                                  (dropped.type >= SENSE_TOUCHING_MOUSE && dropped.type <= SENSE_RESET_TIMER);
+
+                if (compatible) {
+                    if (target.argBlocks.size() <= (size_t)i) target.argBlocks.resize(i + 1, nullptr);
+                    
+                    if (target.argBlocks[i]) {
+                        target.argBlocks[i]->parent = nullptr;
+                    }
+
+                    target.argBlocks[i] = &dropped;
+                    dropped.parent = &target;
+                    dropped.is_snapped = true;
+
+                    dropped.x = r.x;
+                    dropped.y = r.y;
+                    
+                    log_info("Snapped block #" + std::to_string(dropped.id) + " into arg slot " + std::to_string(i) + " of #" + std::to_string(target.id));
+                    return;
+                }
+            }
+        }
+    }
+}
+
 bool is_point_in_rect(int px, int py, float rx, float ry, float rw, float rh) {
     return (px >= rx && px <= rx + rw && py >= ry && py <= ry + rh);
 }
@@ -71,7 +109,8 @@ static void move_block_tree(Block* head, float dx, float dy) {
 
 void handle_mouse_down(SDL_Event& event, std::vector<Block>& blocks,
                        std::vector<PaletteItem>& palette_items,
-                       int& next_block_id, int palette_scroll_offset) {
+                       int& next_block_id, int palette_scroll_offset,
+                       TextInputState& state) {
     int mx = event.button.x;
     int my = event.button.y;
 
@@ -91,29 +130,12 @@ void handle_mouse_down(SDL_Event& event, std::vector<Block>& blocks,
             new_block.drag_offset_x = mx - item.x;
             new_block.drag_offset_y = my - item_y;
 
-            if (new_block.type == CMD_MOVE || new_block.type == CMD_TURN ||
-                new_block.type == CMD_GOTO || new_block.type == CMD_SET_X ||
-                new_block.type == CMD_SET_Y || new_block.type == CMD_CHANGE_X ||
-                new_block.type == CMD_CHANGE_Y) {
-                new_block.args.push_back("10");
-            } else if (new_block.type == CMD_REPEAT) {
-                new_block.args.push_back("10");
-            } else if (new_block.type == CMD_WAIT) {
-                new_block.args.push_back("1");
-            } else if (new_block.type == CMD_SAY) {
-                new_block.args.push_back("Hello!");
-            } else if (new_block.type == CMD_SET_SIZE || new_block.type == CMD_CHANGE_SIZE) {
-                new_block.args.push_back("10");
-            } else if (new_block.type == CMD_CHANGE_VOLUME || new_block.type == CMD_SET_VOLUME) {
-                new_block.args.push_back("10");
-            } else if (new_block.type == CMD_GOTO) {
-                new_block.args.push_back("0");
-                new_block.args.push_back("0");
-            } else if (new_block.type == OP_ADD || new_block.type == OP_SUB || new_block.type == OP_DIV) {
-                new_block.args.push_back("0");
-                new_block.args.push_back("0");
-                new_block.color = COLOR_GREEN;
-            }
+            auto defs = get_default_args(new_block.type);
+            new_block.args = defs;
+
+            std::string lbl = block_get_label(new_block.type);
+            float min_width = lbl.size() * 8.0f + 20.0f;
+            if (new_block.width < min_width) new_block.width = min_width;
 
             blocks.push_back(new_block);
             log_info("Created block #" + std::to_string(new_block.id) + " from palette");
@@ -124,26 +146,55 @@ void handle_mouse_down(SDL_Event& event, std::vector<Block>& blocks,
     for (int i = (int)blocks.size() - 1; i >= 0; i--) {
         Block& b = blocks[i];
 
-        b.height = get_total_height(&b);
+        if (b.parent && b.is_snapped) {
+            bool isArg = false;
+            for (auto& ab : b.parent->argBlocks) {
+                if (ab == &b) {
+                    isArg = true;
+                    break;
+                }
+            }
+            if (isArg) {
+                if (is_point_in_rect(mx, my, b.x, b.y, b.width, b.height)) {
+                    for (auto& ab : b.parent->argBlocks) {
+                        if (ab == &b) ab = nullptr;
+                    }
+                    b.parent = nullptr;
+                    b.is_snapped = false;
+                    
+                    b.width = BLOCK_WIDTH;
+                    
+                    b.dragging = true;
+                    b.drag_offset_x = mx - b.x;
+                    b.drag_offset_y = my - b.y;
+                    
+                    bring_to_front(blocks, i);
+                    return;
+                }
+            }
+        }
 
-        if (is_point_in_rect(mx, my, b.x, b.y, b.width, b.height)) {
+        int headerY = (int)b.y;
+        int headerH = BLOCK_HEIGHT;
+
+        if (is_point_in_rect(mx, my, b.x, b.y, b.width, BLOCK_HEIGHT)) {
             int target_id = b.id;
 
             unsnap_from_parent(blocks, b);
 
-            Block* blk = find_block_by_id(blocks, target_id);
+            Block* blk = find_block_by_id(blocks, b.id);
             if (!blk) return;
 
             blk->dragging = true;
             blk->drag_offset_x = mx - blk->x;
             blk->drag_offset_y = my - blk->y;
-
-            std::vector<int> ids;
-            ids.push_back(blk->id);
-            
-            Block temp = *blk;
-            blk->dragging = true; 
             return;
+        }
+        int totalH = get_total_height(&b);
+        if (is_point_in_rect(mx, my, b.x, b.y, b.width, totalH)) {
+            if (try_click_arg(b, mx, my, state)) {
+                return;
+            }
         }
     }
 }
@@ -179,10 +230,12 @@ void handle_mouse_up(SDL_Event& event, std::vector<Block>& blocks) {
         return;
     }
 
+    try_snap_to_argument(blocks, *dropped);
+    if (dropped->is_snapped) return;
+
     try_snap_blocks(blocks, *dropped);
 
-    log_debug("Dropped block #" + std::to_string(dropped->id) +
-              " at (" + std::to_string((int)dropped->x) + ", " + std::to_string((int)dropped->y) + ")");
+    log_debug("Dropped block #" + std::to_string(dropped->id));
 }
 
 void handle_mouse_motion(SDL_Event& event, std::vector<Block>& blocks) {
@@ -217,44 +270,21 @@ void try_snap_blocks(std::vector<Block>& blocks, Block& dropped_block) {
         
         target.height = get_total_height(&target);
 
-        // NEXT:
-        if (!target.next) {
-            float snap_x = target.x;
-            float snap_y = target.y + get_total_height(&target);
-
-            float dx = std::abs(dropped_block.x - snap_x);
-            float dy = std::abs(dropped_block.y - snap_y);
-            float dist = std::sqrt(dx * dx + dy * dy);
-
-            if (dist < SNAP_DISTANCE * 2) {
-                Block* dropped = find_block_by_id(blocks, dropped_id);
-                if (!dropped) return;
-
-                dropped->x = snap_x;
-                dropped->y = snap_y;
-                connect_blocks(&target, dropped);
-                log_info("Snapped as NEXT");
-                return;
-            }
-        }
-
-        // INNER:
         if ((target.type == CMD_IF || target.type == CMD_REPEAT) && !target.inner) {
-            float snap_x = target.x + 20;
-            float snap_y = target.y + BLOCK_HEIGHT;
+            float container_height = get_total_height(&target);
+            float snap_x = target.x + 15;
+            float snap_y = target.y + BLOCK_HEIGHT + 5;
 
-            float dx = std::abs(dropped_block.x - snap_x);
-            float dy = std::abs(dropped_block.y - snap_y);
-            bool x_match = std::abs(dropped_block.x - (target.x + 20)) < 30;
-            bool y_match = (dropped_block.y > target.y + BLOCK_HEIGHT - 10) && 
-                           (dropped_block.y < target.y + get_total_height(&target));
+            bool x_aligned = std::abs(dropped_block.x - snap_x) < 60;
+            
+            bool y_overlapping = dropped_block.y < target.y + container_height;
 
-            if (x_match && y_match) {
+            if (x_aligned && y_overlapping) {
                 Block* dropped = find_block_by_id(blocks, dropped_id);
                 if (!dropped) return;
 
-                float offset_x = (target.x + 20) - dropped->x;
-                float offset_y = (target.y + BLOCK_HEIGHT) - dropped->y;
+                float offset_x = snap_x - dropped->x;
+                float offset_y = snap_y - dropped->y;
                 
                 dropped->x += offset_x;
                 dropped->y += offset_y;
@@ -267,6 +297,35 @@ void try_snap_blocks(std::vector<Block>& blocks, Block& dropped_block) {
                 return;
             }
         }
+
+        if (!target.next) {
+            float snap_x = target.x;
+            float snap_y = target.y + get_total_height(&target);
+
+            float dx = std::abs(dropped_block.x - snap_x);
+            float dy = std::abs(dropped_block.y - snap_y);
+            float dist = std::sqrt(dx * dx + dy * dy);
+
+            if (dist < SNAP_DISTANCE * 2) {
+                Block* dropped = find_block_by_id(blocks, dropped_id);
+                if (!dropped) return;
+
+                float offset_x = snap_x - dropped->x;
+                float offset_y = snap_y - dropped->y;
+
+                dropped->x = snap_x;
+                dropped->y = snap_y;
+
+                move_block_tree(dropped->next, offset_x, offset_y);
+                move_block_tree(dropped->inner, offset_x, offset_y);
+
+                connect_blocks(&target, dropped);
+                log_info("Snapped as NEXT");
+                return;
+            }
+        }
+
+        
     }
 }
 
@@ -275,21 +334,26 @@ void unsnap_block(Block& block) {
     block.is_snapped = false;
     log_debug("Unsnapped block #" + std::to_string(block.id));
 }
+
 bool try_click_arg(const Block& block, int mx, int my, TextInputState& state) {
-    int arg_x = (int)block.x + 80;  
-    int arg_y = (int)block.y + 8;   
-    int arg_w = 40;
-    int arg_h = 20;
-    
-    for (size_t i = 0; i < block.args.size(); i++) {
-        int box_x = arg_x + (int)i * 50;
-        
-        if (mx >= box_x && mx <= box_x + arg_w &&
-            my >= arg_y && my <= arg_y + arg_h) {
+    int count = get_arg_count(block.type);
+    for (int i = 0; i < count; i++) {
+        SDL_Rect r = get_arg_box_rect(block, i);
+        if (r.w == 0) continue;
+        if (mx >= r.x && mx <= r.x + r.w &&
+            my >= r.y && my <= r.y + r.h) {
+            if (i < (int)block.argBlocks.size() && block.argBlocks[i] != nullptr) {
+                return false; 
+            }
+            
             state.active = true;
             state.block_id = block.id;
-            state.arg_index = (int)i;
+            state.arg_index = i;
+            if (i < (int)block.args.size()) {
             state.buffer = block.args[i];
+            } else {
+                state.buffer = "";
+            }
             state.cursor_pos = (int)state.buffer.length();
             return true;
         }

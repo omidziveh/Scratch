@@ -10,7 +10,10 @@ std::string block_get_label(BlockType type);
 SDL_Color block_get_color(BlockType type);
 std::vector<std::string> get_default_args(BlockType type);
 int get_arg_count(BlockType type);
-SDL_Rect get_arg_box_rect(const Block& block, int arg_index);
 int get_total_height(Block* block);
+SDL_Rect get_arg_box_rect(const Block& block, int arg_index);
+std::string get_header_label(BlockType type);
+std::string get_arg_label(BlockType type, int index);
+bool is_reporter_block(BlockType type);
 
 #endif

@@ -9,7 +9,8 @@ bool is_point_in_rect(int px, int py, float rx, float ry, float rw, float rh);
 
 void handle_mouse_down(SDL_Event& event, std::vector<Block>& blocks,
                        std::vector<PaletteItem>& palette_items,
-                       int& next_block_id, int palette_scroll_offset);
+                       int& next_block_id, int palette_scroll_offset,
+                       TextInputState& state);
 
 void handle_mouse_up(SDL_Event& event, std::vector<Block>& blocks);
 void handle_mouse_motion(SDL_Event& event, std::vector<Block>& blocks);

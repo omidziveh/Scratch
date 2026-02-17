@@ -1,18 +1,22 @@
 #include "costume_editor.h"
 #include "../utils/logger.h"
+#include "draw.h"
+#include "../common/globals.h"
 #include <cmath>
 #include <cstdio>
 
 static void draw_point_on_canvas(SDL_Renderer* renderer, SDL_Texture* canvas, int x, int y, int size, Uint8 r, Uint8 g, Uint8 b) {
+    SDL_SetTextureBlendMode(canvas, SDL_BLENDMODE_BLEND);
     SDL_SetRenderTarget(renderer, canvas);
     filledCircleRGBA(renderer, x, y, size, r, g, b, 255);
     SDL_SetRenderTarget(renderer, nullptr);
 }
 
 static void draw_line_on_canvas(SDL_Renderer* renderer, SDL_Texture* canvas, int x1, int y1, int x2, int y2, int size, Uint8 r, Uint8 g, Uint8 b) {
+    SDL_SetTextureBlendMode(canvas, SDL_BLENDMODE_BLEND);
     SDL_SetRenderTarget(renderer, canvas);
     if (size <= 1) {
-        lineRGBA(renderer, x1, y1, x2, y2, r, g, b, 255);
+        aalineRGBA(renderer, x1, y1, x2, y2, r, g, b, 255);
     } else {
         thickLineRGBA(renderer, x1, y1, x2, y2, size, r, g, b, 255);
     }
@@ -20,24 +24,28 @@ static void draw_line_on_canvas(SDL_Renderer* renderer, SDL_Texture* canvas, int
 }
 
 static void draw_rect_on_canvas(SDL_Renderer* renderer, SDL_Texture* canvas, int x1, int y1, int x2, int y2, Uint8 r, Uint8 g, Uint8 b) {
+    SDL_SetTextureBlendMode(canvas, SDL_BLENDMODE_BLEND);
     SDL_SetRenderTarget(renderer, canvas);
     rectangleRGBA(renderer, x1, y1, x2, y2, r, g, b, 255);
     SDL_SetRenderTarget(renderer, nullptr);
 }
 
 static void draw_circle_on_canvas(SDL_Renderer* renderer, SDL_Texture* canvas, int cx, int cy, int radius, Uint8 r, Uint8 g, Uint8 b) {
+    SDL_SetTextureBlendMode(canvas, SDL_BLENDMODE_BLEND);
     SDL_SetRenderTarget(renderer, canvas);
     circleRGBA(renderer, cx, cy, radius, r, g, b, 255);
     SDL_SetRenderTarget(renderer, nullptr);
 }
 
 static void erase_on_canvas(SDL_Renderer* renderer, SDL_Texture* canvas, int x, int y, int size) {
+    SDL_SetTextureBlendMode(canvas, SDL_BLENDMODE_BLEND);
     SDL_SetRenderTarget(renderer, canvas);
     filledCircleRGBA(renderer, x, y, size, 255, 255, 255, 255);
     SDL_SetRenderTarget(renderer, nullptr);
 }
 
 static void flood_fill_on_canvas(SDL_Renderer* renderer, SDL_Texture* canvas, int x, int y, Uint8 r, Uint8 g, Uint8 b) {
+    SDL_SetTextureBlendMode(canvas, SDL_BLENDMODE_BLEND);
     SDL_SetRenderTarget(renderer, canvas);
     filledCircleRGBA(renderer, x, y, 20, r, g, b, 255);
     SDL_SetRenderTarget(renderer, nullptr);
@@ -304,12 +312,12 @@ void ceditor_render(CostumeEditor* editor, SDL_Renderer* renderer) {
     SDL_SetRenderDrawColor(renderer, 80, 80, 80, 255);
     SDL_RenderDrawRect(renderer, &panel);
 
-    stringRGBA(renderer, editor->editor_x + 10, editor->editor_y + 8, "Costume Editor", 30, 30, 30, 255);
+    draw_text(renderer, editor->editor_x + 10, editor->editor_y + 8, "Costume Editor", COLOR_GRAY);
 
     SDL_Rect close_btn = {editor->editor_x + CEDITOR_W - 22, editor->editor_y + 5, 16, 16};
     SDL_SetRenderDrawColor(renderer, 220, 60, 60, 255);
     SDL_RenderFillRect(renderer, &close_btn);
-    stringRGBA(renderer, close_btn.x + 3, close_btn.y + 2, "X", 255, 255, 255, 255);
+    draw_text(renderer, close_btn.x + 3, close_btn.y + 2, "X", COLOR_WHITE);
 
     SDL_Rect canvas_bg = {editor->canvas_offset_x - 1, editor->canvas_offset_y - 1, CEDITOR_CANVAS_SIZE + 2, CEDITOR_CANVAS_SIZE + 2};
     for (int row = 0; row < CEDITOR_CANVAS_SIZE; row += 16) {
@@ -343,14 +351,14 @@ void ceditor_render(CostumeEditor* editor, SDL_Renderer* renderer) {
         SDL_RenderFillRect(renderer, &btn);
         SDL_SetRenderDrawColor(renderer, 60, 60, 60, 255);
         SDL_RenderDrawRect(renderer, &btn);
-        stringRGBA(renderer, bx + 4, tool_y + 6, tool_names[i], 255, 255, 255, 255);
+        draw_text(renderer, bx + 4, tool_y + 6, tool_names[i], COLOR_WHITE);
     }
 
     int undo_x = editor->editor_x + CEDITOR_W - 55;
     SDL_Rect undo_btn = {undo_x, tool_y, 48, 24};
     SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
     SDL_RenderFillRect(renderer, &undo_btn);
-    stringRGBA(renderer, undo_x + 8, tool_y + 6, "Undo", 255, 255, 255, 255);
+    draw_text(renderer, undo_x + 8, tool_y + 6, "Undo", COLOR_WHITE);
 
     int size_y = editor->editor_y + CEDITOR_H - 60;
     int sizes[] = {1, 3, 5, 8, 12};
@@ -367,10 +375,10 @@ void ceditor_render(CostumeEditor* editor, SDL_Renderer* renderer) {
         SDL_RenderDrawRect(renderer, &sbtn);
         char sz_text[8];
         snprintf(sz_text, sizeof(sz_text), "%d", sizes[i]);
-        stringRGBA(renderer, sx + 8, size_y + 4, sz_text, 255, 255, 255, 255);
+        draw_text(renderer, sx + 8, size_y + 4, sz_text, COLOR_WHITE);
     }
 
-    stringRGBA(renderer, editor->editor_x + 220, size_y + 4, "Size:", 80, 80, 80, 255);
+    draw_text(renderer, editor->editor_x + 220, size_y + 4, "Size:", COLOR_GRAY);
 
     Uint8 preset_r[] = {0, 255, 0, 0, 255, 255, 128, 0};
     Uint8 preset_g[] = {0, 0, 255, 0, 255, 0, 0, 128};
@@ -394,5 +402,5 @@ void ceditor_render(CostumeEditor* editor, SDL_Renderer* renderer) {
 
     char tool_info[64];
     snprintf(tool_info, sizeof(tool_info), "Tool: %s  |  Size: %d", tool_names[(int)editor->current_tool], editor->pen_size);
-    stringRGBA(renderer, editor->editor_x + 10, editor->editor_y + 28, tool_info, 100, 100, 100, 255);
+    draw_text(renderer, editor->editor_x + 10, editor->editor_y + 28, tool_info, COLOR_GRAY);
 }

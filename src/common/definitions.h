@@ -44,12 +44,13 @@ const int TOOLBAR_HEIGHT = 40;
 
 const int BLOCK_WIDTH  = 200;
 const int BLOCK_HEIGHT = 40;
+const int ARG_ROW_HEIGHT = 35;
 const int SNAP_DISTANCE = 20;
 
-const int ARG_BOX_WIDTH    = 45;
-const int ARG_BOX_HEIGHT   = 20;
+const int ARG_BOX_WIDTH    = 35;
+const int ARG_BOX_HEIGHT   = 15;
 const int ARG_BOX_MARGIN_X = 8;
-const int ARG_BOX_Y_OFFSET = 10;
+const int ARG_BOX_Y_OFFSET = 20;
 const Uint32 CURSOR_BLINK_MS = 500;
 
 const int CATEGORY_BAR_Y = 30;
@@ -65,7 +66,7 @@ const int SOUND_BLOCKS_COUNT = 18;
 const int PEN_BLOCKS_COUNT = 22;
 const int SENSING_BLOCKS_COUNT = 28;
 const int OPERATORS_BLOCKS_COUNT = 33;
-const int VARIABLE_BLOCKS_COUNT = 40;
+const int VARIABLE_BLOCKS_COUNT = 57;
 
 struct Color {
     Uint8 r, g, b, a;
@@ -262,7 +263,7 @@ struct Block {
     float drag_offset_x;
     float drag_offset_y;
     std::vector<std::string> args;
-    std::vector<std::string> argBlocks;
+    std::vector<Block*> argBlocks;
     SDL_Color color;
 
     Block* parent;

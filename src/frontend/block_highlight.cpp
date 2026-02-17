@@ -1,4 +1,6 @@
 #include "block_highlight.h"
+#include "draw.h"
+#include "../common/globals.h"
 #include <cmath>
 
 void draw_block_execution_highlight(SDL_Renderer* renderer, Block* block, Uint32 current_time) {
@@ -30,7 +32,7 @@ void draw_block_execution_highlight(SDL_Renderer* renderer, Block* block, Uint32
     SDL_SetRenderDrawColor(renderer, bright_r, bright_g, bright_b, 255);
     SDL_RenderFillRect(renderer, &rect);
 
-    stringRGBA(renderer, rect.x + rect.w - 14, rect.y + 3, ">", 255, 255, 0, 255);
+    draw_text(renderer, rect.x + rect.w - 14, rect.y + 3, ">", COLOR_WHITE);
 }
 
 void draw_block_breakpoint_marker(SDL_Renderer* renderer, Block* block) {

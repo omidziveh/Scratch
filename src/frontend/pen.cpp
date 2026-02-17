@@ -93,7 +93,7 @@ void pen_draw_line(SDL_Renderer* renderer, float x1, float y1,
     int thickness = sprite.penSize;
 
     if (thickness <= 1) {
-        lineRGBA(renderer, cx1, cy1, cx2, cy2, r, g, b, 255);
+        aalineRGBA(renderer, cx1, cy1, cx2, cy2, r, g, b, 255);
     } else {
         thickLineRGBA(renderer, cx1, cy1, cx2, cy2, thickness, r, g, b, 255);
     }
@@ -122,7 +122,7 @@ void pen_update(SDL_Renderer* renderer, Sprite& sprite) {
     int y2 = (int)(cy - STAGE_Y);
 
     if (pen_thickness <= 1) {
-        lineRGBA(renderer, x1, y1, x2, y2, pen_r, pen_g, pen_b, pen_a);
+        aalineRGBA(renderer, x1, y1, x2, y2, pen_r, pen_g, pen_b, pen_a);
     } else {
         thickLineRGBA(renderer, x1, y1, x2, y2, pen_thickness,
                       pen_r, pen_g, pen_b, pen_a);

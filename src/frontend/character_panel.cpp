@@ -1,5 +1,7 @@
 #include "character_panel.h"
 #include "../utils/logger.h"
+#include "../common/globals.h"
+#include "draw.h"
 #include <cstdio>
 
 void cpanel_init(CharacterPanel* panel, int px, int py, int pw, int ph) {
@@ -90,7 +92,7 @@ void cpanel_render(CharacterPanel* panel, SDL_Renderer* renderer) {
     SDL_SetRenderDrawColor(renderer, 150, 150, 150, 255);
     SDL_RenderDrawRect(renderer, &bg);
 
-    stringRGBA(renderer, panel->panel_x + 6, panel->panel_y + 4, "Sprites:", 70, 70, 70, 255);
+    draw_text(renderer, panel->panel_x + 6, panel->panel_y + 4, "Sprites:", COLOR_GRAY);
 
     int start_x = panel->panel_x + 8;
     int thumb_y = panel->panel_y + 20;
@@ -110,7 +112,7 @@ void cpanel_render(CharacterPanel* panel, SDL_Renderer* renderer) {
         } else {
             SDL_SetRenderDrawColor(renderer, 200, 200, 220, 255);
             SDL_RenderFillRect(renderer, &thumb_rect);
-            stringRGBA(renderer, tx + 15, thumb_y + 20, "?", 100, 100, 100, 255);
+            draw_text(renderer, tx + 15, thumb_y + 20, "?", COLOR_GRAY);
         }
 
         if (panel->items[i].is_selected) {
@@ -128,15 +130,15 @@ void cpanel_render(CharacterPanel* panel, SDL_Renderer* renderer) {
             SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
             SDL_SetRenderDrawColor(renderer, 255, 255, 255, 140);
             SDL_RenderFillRect(renderer, &thumb_rect);
-            lineRGBA(renderer, tx + 4, thumb_y + 4, tx + CPANEL_THUMB_SIZE - 4, thumb_y + CPANEL_THUMB_SIZE - 4, 200, 50, 50, 220);
-            lineRGBA(renderer, tx + CPANEL_THUMB_SIZE - 4, thumb_y + 4, tx + 4, thumb_y + CPANEL_THUMB_SIZE - 4, 200, 50, 50, 220);
+            aalineRGBA(renderer, tx + 4, thumb_y + 4, tx + CPANEL_THUMB_SIZE - 4, thumb_y + CPANEL_THUMB_SIZE - 4, 200, 50, 50, 220);
+            aalineRGBA(renderer, tx + CPANEL_THUMB_SIZE - 4, thumb_y + 4, tx + 4, thumb_y + CPANEL_THUMB_SIZE - 4, 200, 50, 50, 220);
         }
 
         if (panel->count > 1) {
             SDL_Rect del_btn = {tx + CPANEL_THUMB_SIZE - 11, thumb_y + 2, 10, 10};
             SDL_SetRenderDrawColor(renderer, 200, 50, 50, 210);
             SDL_RenderFillRect(renderer, &del_btn);
-            stringRGBA(renderer, del_btn.x + 2, del_btn.y + 0, "x", 255, 255, 255, 255);
+            draw_text(renderer, del_btn.x + 2, del_btn.y + 0, "x", COLOR_WHITE);
         }
 
         SDL_Rect vis_btn = {tx + 1, thumb_y + 1, 12, 10};
@@ -146,9 +148,9 @@ void cpanel_render(CharacterPanel* panel, SDL_Renderer* renderer) {
             SDL_SetRenderDrawColor(renderer, 180, 50, 50, 200);
         }
         SDL_RenderFillRect(renderer, &vis_btn);
-        stringRGBA(renderer, vis_btn.x + 1, vis_btn.y + 0, panel->items[i].is_visible ? "V" : "H", 255, 255, 255, 255);
+        draw_text(renderer, vis_btn.x + 1, vis_btn.y + 0, panel->items[i].is_visible ? "V" : "H", COLOR_WHITE);
 
-        stringRGBA(renderer, tx + 2, thumb_y + CPANEL_THUMB_SIZE + 3, panel->items[i].name.c_str(), 50, 50, 50, 255);
+        draw_text(renderer, tx + 2, thumb_y + CPANEL_THUMB_SIZE + 3, panel->items[i].name.c_str(), COLOR_GRAY);
     }
 
     int add_x = start_x + panel->count * spacing;
@@ -158,7 +160,7 @@ void cpanel_render(CharacterPanel* panel, SDL_Renderer* renderer) {
         SDL_RenderFillRect(renderer, &add_btn);
         SDL_SetRenderDrawColor(renderer, 100, 190, 100, 255);
         SDL_RenderDrawRect(renderer, &add_btn);
-        stringRGBA(renderer, add_x + CPANEL_THUMB_SIZE / 2 - 4, thumb_y + CPANEL_THUMB_SIZE / 2 - 6, "+", 0, 160, 0, 255);
+        draw_text(renderer, add_x + CPANEL_THUMB_SIZE / 2 - 4, thumb_y + CPANEL_THUMB_SIZE / 2 - 6, "+", COLOR_GREEN);
     }
 }
 

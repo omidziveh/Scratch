@@ -59,12 +59,26 @@ void draw_block_glow(SDL_Renderer* renderer, const Block& block) {
     }
 }
 
+void draw_text(SDL_Renderer* renderer, int x, int y, const std::string& text, SDL_Color color) {
+    if (!g_font) return;
+    SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
+    SDL_Surface* surface = TTF_RenderUTF8_Blended(g_font, text.c_str(), color);
+    if (!surface) return;
+    SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
+    if (texture) {
+        SDL_Rect dst = {x, y, surface->w, surface->h};
+        SDL_RenderCopy(renderer, texture, nullptr, &dst);
+        SDL_DestroyTexture(texture);
+    }
+    SDL_FreeSurface(surface);
+}
 
 void draw_block(SDL_Renderer* renderer, const Block& block, const std::string& label) {
     int bx = (int)block.x;
     int by = (int)block.y;
     int bw = (int)block.width;
-    int bh = BLOCK_HEIGHT;
+    bool isReporter = is_reporter_block(block.type);
+    int bh = isReporter ? 25 : BLOCK_HEIGHT;
 
     Uint8 r = block.color.r;
     Uint8 g = block.color.g;
@@ -76,30 +90,40 @@ void draw_block(SDL_Renderer* renderer, const Block& block, const std::string& l
         b = (Uint8)std::min(255, (int)b + 60);
     }
 
-    roundedBoxRGBA(renderer,
-        bx, by, bx + bw, by + bh,
-        6,
-        r, g, b, block.color.a);
+    std::string textToDraw = label.empty() ? block_get_label(block.type) : label;
+    if (isReporter) {
+        roundedBoxRGBA(renderer, bx, by, bx + bw, by + bh, 12, r, g, b, block.color.a);
+        roundedRectangleRGBA(renderer, bx, by, bx + bw, by + bh, 12, (Uint8)(r*0.7), (Uint8)(g*0.7), (Uint8)(b*0.7), 255);
+        draw_text(renderer, bx + 8, by + 8, textToDraw, COLOR_BLACK);
+    } else {
+        roundedBoxRGBA(renderer, bx, by, bx + bw, by + bh, 6, r, g, b, block.color.a);
+        roundedRectangleRGBA(renderer, bx, by, bx + bw, by + bh, 8, (Uint8)(r*0.7), (Uint8)(g*0.7), (Uint8)(b*0.7), 255);
 
-    Uint8 dr = (Uint8)(r * 0.7f);
-    Uint8 dg = (Uint8)(g * 0.7f);
-    Uint8 db = (Uint8)(b * 0.7f);
-    roundedRectangleRGBA(renderer,
-        bx, by, bx + bw, by + bh,
-        8,
-        dr, dg, db, 255);
+        std::string headerText = get_header_label(block.type);
+        draw_text(renderer, bx + 8, by + 12, headerText, COLOR_BLACK);
 
-    draw_text(renderer, bx + 8, by + 12, label, COLOR_WHITE);
-
-    if (block.type == CMD_IF || block.type == CMD_REPEAT) {
         int totalH = get_total_height((Block*)&block);
         int bodyY = by + bh;
         int bodyH = totalH - bh;
 
         if (bodyH > 0) {
-            boxRGBA(renderer, bx, bodyY, bx + 8, bodyY + bodyH, r, g, b, 255);
-            roundedBoxRGBA(renderer, bx, bodyY + bodyH - 20, bx + bw, bodyY + bodyH, 6, r, g, b, 255);
-            roundedRectangleRGBA(renderer, bx, bodyY + bodyH - 20, bx + bw, bodyY + bodyH, 6, dr, dg, db, 255);
+            SDL_Rect bodyRect = {bx, bodyY, bw, bodyH};
+            SDL_SetRenderDrawColor(renderer, (Uint8)(r*0.9), (Uint8)(g*0.9), (Uint8)(b*0.9), 255);
+            SDL_RenderFillRect(renderer, &bodyRect);
+            SDL_SetRenderDrawColor(renderer, (Uint8)(r*0.7), (Uint8)(g*0.7), (Uint8)(b*0.7), 255);
+            SDL_RenderDrawLine(renderer, bx, bodyY, bx, bodyY + bodyH);
+            SDL_RenderDrawLine(renderer, bx + bw, bodyY, bx + bw, bodyY + bodyH);
+            SDL_RenderDrawLine(renderer, bx, bodyY + bodyH, bx + bw, bodyY + bodyH);
+            roundedBoxRGBA(renderer, bx, bodyY + bodyH - 20, bx + bw, bodyY + bodyH, 6, (Uint8)(r*0.9), (Uint8)(g*0.9), (Uint8)(b*0.9), 255);
+            roundedRectangleRGBA(renderer, bx, bodyY + bodyH - 20, bx + bw, bodyY + bodyH, 6, (Uint8)(r*0.7), (Uint8)(g*0.7), (Uint8)(b*0.7), 255);
+            int argCount = get_arg_count(block.type);
+            int argAreaH = 0;
+
+            if (block.inner && argCount > 0) {
+                int lineY = bodyY + argAreaH;
+                SDL_SetRenderDrawColor(renderer, (Uint8)(r*0.7), (Uint8)(g*0.7), (Uint8)(b*0.7), 150);
+                SDL_RenderDrawLine(renderer, bx + 10, lineY, bx + bw - 10, lineY);
+            }
         }
     }
 }
@@ -109,16 +133,26 @@ static void draw_block_tree(SDL_Renderer* renderer, Block* block, const TextInpu
     
     std::string label = block_get_label(block->type);
 
-    block->height = get_total_height(block);
-
-    draw_block_glow(renderer, *block);
     draw_block(renderer, *block, label);
-    draw_arg_boxes(renderer, *block, state);
+    if (!is_reporter_block(block->type)) {
+        draw_arg_boxes(renderer, *block, state);
+    }
 
     if (block->inner) {
-        draw_block_tree(renderer, block->inner, state);
+        int innerY = block->y + BLOCK_HEIGHT + 5; 
+        
+        Block* child = block->inner;
+        while(child) {
+            child->x = block->x + 15; 
+            child->y = innerY;
+            draw_block_tree(renderer, child, state);
+            innerY += get_total_height(child);
+            child = child->next;
+        }
     }
     if (block->next) {
+        block->next->x = block->x;
+        block->next->y = block->y + get_total_height(block);
         draw_block_tree(renderer, block->next, state);
     }
 }
@@ -177,9 +211,6 @@ void draw_sprite(SDL_Renderer* renderer, Sprite& sprite) {
     SDL_RenderSetClipRect(renderer, nullptr);
 }
 
-void draw_text(SDL_Renderer* renderer, int x, int y, const std::string& text, SDL_Color color) {
-    stringRGBA(renderer, x, y, text.c_str(), color.r, color.g, color.b, color.a);
-}
 void draw_cursor(SDL_Renderer* renderer, int x, int y, int height, SDL_Color color) {
     SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
     SDL_RenderDrawLine(renderer, x, y, x, y + height);
@@ -192,51 +223,81 @@ void draw_arg_boxes(SDL_Renderer* renderer, const Block& block, const TextInputS
     for (int i = 0; i < arg_count; i++) {
         SDL_Rect box = get_arg_box_rect(block, i);
         if (box.w == 0) continue;
+        std::string argLbl = get_arg_label(block.type, i);
+        if (!argLbl.empty()) {
+            draw_text(renderer, box.x, box.y - 8, argLbl.c_str(), COLOR_GREEN);
+        }
+        bool has_block = (i < (int)block.argBlocks.size() && block.argBlocks[i] != nullptr);
 
-        bool is_editing = (state.active &&
-                           state.block_id == block.id &&
-                           state.arg_index == i);
+        if (has_block) {
+        
+            Block* sub = block.argBlocks[i];
+            
+            sub->x = box.x;
+            sub->y = box.y;
+            sub->width = box.w;
+            sub->height = box.h;
+            std::string lbl = block_get_label(sub->type);
+            
+            {
+                Uint8 r = sub->color.r;
+                Uint8 g = sub->color.g;
+                Uint8 b = sub->color.b;
 
-        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-        SDL_Rect fill_rect = {box.x, box.y, box.w, box.h};
-        SDL_RenderFillRect(renderer, &fill_rect);
+                roundedBoxRGBA(renderer, box.x, box.y, box.x + box.w, box.y + box.h, 6, r, g, b, 255);
+                roundedRectangleRGBA(renderer, box.x, box.y, box.x + box.w, box.y + box.h, 6, (Uint8)(r*0.7), (Uint8)(g*0.7), (Uint8)(b*0.7), 255);
 
-        if (is_editing) {
-            SDL_SetRenderDrawColor(renderer, 50, 120, 255, 255);
+                std::string valText;
+                if (!sub->args.empty()) {
+                    valText = sub->args[0];
+                } else {
+                    valText = get_header_label(sub->type);
+                }
+
+                int maxW = box.w - 10;
+                if ((int)valText.length() * 8 > maxW) {
+                    valText = valText.substr(0, (maxW / 8));
+                }
+
+                draw_text(renderer, box.x + 5, box.y + 8, valText.c_str(), COLOR_BLACK);
+            }
         } else {
-            SDL_SetRenderDrawColor(renderer, 160, 160, 160, 255);
-        }
-        SDL_RenderDrawRect(renderer, &fill_rect);
+            bool is_editing = (state.active && state.block_id == block.id && state.arg_index == i);
 
-        std::string display_text;
-        if (is_editing) {
-            display_text = state.buffer;
-        } else {
-            if (i < (int)block.args.size()) {
-                display_text = block.args[i];
-            }
-        }
+            SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+            SDL_RenderFillRect(renderer, &box);
 
-        if (!display_text.empty()) {
-            int text_x = box.x + 3;
-            int text_y = box.y + (box.h - 8) / 2;
+            if (is_editing) SDL_SetRenderDrawColor(renderer, 50, 120, 255, 255);
+            else SDL_SetRenderDrawColor(renderer, 180, 180, 180, 255);
+            SDL_RenderDrawRect(renderer, &box);
 
-            int max_chars = (box.w - 6) / 8;
-            if ((int)display_text.size() > max_chars && max_chars > 0) {
-                display_text = display_text.substr(0, max_chars);
+            std::string display_text;
+            if (is_editing) {
+                display_text = state.buffer;
+            } else {
+                if (i < (int)block.args.size()) {
+                    display_text = block.args[i];
+                }
             }
 
-            stringRGBA(renderer, text_x, text_y,
-                       display_text.c_str(),
-                       0, 0, 0, 255);
-        }
+            if (!display_text.empty()) {
+                int text_x = box.x + 3;
+                int text_y = box.y + (box.h - 8) / 2;
 
-        if (is_editing && state.cursor_visible) {
-            int cursor_x = box.x + 3 + state.cursor_pos * 8;
-            if (cursor_x > box.x + box.w - 3) {
-                cursor_x = box.x + box.w - 3;
+                int max_chars = (box.w - 6) / 8;
+                if ((int)display_text.size() > max_chars && max_chars > 0) {
+                    display_text = display_text.substr(0, max_chars);
+                }
+                draw_text(renderer, text_x, text_y, display_text.c_str(), COLOR_BLACK);
             }
-            draw_cursor(renderer, cursor_x, box.y + 2, box.h - 4, {0, 0, 0, 255});
+
+            if (is_editing && state.cursor_visible) {
+                int cursor_x = box.x + 3 + state.cursor_pos * 8;
+                if (cursor_x > box.x + box.w - 3) {
+                    cursor_x = box.x + box.w - 3;
+                }
+                draw_cursor(renderer, cursor_x, box.y + 2, box.h - 4, {0, 0, 0, 255});
+            }
         }
     }
 }
@@ -261,6 +322,6 @@ void draw_category_bar(SDL_Renderer* renderer, const std::vector<CategoryItem>& 
         
         SDL_SetRenderDrawColor(renderer, col.r, col.g, col.b, col.a);
         SDL_RenderFillRect(renderer, &rect);
-        stringRGBA(renderer, x + 5, y + 15, cat.name.c_str(), 255, 255, 255, 255);
+        draw_text(renderer, x + 5, y + 15, cat.name.c_str(), COLOR_BLACK);
     }
 }

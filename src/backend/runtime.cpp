@@ -9,6 +9,24 @@
 #include "block_executor_sound.h"
 #include "block_executor_looks.h"
 
+float evaluate_block_argument(Runtime* rt, Block* host, int argIndex) {
+    if (!host) return 0.0f;
+
+    if (argIndex < (int)host->argBlocks.size() && host->argBlocks[argIndex] != nullptr) {
+        Block* subBlock = host->argBlocks[argIndex];
+        
+        execute_block(rt, subBlock, rt->stage);
+        
+        return rt->lastResult;
+    }
+
+    if (argIndex < (int)host->args.size()) {
+        return resolve_argument(rt, host->args[argIndex]);
+    }
+
+    return 0.0f;
+}
+
 float resolve_argument(Runtime* rt, const std::string& arg) {
     if (!rt || !rt->targetSprite) return 0.0f;
 
@@ -83,6 +101,8 @@ void runtime_init(Runtime* rt, Block* head, Sprite* sprite) {
     rt->watchdogTriggered = false;
     rt->mouseX = 0;
     rt->mouseY = 0;
+    rt->lastResult = 0.0f;
+    rt->stage = nullptr;
 }
 
 void runtime_reset(Runtime* rt) {
@@ -214,6 +234,7 @@ bool runtime_is_waiting_for_step(Runtime* rt) {
 void runtime_tick(Runtime* rt, Stage* stage, int mouseX, int mouseY) {
     if (rt->state != RUNTIME_RUNNING) return;
 
+    rt->stage = stage;
     rt->mouseX = mouseX;
     rt->mouseY = mouseY;
 
@@ -308,6 +329,10 @@ const char* runtime_get_status(Runtime* rt) {
 }
 
 bool evaluate_condition(Runtime* rt, Block* b) {
+    if (!b->argBlocks.empty() && b->argBlocks[0]) {
+        float val = evaluate_block_argument(rt, b, 0);
+        return (val != 0.0f);
+    }
     if (b->args.empty()) return true;
 
     std::string conditionStr = b->args[0];
@@ -401,8 +426,7 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
     switch (b->type) {
         // Motion:
         case CMD_MOVE: {
-            float steps = resolve_argument(rt, b->args.empty() ? "10" : b->args[0]);
-
+            float steps = evaluate_block_argument(rt, b, 0);
             float oldX = rt->targetSprite->x;
             float oldY = rt->targetSprite->y;
 
@@ -418,7 +442,7 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
             break;
         }
         case CMD_TURN: {
-            float degrees = resolve_argument(rt, b->args.empty() ? "15" : b->args[0]);
+            float degrees =  evaluate_block_argument(rt, b, 0);
             rt->targetSprite->angle += degrees;
 
             while (rt->targetSprite->angle >= 360.0f) rt->targetSprite->angle -= 360.0f;
@@ -426,12 +450,8 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
             break;
         }
         case CMD_GOTO: {
-            float gotoX = 0.0f;
-            float gotoY = 0.0f;
-            if (b->args.size() >= 2) {
-                gotoX = resolve_argument(rt, b->args[0]);
-                gotoY = resolve_argument(rt, b->args[1]);
-            }
+            float gotoX = evaluate_block_argument(rt, b, 0);
+            float gotoY = evaluate_block_argument(rt, b, 1);
 
             float oldX = rt->targetSprite->x;
             float oldY = rt->targetSprite->y;
@@ -449,7 +469,7 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
 
         // Control:
         case CMD_WAIT: {
-            float seconds = resolve_argument(rt, b->args.empty() ? "1" : b->args[0]);
+            float seconds = evaluate_block_argument(rt, b, 0);
             rt->waitTicksRemaining = (int)(seconds * rt->tickRate);
 
             rt->ticksSinceLastWait = 0;
@@ -465,8 +485,7 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
             break;
         }
         case CMD_REPEAT: {
-            int times = (int)resolve_argument(rt, b->args.empty() ? "10" : b->args[0]);
-            
+            int times = (int)evaluate_block_argument(rt, b, 0);
             if (times <= 0) {
                 log_warning("REPEAT with zero or negative count, skipping");
                 break;
@@ -503,7 +522,7 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
 
         // Position:
         case CMD_SET_X: {
-            float newX = resolve_argument(rt, b->args.empty() ? "0" : b->args[0]);
+            float newX = evaluate_block_argument(rt, b, 0);
             float oldX = rt->targetSprite->x;
             float oldY = rt->targetSprite->y;
 
@@ -517,7 +536,7 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
             break;
         }
         case CMD_SET_Y: {
-            float newY = resolve_argument(rt, b->args.empty() ? "0" : b->args[0]);
+            float newY = evaluate_block_argument(rt, b, 0);
             float oldX = rt->targetSprite->x;
             float oldY = rt->targetSprite->y;
 
@@ -531,7 +550,7 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
             break;
         }
         case CMD_CHANGE_X: {
-            float deltaX = resolve_argument(rt, b->args.empty() ? "0" : b->args[0]);
+            float deltaX = evaluate_block_argument(rt, b, 0);
             float oldX = rt->targetSprite->x;
             float oldY = rt->targetSprite->y;
 
@@ -545,7 +564,7 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
             break;
         }
         case CMD_CHANGE_Y: {
-            float deltaY = resolve_argument(rt, b->args.empty() ? "0" : b->args[0]);
+            float deltaY = evaluate_block_argument(rt, b, 0);
             float oldX = rt->targetSprite->x;
             float oldY = rt->targetSprite->y;
 
@@ -563,38 +582,19 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
         case CMD_SET_VAR: {
             if (b->args.size() >= 2) {
                 std::string name = b->args[0];
-                std::string value = b->args[1];
+                float value = evaluate_block_argument(rt, b, 1);
                 
-                // Value can also be a variable name or expression, but for now, treat as string/number
-                // We can support dynamic evaluation here if needed, similar to resolve_argument but returning string
-                sprite_set_variable(rt->targetSprite, name, value);
+                sprite_set_variable(rt->targetSprite, name, std::to_string(value));
             } else {
                 log_warning("Set variable block missing arguments");
             }
             break;
         }
         case CMD_CHANGE_VAR: {
-            if (b->args.size() >= 2) {
+            if (b->args.size() >= 1) {
                 std::string name = b->args[0];
-                float delta = resolve_argument(rt, b->args[1]);
-                
-                bool found = false;
-                for (auto& var : rt->targetSprite->variables) {
-                    if (var.name == name) {
-                        try {
-                            float current = std::stof(var.value);
-                            var.value = std::to_string(current + delta);
-                        } catch (...) {
-                            var.value = std::to_string(delta);
-                        }
-                        found = true;
-                        log_info("Changed var " + name + " by " + std::to_string(delta) + " -> " + var.value);
-                        break;
-                    }
-                }
-                if (!found) {
-                    rt->targetSprite->variables.push_back(Variable(name, std::to_string(delta)));
-                }
+                float delta = evaluate_block_argument(rt, b, 1);
+                sprite_change_variable(rt->targetSprite, name, delta);
             }
             break;
         }
@@ -704,6 +704,7 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
             ctx.mouseX = rt->mouseX;
             ctx.mouseY = rt->mouseY;
             execute_sensing_block(b, ctx);
+            rt->lastResult = ctx.lastResult;
             break;
         }
 

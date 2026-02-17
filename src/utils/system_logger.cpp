@@ -1,5 +1,7 @@
 #include "system_logger.h"
 #include "../gfx/SDL2_gfxPrimitives.h"
+#include "../frontend/draw.h"
+#include "../common/globals.h"
 #include <cstring>
 #include <string>
 
@@ -68,13 +70,12 @@ void syslog_render(SDL_Renderer* renderer) {
 
     rectangleRGBA(renderer, bx, by, bx + bw, by + bh, 0, 255, 0, 255);
 
-    stringRGBA(renderer, bx + 10, by + 8, "=== BLACK BOX ===", 0, 255, 0, 255);
+    draw_text(renderer, bx + 10, by + 8, "=== BLACK BOX ===", COLOR_GREEN);
 
     hlineRGBA(renderer, bx + 5, bx + bw - 5, by + 22, 0, 255, 0, 200);
 
     if (entry_count == 0) {
-        stringRGBA(renderer, bx + 10, by + 50,
-                   "No blocks executed", 100, 100, 100, 255);
+        draw_text(renderer, bx + 10, by + 50, "No blocks executed", COLOR_GRAY);
         return;
     }
 
@@ -109,10 +110,10 @@ void syslog_render(SDL_Renderer* renderer) {
             display[27] = '\0';
         }
 
-        stringRGBA(renderer, bx + 10, ypos, display, 0, green, 0, alpha);
+        draw_text(renderer, bx + 10, ypos, display, {0, green, 0, alpha});
         ypos += 18;
     }
     char count_str[32];
     snprintf(count_str, sizeof(count_str), "Total: %d", entry_count);
-    stringRGBA(renderer, bx + 10, by + bh - 18, count_str, 0, 200, 0, 255);
+    draw_text(renderer, bx + 10, by + bh - 18, count_str, COLOR_GREEN);
 }

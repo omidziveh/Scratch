@@ -1,4 +1,6 @@
 #include "confirm_dialog.h"
+#include "draw.h"
+#include "../common/globals.h"
 #include <cstring>
 
 void cdialog_init(ConfirmDialog* dialog, int screen_w, int screen_h) {
@@ -51,24 +53,24 @@ void cdialog_render(ConfirmDialog* dialog, SDL_Renderer* renderer) {
     SDL_Rect title_bar = {dx, dy, CDIALOG_W, 32};
     SDL_SetRenderDrawColor(renderer, 66, 133, 244, 255);
     SDL_RenderFillRect(renderer, &title_bar);
-    stringRGBA(renderer, dx + 12, dy + 9, dialog->title, 255, 255, 255, 255);
+    draw_text(renderer, dx + 12, dy + 9, dialog->title, COLOR_WHITE);
 
-    stringRGBA(renderer, dx + 20, dy + 55, dialog->message, 50, 50, 50, 255);
+    draw_text(renderer, dx + 20, dy + 55, dialog->message, COLOR_GRAY);
 
     SDL_Rect yes_btn = {dx + 30, dy + CDIALOG_H - 42, 80, 28};
     SDL_SetRenderDrawColor(renderer, 76, 175, 80, 255);
     SDL_RenderFillRect(renderer, &yes_btn);
-    stringRGBA(renderer, yes_btn.x + 25, yes_btn.y + 8, "Yes", 255, 255, 255, 255);
+    draw_text(renderer, yes_btn.x + 25, yes_btn.y + 8, "Yes", COLOR_WHITE);
 
     SDL_Rect no_btn = {dx + 120, dy + CDIALOG_H - 42, 80, 28};
     SDL_SetRenderDrawColor(renderer, 244, 67, 54, 255);
     SDL_RenderFillRect(renderer, &no_btn);
-    stringRGBA(renderer, no_btn.x + 28, no_btn.y + 8, "No", 255, 255, 255, 255);
+    draw_text(renderer, no_btn.x + 28, no_btn.y + 8, "No", COLOR_WHITE);
 
     SDL_Rect cancel_btn = {dx + 210, dy + CDIALOG_H - 42, 80, 28};
     SDL_SetRenderDrawColor(renderer, 158, 158, 158, 255);
     SDL_RenderFillRect(renderer, &cancel_btn);
-    stringRGBA(renderer, cancel_btn.x + 14, cancel_btn.y + 8, "Cancel", 255, 255, 255, 255);
+    draw_text(renderer, cancel_btn.x + 14, cancel_btn.y + 8, "Cancel", COLOR_WHITE);
 }
 
 CDialogResult cdialog_handle_click(ConfirmDialog* dialog, int mx, int my) {

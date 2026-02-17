@@ -1,5 +1,7 @@
 #include "background_menu.h"
 #include "../utils/logger.h"
+#include "../common/globals.h"
+#include "draw.h"
 #include <cstdio>
 #include <cstring>
 #include <cmath>
@@ -7,6 +9,7 @@
 static SDL_Texture* create_color_texture(SDL_Renderer* renderer, Uint8 r, Uint8 g, Uint8 b, int w, int h) {
     SDL_Texture* tex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, w, h);
     if (!tex) return nullptr;
+    SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
     SDL_SetRenderTarget(renderer, tex);
     SDL_SetRenderDrawColor(renderer, r, g, b, 255);
     SDL_RenderClear(renderer);
@@ -155,12 +158,12 @@ void bg_menu_render(BackgroundMenu* menu, SDL_Renderer* renderer) {
     SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
     SDL_RenderDrawRect(renderer, &panel);
 
-    stringRGBA(renderer, menu->panel_x + 10, menu->panel_y + 8, "Backgrounds", 30, 30, 30, 255);
+    draw_text(renderer, menu->panel_x + 10, menu->panel_y + 8, "Backgrounds", COLOR_GRAY);
 
     SDL_Rect close_btn = {menu->panel_x + BG_PANEL_W - 22, menu->panel_y + 5, 16, 16};
     SDL_SetRenderDrawColor(renderer, 220, 60, 60, 255);
     SDL_RenderFillRect(renderer, &close_btn);
-    stringRGBA(renderer, close_btn.x + 3, close_btn.y + 2, "X", 255, 255, 255, 255);
+    draw_text(renderer, close_btn.x + 3, close_btn.y + 2, "X", COLOR_BLACK);
 
     int cols = 3;
     int padding = 6;
@@ -191,12 +194,12 @@ void bg_menu_render(BackgroundMenu* menu, SDL_Renderer* renderer) {
             SDL_RenderDrawRect(renderer, &thumb_rect);
         }
 
-        stringRGBA(renderer, tx + 2, ty + BG_THUMB_SIZE + 2, menu->items[i].name.c_str(), 50, 50, 50, 255);
+        draw_text(renderer, tx + 2, ty + BG_THUMB_SIZE + 2, menu->items[i].name.c_str(), COLOR_GRAY);
 
         SDL_Rect del_btn = {tx + BG_THUMB_SIZE - 10, ty + 2, 9, 9};
         SDL_SetRenderDrawColor(renderer, 200, 50, 50, 200);
         SDL_RenderFillRect(renderer, &del_btn);
-        stringRGBA(renderer, del_btn.x + 1, del_btn.y, "x", 255, 255, 255, 255);
+        draw_text(renderer, del_btn.x + 1, del_btn.y, "x", COLOR_WHITE);
     }
 
     int row_after = menu->item_count / cols;
@@ -209,12 +212,12 @@ void bg_menu_render(BackgroundMenu* menu, SDL_Renderer* renderer) {
     SDL_Rect add_img_btn = {menu->panel_x + 10, btn_y + BG_THUMB_SIZE + 20, 85, 22};
     SDL_SetRenderDrawColor(renderer, 66, 133, 244, 255);
     SDL_RenderFillRect(renderer, &add_img_btn);
-    stringRGBA(renderer, add_img_btn.x + 5, add_img_btn.y + 5, "+ Image", 255, 255, 255, 255);
+    draw_text(renderer, add_img_btn.x + 5, add_img_btn.y + 5, "+ Image", COLOR_WHITE);
 
     SDL_Rect add_white_btn = {menu->panel_x + 105, btn_y + BG_THUMB_SIZE + 20, 85, 22};
     SDL_SetRenderDrawColor(renderer, 76, 175, 80, 255);
     SDL_RenderFillRect(renderer, &add_white_btn);
-    stringRGBA(renderer, add_white_btn.x + 5, add_white_btn.y + 5, "+ Color", 255, 255, 255, 255);
+    draw_text(renderer, add_white_btn.x + 5, add_white_btn.y + 5, "+ Color", COLOR_WHITE);
 
     SDL_Rect color_preview = {menu->panel_x + BG_PANEL_W - 30, menu->panel_y + BG_PANEL_H - 28, 20, 20};
     SDL_SetRenderDrawColor(renderer, menu->custom_r, menu->custom_g, menu->custom_b, 255);

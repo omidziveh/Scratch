@@ -4,6 +4,7 @@
 #include <fstream>
 #include <sstream>
 #include <map>
+#include "../frontend/block_utils.h"
 
 std::string blocktype_to_string(BlockType type) {
     switch (type) {
@@ -163,6 +164,12 @@ static void save_block_recursive(std::ofstream& file, Block* b, int parentId, in
     }
     file << "\n";
 
+    for (size_t i = 0; i < b->argBlocks.size(); i++) {
+        if (b->argBlocks[i]) {
+            file << "ARG_LINK " << b->id << " " << i << " " << b->argBlocks[i]->id << "\n";
+        }
+    }
+
     save_block_recursive(file, b->inner, b->id, 0);
     save_block_recursive(file, b->next, b->id, 1);
 }
@@ -204,6 +211,7 @@ Block* load_project(const std::string& filename, Sprite& sprite) {
 
     std::map<int, Block*> blocks;
     std::vector<std::tuple<int, int, int>> links; // childId, parentId, slot
+    std::vector<std::tuple<int, int, int>> argLinks; // hostId, slot, childId
 
     std::string line;
     while (std::getline(file, line)) {
@@ -234,6 +242,7 @@ Block* load_project(const std::string& filename, Sprite& sprite) {
             b->width = w;
             b->height = h;
             b->args.clear();
+            b->argBlocks.resize(get_arg_count(b->type), nullptr);
 
             for (int i = 0; i < argCount; i++) {
                 std::string arg;
@@ -245,6 +254,11 @@ Block* load_project(const std::string& filename, Sprite& sprite) {
             if (parentId != -1) {
                 links.push_back({id, parentId, slot});
             }
+        }
+        else if (type == "ARG_LINK") {
+            int hostId, slot, childId;
+            ss >> hostId >> slot >> childId;
+            argLinks.push_back({hostId, slot, childId});
         }
     }
 
@@ -260,6 +274,22 @@ Block* load_project(const std::string& filename, Sprite& sprite) {
             child->parent = parent;
             if (slot == 0) parent->inner = child;
             else parent->next = child;
+        }
+    }
+
+    for (auto& link : argLinks) {
+        int hostId = std::get<0>(link);
+        int slot = std::get<1>(link);
+        int childId = std::get<2>(link);
+
+        if (blocks.count(hostId) && blocks.count(childId)) {
+            Block* host = blocks[hostId];
+            Block* child = blocks[childId];
+            if (slot < (int)host->argBlocks.size()) {
+                host->argBlocks[slot] = child;
+                child->parent = host;
+                child->is_snapped = true;
+            }
         }
     }
 

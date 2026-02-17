@@ -33,6 +33,8 @@ struct Runtime {
     bool watchdogTriggered;
     int mouseX;
     int mouseY;
+    Stage* stage;
+    float lastResult;
 };
 
 void runtime_init(Runtime* rt, Block* head, Sprite* sprite);

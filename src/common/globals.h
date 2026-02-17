@@ -2,6 +2,7 @@
 #define GLOBALS_H
 
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_ttf.h>
 
 const SDL_Color COLOR_WHITE      = {255, 255, 255, 255};
 const SDL_Color COLOR_BLACK      = {0,   0,   0,   255};
@@ -37,5 +38,6 @@ extern int g_execution_index;
 extern bool g_is_executing;
 extern bool g_step_mode;
 extern bool g_waiting_for_step;
+extern TTF_Font* g_font;
 
 #endif

@@ -39,6 +39,7 @@
 Sprite sprite;
 Runtime gRuntime;
 Stage stage;
+TTF_Font* g_font = nullptr;
 
 void init_program(SDL_Renderer& renderer) {
     syslog_init();
@@ -236,7 +237,7 @@ void draw_variables(SDL_Renderer* renderer, const Sprite& sprite) {
         SDL_SetRenderDrawColor(renderer, 200, 100, 10, 255);
         SDL_RenderDrawRect(renderer, &bg);
 
-        stringRGBA(renderer, bg.x + 5, bg.y + 4, display.c_str(), 255, 255, 255, 255);
+        draw_text(renderer, bg.x + 5, bg.y + 4, display.c_str(), COLOR_BLACK);
         
         y_offset += 22;
     }
@@ -251,10 +252,20 @@ int main(int argc, char* argv[]) {
     bool g_step_mode         = false;
     bool g_waiting_for_step  = false;
 
+    
+
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0) {
         std::cerr << "SDL_Init Error: " << SDL_GetError() << std::endl;
         return 1;
     }
+
+    if (TTF_Init() == -1) {
+        std::cerr << "TTF_Init Error: " << TTF_GetError() << std::endl;
+        SDL_Quit();
+        return 1;
+    }
+
+    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "1");
 
     syslog_init();
     menu_init();
@@ -292,6 +303,11 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    g_font = TTF_OpenFont("../assets/font.ttf", 14);
+    if (!g_font) {
+         std::cerr << "Error: No font loaded. Text will not render." << std::endl;
+    }
+
     init_program(*renderer);
 
     {
@@ -309,6 +325,7 @@ int main(int argc, char* argv[]) {
 
         for (int i = 0; i < num_costumes; i++) {
             SDL_Texture* tex = load_texture(renderer, costume_files[i]);
+            SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
             if (tex) {
                 int w = 0, h = 0;
                 SDL_QueryTexture(tex, nullptr, nullptr, &w, &h);
@@ -464,7 +481,7 @@ int main(int argc, char* argv[]) {
                                 commit_editing(text_state, blocks);
                             }
                             handle_mouse_down(event, blocks, palette_items,
-                                              next_block_id, palette_scroll_offset);
+                                              next_block_id, palette_scroll_offset, text_state);
                         }
                     }
                     break;
@@ -544,7 +561,7 @@ int main(int argc, char* argv[]) {
                 next_block_id = 1;
                 g_execution_index = -1;
                 g_is_executing = false;
-                sprite.variables.clear(); // Clear variables
+                sprite.variables.clear();
                 sprite.x = STAGE_X + STAGE_WIDTH / 2.0f;
                 sprite.y = STAGE_Y + STAGE_HEIGHT / 2.0f;
                 sprite.angle = 0;
@@ -727,6 +744,10 @@ int main(int argc, char* argv[]) {
 
     close_logger();
     sound_cleanup();
+    
+    if (g_font) TTF_CloseFont(g_font);
+    TTF_Quit();
+
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     IMG_Quit();

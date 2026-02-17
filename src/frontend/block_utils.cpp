@@ -1,6 +1,12 @@
 #include "block_utils.h"
 #include "../common/globals.h"
 
+bool is_reporter_block(BlockType type) {
+    if (type >= OP_ADD && type <= OP_XOR) return true;
+    if (type >= SENSE_TOUCHING_MOUSE & type <= SENSE_TIMER) return true;
+    return false;
+}
+
 std::string block_get_label(BlockType type) {
     switch (type) {
         case CMD_MOVE:     return "Move (10) steps";
@@ -63,6 +69,68 @@ std::string block_get_label(BlockType type) {
 
         default:           return "Unknown";
     }
+}
+
+std::string get_header_label(BlockType type) {
+    std::string full = block_get_label(type);
+    std::string result;
+    bool inArg = false;
+    for (char c : full) {
+        if (c == '(' || c == '[' || c == '<') {
+            inArg = true;
+        } else if (c == ')' || c == ']' || c == '>') {
+            inArg = false;
+            if (!result.empty() && result.back() == ' ') {}
+        } else if (!inArg) {
+            result += c;
+        }
+    }
+    std::string clean;
+    bool prevSpace = false;
+    for(char c : result) {
+        if (c == ' ') {
+            if (!prevSpace) clean += c;
+            prevSpace = true;
+        } else {
+            clean += c;
+            prevSpace = false;
+        }
+    }
+    return clean;
+}
+
+std::string get_arg_label(BlockType type, int index) {
+    std::string full = block_get_label(type);
+    std::string currentArg;
+    int argIdx = -1;
+    bool inArg = false;
+    std::string label;
+
+    for (size_t i = 0; i < full.length(); ++i) {
+        char c = full[i];
+        if (c == '(' || c == '[' || c == '<') {
+            argIdx++;
+            inArg = true;
+            std::string prefix;
+            int j = (int)i - 1;
+            while (j >= 0 && full[j] != '(' && full[j] != '[' && full[j] != '<' && full[j] != ')') {
+                prefix = full[j] + prefix;
+                j--;
+            }
+            size_t start = prefix.find_first_not_of(" ");
+            size_t end = prefix.find_last_not_of(" ");
+            if (start != std::string::npos) {
+                prefix = prefix.substr(start, end - start + 1);
+            } else {
+                prefix = "";
+            }
+            
+            if (argIdx == index) return prefix;
+        } else if (c == ')' || c == ']' || c == '>') {
+            inArg = false;
+        }
+    }
+    return "";
 }
 
 SDL_Color block_get_color(BlockType type) {
@@ -172,6 +240,7 @@ int get_arg_count(BlockType type) {
         case OP_COS:
         case OP_NOT:
         case OP_STR_LEN:
+        case CMD_IF:
             return 1;
 
         case CMD_GOTO:
@@ -196,7 +265,6 @@ int get_arg_count(BlockType type) {
         case CMD_SHOW:
         case CMD_HIDE:
         case CMD_STOP_ALL_SOUNDS:
-        case CMD_IF:
         case CMD_NONE:
             return 0;
 
@@ -210,22 +278,22 @@ SDL_Rect get_arg_box_rect(const Block& block, int arg_index) {
     int count = get_arg_count(block.type);
     if (arg_index < 0 || arg_index >= count)
         return rect;
-
-    const int ARG_BOX_WIDTH  = 40;
-    const int ARG_BOX_HEIGHT = 16;
-    const int ARG_PADDING_X  = 30;
-    const int ARG_PADDING_Y  = 7;
-    const int ARG_SPACING    = 6;
-
-    rect.x = (int)block.x + ARG_PADDING_X + arg_index * (ARG_BOX_WIDTH + ARG_SPACING);
-    rect.y = (int)block.y + ARG_PADDING_Y;
-    rect.w = ARG_BOX_WIDTH;
-    rect.h = ARG_BOX_HEIGHT;
-    int max_right = (int)(block.x + block.width) - 4;
-    if (rect.x + rect.w > max_right) {
-        rect.w = max_right - rect.x;
-        if (rect.w < 8) rect.w = 0;
+    
+    if (is_reporter_block(block.type)) {
+        return rect;
     }
+
+    int argWidth = 80;
+    int argHeight = 25;
+    int margin = 5;
+
+    rect.y = (int)block.y + (BLOCK_HEIGHT - argHeight) / 2;
+    rect.x = (int)block.x + (int)block.width + 5;
+    
+    rect.x += arg_index * (argWidth + margin);
+
+    rect.w = argWidth;
+    rect.h = argHeight;
 
     return rect;
 }
@@ -233,16 +301,23 @@ SDL_Rect get_arg_box_rect(const Block& block, int arg_index) {
 
 int get_total_height(Block* block) {
     if (!block) return 0;
+    if (is_reporter_block(block->type)) {
+        return 25;
+    }
 
     int h = BLOCK_HEIGHT;
+    // h += get_arg_count(block->type) * ARG_ROW_HEIGHT;
 
     if (block->type == CMD_IF || block->type == CMD_REPEAT) {
-        Block* child = block->inner;
-        while (child) {
-            h += get_total_height(child);
-            child = child->next;
+        if (block->inner) {
+            h += 5;
+            Block* child = block->inner;
+            while (child) {
+                h += get_total_height(child);
+                child = child->next;
+            }
         }
-        h += 10;
+        h += 15;
     }
     return h;
 }
