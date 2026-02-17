@@ -53,15 +53,14 @@ void init_program(SDL_Renderer& renderer) {
     pen_init(&renderer);
     init_logger("debug.log");
     log_info("Application started");
-    sound_load("meow", "../assets/meow.wav");
     sprite.texture = load_texture(&renderer, "../assets/cat.png");
     if (!sprite.texture) {
         log_warning("Failed to load cat.png - sprite will be invisible");
     }
     cdialog_init(&g_dialog, WINDOW_WIDTH, WINDOW_HEIGHT);
     ceditor_init(&g_costume_editor, &renderer, 50, 50);
-    sound_manager_init(&renderer, 10, 100, 200, 400);
-    sound_manager_set_visible(true);
+    sound_manager_init(&renderer, WINDOW_WIDTH/2 - 100, WINDOW_HEIGHT/2 - 200, 200, 400);
+    // sound_manager_set_visible(true);
 }
 
 static void save_project(const char* filename,
@@ -402,6 +401,7 @@ int main(int argc, char* argv[]) {
     int  mouse_x   = 0, mouse_y   = 0;
     bool hover_run  = false;
     bool hover_stop = false;
+    bool hover_sound = false;
 
     bool running = true;
     SDL_Event event;
@@ -480,8 +480,14 @@ int main(int argc, char* argv[]) {
                             break;
                         }
 
-                        if (mx >= TOOLBAR_WIDTH - 90 && mx <= TOOLBAR_WIDTH - 90 + 30 &&
-                            my >= TOOLBAR_Y + 5  && my <= TOOLBAR_Y + 5 + 30) {
+                        if (mx >= TOOLBAR_WIDTH - 155 && mx <= TOOLBAR_WIDTH - 125 &&
+                            my >= TOOLBAR_Y + 5 && my <= TOOLBAR_Y + TOOLBAR_HEIGHT - 5) {
+                            sound_manager_set_visible(!sound_manager_is_visible());
+                            break;
+                        }
+
+                        if (mx >= TOOLBAR_WIDTH - 110 && mx <= TOOLBAR_WIDTH - 80 &&
+                            my >= TOOLBAR_Y + 5  && my <= TOOLBAR_Y + TOOLBAR_HEIGHT - 5) {
 
                             bool is_any_running = false;
                             for (Runtime& rt : activeRuntimes) {
@@ -525,8 +531,8 @@ int main(int argc, char* argv[]) {
                             break;
                         }
 
-                        if (mx >= TOOLBAR_WIDTH - 50 && mx <= TOOLBAR_WIDTH - 50 + 30 &&
-                            my >= TOOLBAR_Y + 5  && my <= TOOLBAR_Y + 5 + 30) {
+                        if (mx >= TOOLBAR_WIDTH - 65 && mx <= TOOLBAR_WIDTH - 35 &&
+                            my >= TOOLBAR_Y + 5  && my <= TOOLBAR_Y + TOOLBAR_HEIGHT - 5) {
 
                             for (Runtime& rt : activeRuntimes) {
                                 runtime_stop(&rt);
@@ -597,11 +603,14 @@ int main(int argc, char* argv[]) {
                     } else {
                         menu_handle_mouse_move(mx, my);
 
-                        hover_run  = (mx >= TOOLBAR_WIDTH - 90 && mx <= TOOLBAR_WIDTH - 90 + 30 &&
-                                    my >= TOOLBAR_Y + 5  && my <= TOOLBAR_Y + 5 + 30);
+                        hover_sound = (mx >= TOOLBAR_WIDTH - 155 && mx <= TOOLBAR_WIDTH - 125 &&
+                        my >= TOOLBAR_Y + 5 && my <= TOOLBAR_Y + TOOLBAR_HEIGHT - 5);
 
-                        hover_stop = (mx >= TOOLBAR_WIDTH - 50 && mx <= TOOLBAR_WIDTH - 50 + 30 &&
-                                    my >= TOOLBAR_Y + 5  && my <= TOOLBAR_Y + 5 + 30);
+                        hover_run = (mx >= TOOLBAR_WIDTH - 110 && mx <= TOOLBAR_WIDTH - 80 &&
+                        my >= TOOLBAR_Y + 5 && my <= TOOLBAR_Y + TOOLBAR_HEIGHT - 5);
+
+                        hover_stop = (mx >= TOOLBAR_WIDTH - 65 && mx <= TOOLBAR_WIDTH - 35 &&
+                        my >= TOOLBAR_Y + 5 && my <= TOOLBAR_Y + TOOLBAR_HEIGHT - 5);
 
                         handle_mouse_motion(event, blocks);
                     }
@@ -774,21 +783,21 @@ int main(int argc, char* argv[]) {
 
         draw_all_blocks(renderer, blocks, text_state);
 
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+
+        if (hover_sound) {
+            filledCircleRGBA(renderer, TOOLBAR_WIDTH - 140, 50, 15, 255, 255, 255, 50);
+        }
+
         if (hover_run) {
-            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-            SDL_SetRenderDrawColor(renderer, 255, 255, 255, 50);
-            SDL_Rect run_rect = { TOOLBAR_WIDTH - 90, TOOLBAR_Y + 5, 30, 30 };
-            SDL_RenderFillRect(renderer, &run_rect);
-            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+            filledCircleRGBA(renderer, TOOLBAR_WIDTH - 95, 50, 15, 255, 255, 255, 50);
         }
 
         if (hover_stop) {
-            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-            SDL_SetRenderDrawColor(renderer, 255, 255, 255, 50);
-            SDL_Rect stop_rect = { TOOLBAR_WIDTH - 50, TOOLBAR_Y + 5, 30, 30 };
-            SDL_RenderFillRect(renderer, &stop_rect);
-            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+            filledCircleRGBA(renderer, TOOLBAR_WIDTH - 50, 50, 15, 255, 255, 255, 50);
         }
+
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
 
         if (syslog_is_visible()) {
             syslog_render(renderer);

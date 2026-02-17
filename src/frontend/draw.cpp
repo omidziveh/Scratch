@@ -368,14 +368,29 @@ void draw_toolbar(SDL_Renderer* renderer, bool is_running) {
     hlineRGBA(renderer, TOOLBAR_X, TOOLBAR_X + TOOLBAR_WIDTH, TOOLBAR_Y, 65, 65, 80, 100);
     hlineRGBA(renderer, TOOLBAR_X, TOOLBAR_X + TOOLBAR_WIDTH, TOOLBAR_Y + TOOLBAR_HEIGHT - 1, 80, 80, 100, 220);
 
-    int startCX = TOOLBAR_WIDTH - 75;
     int startCY = TOOLBAR_Y + TOOLBAR_HEIGHT / 2;
     int btnR = 15;
+
+    int sndCX = TOOLBAR_WIDTH - 140;
+    filledCircleRGBA(renderer, sndCX + 2, startCY + 3, btnR + 2, 0, 0, 0, 50);
+    filledCircleRGBA(renderer, sndCX, startCY, btnR + 2, 140, 70, 180, 255);
+    filledCircleRGBA(renderer, sndCX, startCY, btnR, 180, 100, 200, 255);
+    filledCircleRGBA(renderer, sndCX, startCY - 4, btnR - 5, 220, 150, 240, 55);
+    aacircleRGBA(renderer, sndCX, startCY, btnR + 2, 120, 60, 160, 255);
+    aacircleRGBA(renderer, sndCX, startCY, btnR, 200, 120, 220, 120);
+
+    Sint16 triX[3] = { (Sint16)(sndCX - 4), (Sint16)(sndCX - 4), (Sint16)(sndCX + 3) };
+    Sint16 triY[3] = { (Sint16)(startCY - 5), (Sint16)(startCY + 5), (Sint16)(startCY) };
+    filledPolygonRGBA(renderer, triX, triY, 3, 255, 255, 255, 245);
+    
+    aacircleRGBA(renderer, sndCX + 5, startCY, 4, 255, 255, 255, 180);
+    aacircleRGBA(renderer, sndCX + 8, startCY, 7, 255, 255, 255, 140);
+
+    int startCX = TOOLBAR_WIDTH - 95;
 
     filledCircleRGBA(renderer, startCX + 2, startCY + 3, btnR + 2, 0, 0, 0, 50);
 
     if (is_running) {
-        // --- PAUSE BUTTON (Yellow/Orange) ---
         filledCircleRGBA(renderer, startCX, startCY, btnR + 2, 200, 140, 30, 255);
         filledCircleRGBA(renderer, startCX, startCY, btnR, 255, 180, 40, 255);
         filledCircleRGBA(renderer, startCX, startCY - 4, btnR - 5, 255, 220, 100, 55);
@@ -385,7 +400,6 @@ void draw_toolbar(SDL_Renderer* renderer, bool is_running) {
         boxRGBA(renderer, startCX - 6, startCY - 7, startCX - 1, startCY + 7, 255, 255, 255, 245);
         boxRGBA(renderer, startCX + 1, startCY - 7, startCX + 6, startCY + 7, 255, 255, 255, 245);
     } else {
-        // --- PLAY BUTTON (Green) ---
     filledCircleRGBA(renderer, startCX, startCY, btnR + 2, 40, 155, 40, 255);
     filledCircleRGBA(renderer, startCX, startCY, btnR, 75, 200, 75, 255);
     filledCircleRGBA(renderer, startCX, startCY - 4, btnR - 5, 120, 230, 120, 55);
@@ -404,19 +418,18 @@ void draw_toolbar(SDL_Renderer* renderer, bool is_running) {
         255, 255, 255, 80);
     }
 
-    int stopCX = TOOLBAR_WIDTH - 40;
-    int stopCY = TOOLBAR_Y + TOOLBAR_HEIGHT / 2;
+    int stopCX = TOOLBAR_WIDTH - 50;
 
-    filledCircleRGBA(renderer, stopCX + 2, stopCY + 3, btnR + 2, 0, 0, 0, 50);
-    filledCircleRGBA(renderer, stopCX, stopCY, btnR + 2, 175, 35, 30, 255);
-    filledCircleRGBA(renderer, stopCX, stopCY, btnR, 220, 62, 52, 255);
-    filledCircleRGBA(renderer, stopCX, stopCY - 4, btnR - 5, 245, 105, 95, 50);
-    aacircleRGBA(renderer, stopCX, stopCY, btnR + 2, 145, 25, 20, 255);
-    aacircleRGBA(renderer, stopCX, stopCY, btnR, 235, 80, 70, 120);
+    filledCircleRGBA(renderer, stopCX + 2, startCY + 3, btnR + 2, 0, 0, 0, 50);
+    filledCircleRGBA(renderer, stopCX, startCY, btnR + 2, 175, 35, 30, 255);
+    filledCircleRGBA(renderer, stopCX, startCY, btnR, 220, 62, 52, 255);
+    filledCircleRGBA(renderer, stopCX, startCY - 4, btnR - 5, 245, 105, 95, 50);
+    aacircleRGBA(renderer, stopCX, startCY, btnR + 2, 145, 25, 20, 255);
+    aacircleRGBA(renderer, stopCX, startCY, btnR, 235, 80, 70, 120);
 
     roundedBoxRGBA(renderer,
-        stopCX - 5, stopCY - 5,
-        stopCX + 5, stopCY + 5,
+        stopCX - 5, startCY - 5,
+        stopCX + 5, startCY + 5,
         2, 255, 255, 255, 245);
 }
 
