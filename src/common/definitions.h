@@ -14,6 +14,8 @@
 #include <vector>
 #include <SDL2/SDL.h>
 
+struct Runtime;
+
 const int DEFAULT_TICK_RATE = 60;
 const int DEFAULT_MAX_TICKS = 60;
 const int DEFAULT_WATCHDOG_THRESHOLD = 1000;
@@ -190,6 +192,7 @@ enum BlockType {
     CMD_SAY,
     CMD_START,
     CMD_EVENT_CLICK,
+    CMD_EVENT_KEY,
     
     // Looks
     CMD_SWITCH_COSTUME,
@@ -250,7 +253,11 @@ enum BlockType {
 
     // Variables
     CMD_SET_VAR,
-    CMD_CHANGE_VAR
+    CMD_CHANGE_VAR,
+
+    // Custom
+    CMD_DEFINE_BLOCK,
+    CMD_CALL_BLOCK
 };
 
 struct Block {
@@ -347,6 +354,7 @@ struct ExecutionContext {
     float   lastResult;
     bool    lastCondition;
     std::string lastStringResult;
+    Runtime* runtime;
 
     ExecutionContext()
         : sprite(nullptr)
@@ -356,6 +364,7 @@ struct ExecutionContext {
         , lastResult(0.0f)
         , lastCondition(false)
         , lastStringResult("")
+        , runtime(nullptr)
     {}
 };
 

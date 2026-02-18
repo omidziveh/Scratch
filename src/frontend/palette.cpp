@@ -92,6 +92,8 @@ void init_palette(std::vector<PaletteItem>& items) {
 
     PaletteDef defs[] = {
         {CMD_START,         "When START clicked"},
+        {CMD_EVENT_CLICK,   "When this sprite clicked"},
+        {CMD_EVENT_KEY,     "When [space] key pressed"},
         {CMD_MOVE,          "Move (10) steps"},
         {CMD_TURN,          "Turn (15) degrees"},
         {CMD_GOTO,          "Go to x:(0) y:(0)"},
@@ -141,7 +143,9 @@ void init_palette(std::vector<PaletteItem>& items) {
         {OP_ABS,        "abs ( )"},
         {OP_SQRT,       "sqrt ( )"},
         {CMD_SET_VAR,     "Set [var] to (0)"},
-        {CMD_CHANGE_VAR,  "Change [var] by (1)"}
+        {CMD_CHANGE_VAR,  "Change [var] by (1)"},
+        {CMD_DEFINE_BLOCK, "Define Block"},
+        {CMD_CALL_BLOCK,   "Call Block"}
     };
 
     int count = sizeof(defs) / sizeof(defs[0]);

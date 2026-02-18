@@ -233,7 +233,10 @@ void draw_block(SDL_Renderer* renderer, const Block& block, const std::string& l
         roundedRectangleRGBA(renderer, bx, by, bx + bw, by + bh, 12,
                              dark.r, dark.g, dark.b, 255);
 
-        draw_text_shadowed(renderer, bx + 10, by + 5, textToDraw, COLOR_WHITE);
+        std::string opLabel = get_header_label(block.type);
+        int tW = measure_text_width(opLabel);
+        int textX = bx + (bw / 2) - (tW / 2);
+        draw_text_shadowed(renderer, textX, by + 5, opLabel, COLOR_WHITE);
 
         if (block.has_executed && !block.is_running) {
             draw_text(renderer, bx + bw - 15, by + 3, "v", COLOR_GREEN);
@@ -324,9 +327,7 @@ static void draw_block_tree(SDL_Renderer* renderer, Block* block, const TextInpu
     draw_block_glow(renderer, *block);
     draw_block(renderer, *block, label);
 
-    if (!is_reporter_block(block->type)) {
-        draw_arg_boxes(renderer, *block, state);
-    }
+    draw_arg_boxes(renderer, *block, state);
 
     if (block->inner) {
         int innerY = block->y + BLOCK_HEIGHT + 5;
@@ -523,6 +524,24 @@ void draw_sprite(SDL_Renderer* renderer, Sprite& sprite) {
     SDL_Rect stageClip = {STAGE_X, STAGE_Y, STAGE_WIDTH, STAGE_HEIGHT};
     SDL_RenderSetClipRect(renderer, &stageClip);
     SDL_RenderCopyEx(renderer, sprite.texture, nullptr, &dest, sprite.angle, nullptr, SDL_FLIP_NONE);
+    
+    if (!sprite.sayText.empty()) {
+        int padding = 10;
+        int bubbleH = 30;
+        int textW = sprite.sayText.length() * 8;
+        int bubbleW = textW + padding * 2;
+
+        int bubbleX = dest.x + dest.w / 2 - bubbleW / 2;
+        int bubbleY = dest.y - bubbleH - 10;
+
+        if (bubbleY < STAGE_Y) bubbleY = STAGE_Y + 5;
+        if (bubbleX < STAGE_X) bubbleX = STAGE_X + 5;
+
+        roundedBoxRGBA(renderer, bubbleX, bubbleY, bubbleX + bubbleW, bubbleY + bubbleH, 5, 255, 255, 255, 255);
+        roundedRectangleRGBA(renderer, bubbleX, bubbleY, bubbleX + bubbleW, bubbleY + bubbleH, 5, 0, 0, 0, 255);
+        draw_text(renderer, bubbleX + padding, bubbleY + 8, sprite.sayText, COLOR_BLACK);
+    }
+
     SDL_RenderSetClipRect(renderer, nullptr);
 }
 
@@ -542,7 +561,7 @@ void draw_arg_boxes(SDL_Renderer* renderer, const Block& block, const TextInputS
         if (box.w == 0) continue;
 
         std::string argLbl = get_arg_label(block.type, i);
-        if (!argLbl.empty()) {
+        if (!argLbl.empty() && !is_reporter_block(block.type)) {
             draw_text(renderer, box.x, box.y - 10, argLbl.c_str(), COLOR_GREEN);
         }
 
@@ -552,43 +571,13 @@ void draw_arg_boxes(SDL_Renderer* renderer, const Block& block, const TextInputS
             Block* sub = block.argBlocks[i];
             sub->x = box.x;
             sub->y = box.y;
-            sub->width = box.w;
-            sub->height = box.h;
-
-            SDL_Color sc = sub->color;
-            SDL_Color sd = color_darken(sc, 0.65f);
-
-            roundedBoxRGBA(renderer,
-                box.x + 1, box.y + 2,
-                box.x + box.w + 1, box.y + box.h + 2,
-                10, 0, 0, 0, 35);
-
-            roundedBoxRGBA(renderer,
-                box.x, box.y, box.x + box.w, box.y + box.h,
-                10, sc.r, sc.g, sc.b, 255);
-
-            roundedBoxRGBA(renderer,
-                box.x + 2, box.y + 1,
-                box.x + box.w - 2, box.y + box.h / 3,
-                8, 255, 255, 255, 22);
-
-            roundedRectangleRGBA(renderer,
-                box.x, box.y, box.x + box.w, box.y + box.h,
-                10, sd.r, sd.g, sd.b, 255);
-
-            std::string valText;
-            if (!sub->args.empty()) {
-                valText = sub->args[0];
-            } else {
-                valText = get_header_label(sub->type);
-            }
-
-            int maxW = box.w - 14;
-            if ((int)valText.length() * 8 > maxW && maxW > 0) {
-                valText = valText.substr(0, (maxW / 8));
-            }
-
-            draw_text_shadowed(renderer, box.x + 7, box.y + 5, valText.c_str(), COLOR_WHITE);
+            // sub->width and sub->height remain their natural values
+            
+            // Draw the sub-block
+            draw_block_glow(renderer, *sub);
+            draw_block(renderer, *sub, block_get_label(sub->type));
+            // Recursively draw its arguments
+            draw_arg_boxes(renderer, *sub, state);
 
         } else {
             bool is_editing = (state.active && state.block_id == block.id && state.arg_index == i);

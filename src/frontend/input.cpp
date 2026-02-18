@@ -10,6 +10,14 @@
 #include "../backend/memory.h"
 #include <set>
 
+static bool is_container_block(BlockType type) {
+    return type == CMD_IF || type == CMD_REPEAT || type == CMD_DEFINE_BLOCK;
+}
+
+static bool is_hat_block(BlockType type) {
+    return type == CMD_START || type == CMD_EVENT_CLICK || type == CMD_EVENT_KEY;
+}
+
 static Block* find_block_by_id(std::list<Block>& blocks, int id) {
     for (auto& b : blocks) {
         if (b.id == id) return &b;
@@ -273,7 +281,7 @@ void try_snap_blocks(std::list<Block>& blocks, Block& dropped_block) {
         
         target.height = get_total_height(&target);
 
-        if ((target.type == CMD_IF || target.type == CMD_REPEAT) && !target.inner) {
+        if (is_container_block(target.type) && !target.inner) {
             float container_height = get_total_height(&target);
             float snap_x = target.x + 15;
             float snap_y = target.y + BLOCK_HEIGHT + 5;
@@ -283,6 +291,10 @@ void try_snap_blocks(std::list<Block>& blocks, Block& dropped_block) {
             bool y_overlapping = dropped_block.y < target.y + container_height;
 
             if (x_aligned && y_overlapping) {
+                if (dropped_block.type == CMD_DEFINE_BLOCK || is_hat_block(dropped_block.type)) {
+                    continue; 
+                }
+
                 Block* dropped = find_block_by_id(blocks, dropped_id);
                 if (!dropped) return;
 
@@ -302,6 +314,14 @@ void try_snap_blocks(std::list<Block>& blocks, Block& dropped_block) {
         }
 
         if (!target.next) {
+            if (target.type == CMD_DEFINE_BLOCK) {
+                continue;
+            }
+
+            if (dropped_block.type == CMD_DEFINE_BLOCK || is_hat_block(dropped_block.type)) {
+                continue;
+            }
+
             float snap_x = target.x;
             float snap_y = target.y + get_total_height(&target);
 
@@ -327,8 +347,6 @@ void try_snap_blocks(std::list<Block>& blocks, Block& dropped_block) {
                 return;
             }
         }
-
-        
     }
 }
 
@@ -358,6 +376,11 @@ bool try_click_arg(const Block& block, int mx, int my, TextInputState& state) {
                 state.buffer = "";
             }
             state.cursor_pos = (int)state.buffer.length();
+
+            SDL_StartTextInput();
+            state.blink_timer = SDL_GetTicks();
+            state.cursor_visible = true;
+
             return true;
         }
     }

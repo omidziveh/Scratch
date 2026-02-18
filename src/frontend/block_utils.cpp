@@ -3,7 +3,7 @@
 
 bool is_reporter_block(BlockType type) {
     if (type >= OP_ADD && type <= OP_XOR) return true;
-    if (type >= SENSE_TOUCHING_MOUSE & type <= SENSE_TIMER) return true;
+    if (type >= SENSE_TOUCHING_MOUSE && type <= SENSE_TIMER) return true;
     return false;
 }
 
@@ -66,6 +66,10 @@ std::string block_get_label(BlockType type) {
         case SENSE_RESET_TIMER:return "reset timer";
         case CMD_SET_VAR:       return "Set [var] to (0)";
         case CMD_CHANGE_VAR:    return "Change [var] by (1)";
+        case CMD_DEFINE_BLOCK: return "Define [name] args:(arg)";
+        case CMD_CALL_BLOCK:   return "Call [name] with:(val)";
+        case CMD_EVENT_CLICK: return "When sprite clicked";
+        case CMD_EVENT_KEY:   return "When [key] key pressed";
 
         default:           return "Unknown";
     }
@@ -99,6 +103,8 @@ std::string get_header_label(BlockType type) {
         case SENSE_MOUSE_X:    return "mouse x";
         case SENSE_MOUSE_Y:    return "mouse y";
         case SENSE_TIMER:      return "timer";
+        case CMD_DEFINE_BLOCK: return "Define";
+        case CMD_CALL_BLOCK:   return "Call";
         default: break;
     }
 
@@ -170,6 +176,8 @@ SDL_Color block_get_color(BlockType type) {
         case CMD_HIDE:
             return COLOR_LOOKS;
         case CMD_START:
+        case CMD_EVENT_CLICK:
+        case CMD_EVENT_KEY:
             return COLOR_EVENTS;
         case CMD_PLAY_SOUND:
         case CMD_STOP_ALL_SOUNDS:
@@ -201,6 +209,10 @@ SDL_Color block_get_color(BlockType type) {
         case CMD_SET_VAR:
         case CMD_CHANGE_VAR:
             return COLOR_VARIABLE;
+
+        case CMD_DEFINE_BLOCK:
+        case CMD_CALL_BLOCK:
+            return COLOR_CUSTOM;
         
         default:
             return COLOR_GRAY;
@@ -237,6 +249,11 @@ std::vector<std::string> get_default_args(BlockType type) {
         case OP_STR_CONCAT: return {"", ""};
         case OP_STR_CHAR: return {"1", ""};
 
+        case CMD_DEFINE_BLOCK: return {"myBlock", "param"};
+        case CMD_CALL_BLOCK:   return {"myBlock", "10"};
+
+        case CMD_EVENT_KEY:    return {"space"};
+
         default:           return {};
     }
 }
@@ -268,6 +285,7 @@ int get_arg_count(BlockType type) {
         case CMD_IF:
         case CMD_PEN_SET_COLOR:
         case CMD_PEN_SET_SIZE:
+        case CMD_EVENT_KEY:
             return 1;
 
         case CMD_GOTO:
@@ -286,6 +304,8 @@ int get_arg_count(BlockType type) {
         case OP_STR_CHAR:
         case CMD_SET_VAR:
         case CMD_CHANGE_VAR:
+        case CMD_DEFINE_BLOCK:
+        case CMD_CALL_BLOCK:
             return 2;
 
         case CMD_START:
@@ -294,6 +314,7 @@ int get_arg_count(BlockType type) {
         case CMD_HIDE:
         case CMD_STOP_ALL_SOUNDS:
         case CMD_NONE:
+        case CMD_EVENT_CLICK:
             return 0;
 
         default:
@@ -351,7 +372,7 @@ int get_total_height(Block* block) {
     int h = BLOCK_HEIGHT;
     // h += get_arg_count(block->type) * ARG_ROW_HEIGHT;
 
-    if (block->type == CMD_IF || block->type == CMD_REPEAT) {
+    if (block->type == CMD_IF || block->type == CMD_REPEAT || block->type == CMD_DEFINE_BLOCK) {
         if (block->inner) {
             h += 5;
             Block* child = block->inner;

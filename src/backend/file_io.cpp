@@ -21,6 +21,7 @@ std::string blocktype_to_string(BlockType type) {
         case CMD_SAY: return "SAY";
         case CMD_START: return "START";
         case CMD_EVENT_CLICK: return "EVENT_CLICK";
+        case CMD_EVENT_KEY: return "EVENT_KEY";
         
         case CMD_SWITCH_COSTUME: return "SWITCH_COSTUME";
         case CMD_NEXT_COSTUME: return "NEXT_COSTUME";
@@ -73,6 +74,9 @@ std::string blocktype_to_string(BlockType type) {
 
         case CMD_SET_VAR: return "SET_VAR";
         case CMD_CHANGE_VAR: return "CHANGE_VAR";
+
+        case CMD_DEFINE_BLOCK: return "DEFINE_BLOCK";
+        case CMD_CALL_BLOCK:   return "CALL_BLOCK";
         
         default: return "UNKNOWN";
     }
@@ -92,6 +96,7 @@ BlockType string_to_blocktype(const std::string& str) {
     if (str == "SAY") return CMD_SAY;
     if (str == "START") return CMD_START;
     if (str == "EVENT_CLICK") return CMD_EVENT_CLICK;
+        if (str == "EVENT_KEY") return CMD_EVENT_KEY;
     
     if (str == "SWITCH_COSTUME") return CMD_SWITCH_COSTUME;
     if (str == "NEXT_COSTUME") return CMD_NEXT_COSTUME;
@@ -144,6 +149,9 @@ BlockType string_to_blocktype(const std::string& str) {
 
     if (str == "SET_VAR") return CMD_SET_VAR;
     if (str == "CHANGE_VAR") return CMD_CHANGE_VAR;
+
+    if (str == "DEFINE_BLOCK") return CMD_DEFINE_BLOCK;
+    if (str == "CALL_BLOCK")   return CMD_CALL_BLOCK;
 
     return CMD_NONE;
 }

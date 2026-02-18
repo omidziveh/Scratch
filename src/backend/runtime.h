@@ -1,5 +1,6 @@
 #pragma once
 #include "../common/definitions.h"
+#include <map>
 #include <vector>
 
 enum RuntimeState {
@@ -35,6 +36,9 @@ struct Runtime {
     int mouseY;
     Stage* stage;
     float lastResult;
+    std::string lastStringResult;
+    std::vector<Block*> callStack;
+    std::vector<std::map<std::string, std::string>> scopeStack;
 };
 
 void runtime_init(Runtime* rt, Block* head, Sprite* sprite);
@@ -59,3 +63,4 @@ void advance_to_next_block(Runtime* rt);
 
 bool evaluate_condition(Runtime* rt, Block* b);
 float resolve_argument(Runtime* rt, const std::string& arg);
+std::string resolve_string_variable(Runtime* rt, const std::string& arg);

@@ -27,6 +27,7 @@ const SDL_Color COLOR_PEN        = {0,   171, 132, 255};
 const SDL_Color COLOR_OPERATOR   = {76,  151, 64,  255};
 const SDL_Color COLOR_SENSING    = {255, 102, 102, 255};
 const SDL_Color COLOR_VARIABLE   = {255, 128, 0,   255};
+const SDL_Color COLOR_CUSTOM     = {255, 102, 178, 255};
 
 const SDL_Color COLOR_TOOLBAR_BG    = {60,  60,  60,  255};
 const SDL_Color COLOR_PALETTE_BG    = {45,  45,  45,  255};

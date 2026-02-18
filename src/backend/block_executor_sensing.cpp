@@ -1,6 +1,7 @@
 #include "block_executor_sensing.h"
 #include "sensing.h"
 #include "operators.h"
+#include "runtime.h"
 #include "../utils/logger.h"
 #include "../common/definitions.h"
 #include <string>
@@ -59,16 +60,53 @@ bool execute_sensing_block(Block* block, ExecutionContext& ctx) {
 bool execute_operator_block(Block* block, ExecutionContext& ctx) {
     if (!block) return false;
 
-    auto getFloat = [&](int idx) {
+    auto getFloat = [&](int idx) -> float {
+        if (idx < (int)block->argBlocks.size() && block->argBlocks[idx] != nullptr) {
+            if (ctx.runtime) {
+                Block* subBlock = block->argBlocks[idx];
+                execute_block(ctx.runtime, subBlock, ctx.stage);
+                float result = ctx.lastResult;
+                
+                subBlock->is_running = false;
+                
+                return result;
+            }
+            return 0.0f;
+        }
+
         if (idx < (int)block->args.size()) {
-            return (float)std::atof(block->args[idx].c_str());
+            if (ctx.runtime) {
+                 return resolve_argument(ctx.runtime, block->args[idx]);
+            }
+            try { return std::stof(block->args[idx]); } catch (...) { return 0.0f; }
         }
         return 0.0f;
     };
 
-    auto getString = [&](int idx) {
-        if (idx < (int)block->args.size()) return block->args[idx];
-        return std::string("");
+    auto getString = [&](int idx) -> std::string {
+        if (idx < (int)block->argBlocks.size() && block->argBlocks[idx] != nullptr) {
+            if (ctx.runtime) {
+                Block* subBlock = block->argBlocks[idx];
+                execute_block(ctx.runtime, subBlock, ctx.stage);
+                
+                std::string result;
+                if (!ctx.lastStringResult.empty()) result = ctx.lastStringResult;
+                else result = std::to_string(ctx.lastResult);
+
+                subBlock->is_running = false;
+                
+                return result;
+            }
+            return "";
+        }
+
+        if (idx < (int)block->args.size()) {
+            if (ctx.runtime) {
+                return resolve_string_variable(ctx.runtime, block->args[idx]);
+            }
+            return block->args[idx];
+        }
+        return "";
     };
 
     bool success = true;

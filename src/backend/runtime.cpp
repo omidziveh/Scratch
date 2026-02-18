@@ -4,10 +4,13 @@
 #include <cmath>
 #include <cstdlib>
 #include <sstream>
+#include <algorithm>
 #include "sensing.h"
 #include "block_executor_sensing.h"
 #include "block_executor_sound.h"
 #include "block_executor_looks.h"
+#include "custom_blocks.h"
+#include "../frontend/pen.h"
 
 float evaluate_block_argument(Runtime* rt, Block* host, int argIndex) {
     if (!host) return 0.0f;
@@ -16,8 +19,11 @@ float evaluate_block_argument(Runtime* rt, Block* host, int argIndex) {
         Block* subBlock = host->argBlocks[argIndex];
         
         execute_block(rt, subBlock, rt->stage);
-        
-        return rt->lastResult;
+        float result = rt->lastResult;
+
+        subBlock->is_running = false;
+
+        return result;
     }
 
     if (argIndex < (int)host->args.size()) {
@@ -25,6 +31,56 @@ float evaluate_block_argument(Runtime* rt, Block* host, int argIndex) {
     }
 
     return 0.0f;
+}
+
+std::string resolve_string_variable(Runtime* rt, const std::string& arg) {
+if (!rt || !rt->targetSprite) return arg;
+
+if (arg.find('%') == std::string::npos) {
+return arg;
+}
+
+std::string result;
+result.reserve(arg.size());
+size_t i = 0;
+
+while (i < arg.length()) {
+if (arg[i] == '%') {
+size_t start = i + 1;
+size_t end = start;
+
+while (end < arg.length() && (isalnum(arg[end]) || arg[end] == '_')) {
+end++;
+}
+
+if (end > start) {
+std::string varName = arg.substr(start, end - start);
+bool found = false;
+
+for (const auto& var : rt->targetSprite->variables) {
+if (var.name == varName) {
+result += var.value;
+found = true;
+break;
+}
+}
+
+if (!found) {
+result += arg.substr(i, end - i);
+}
+
+i = end;
+} else {
+result += '%';
+i++;
+}
+} else {
+result += arg[i];
+i++;
+}
+}
+
+return result;
 }
 
 float resolve_argument(Runtime* rt, const std::string& arg) {
@@ -37,20 +93,15 @@ float resolve_argument(Runtime* rt, const std::string& arg) {
             return val;
         }
     } catch (...) {
-        // NOT NUMBER
-    }
+}
 
-    for (const auto& var : rt->targetSprite->variables) {
-        if (var.name == arg) {
+std::string resolved = resolve_string_variable(rt, arg);
+
             try {
-                return std::stof(var.value);
+return std::stof(resolved);
             } catch (...) {
                 return 0.0f;
-            }
         }
-    }
-
-    return 0.0f;
 }
 
 void sprite_set_variable(Sprite* sprite, const std::string& name, const std::string& value) {
@@ -104,6 +155,8 @@ void runtime_init(Runtime* rt, Block* head, Sprite* sprite) {
     rt->mouseY = 0;
     rt->lastResult = 0.0f;
     rt->stage = nullptr;
+    rt->callStack.clear();
+    rt->scopeStack.clear();
 }
 
 void runtime_reset(Runtime* rt) {
@@ -116,6 +169,71 @@ void runtime_reset(Runtime* rt) {
     rt->ticksSinceLastWait = 0;
     rt->waitingForStep = false;
     rt->watchdogTriggered = false;
+    rt->callStack.clear();
+    rt->scopeStack.clear();
+}
+static void push_scope(Runtime* rt, const std::vector<std::string>& paramNames, const std::vector<std::string>& values) {
+    std::map<std::string, std::string> snapshot;
+    
+    for (const auto& name : paramNames) {
+        for (const auto& v : rt->targetSprite->variables) {
+            if (v.name == name) {
+                snapshot[name] = v.value;
+                break;
+            }
+        }
+        if (snapshot.find(name) == snapshot.end()) {
+            snapshot[name] = ""; 
+        }
+    }
+    
+    rt->scopeStack.push_back(snapshot);
+    
+    for (size_t i = 0; i < paramNames.size(); i++) {
+        std::string val = (i < values.size()) ? values[i] : "0";
+        bool found = false;
+        for (auto& v : rt->targetSprite->variables) {
+            if (v.name == paramNames[i]) {
+                v.value = val;
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            rt->targetSprite->variables.push_back(Variable(paramNames[i], val));
+        }
+    }
+    
+    log_debug("Pushed scope, scopeStack size now: " + std::to_string(rt->scopeStack.size()));
+}
+
+static void pop_scope(Runtime* rt) {
+    if (rt->scopeStack.empty()) {
+        log_warning("pop_scope called with empty scopeStack!");
+        return;
+    }
+    
+    std::map<std::string, std::string> snapshot = rt->scopeStack.back();
+    rt->scopeStack.pop_back();
+    
+    auto& vars = rt->targetSprite->variables;
+    for (const auto& pair : snapshot) {
+        if (pair.second.empty()) {
+            vars.erase(std::remove_if(vars.begin(), vars.end(), 
+                [&pair](const Variable& v) { return v.name == pair.first; }), vars.end());
+            log_debug("Removed variable on scope pop: " + pair.first);
+        } else {
+            for (auto& v : vars) {
+                if (v.name == pair.first) {
+                    v.value = pair.second;
+                    log_debug("Restored variable on scope pop: " + pair.first + " = " + pair.second);
+                    break;
+                }
+            }
+        }
+    }
+    
+    log_debug("Popped scope, scopeStack size now: " + std::to_string(rt->scopeStack.size()));
 }
 
 void runtime_start(Runtime* rt) {
@@ -126,6 +244,8 @@ void runtime_start(Runtime* rt) {
         rt->ticksSinceLastWait = 0;
         rt->watchdogTriggered = false;
         rt->waitingForStep = false;
+        rt->scopeStack.clear();
+        rt->waitTicksRemaining = 0;
     }
     rt->state = RUNTIME_RUNNING;
     if (rt->stepMode) {
@@ -138,6 +258,8 @@ void runtime_stop(Runtime* rt) {
     rt->state = RUNTIME_STOPPED;
     rt->waitingForStep = false;
     rt->watchdogTriggered = false;
+    rt->scopeStack.clear();
+    rt->waitTicksRemaining = 0;
     log_info("Runtime stopped");
 }
 
@@ -184,6 +306,10 @@ void runtime_advance_step(Runtime* rt, Stage* stage, int mouseX, int mouseY) {
     if (rt->waitTicksRemaining > 0) {
         rt->waitTicksRemaining--;
         rt->ticksSinceLastWait = 0;
+
+        if (rt->waitTicksRemaining == 0) {
+            advance_to_next_block(rt);
+        }
         return;
     }
 
@@ -204,6 +330,11 @@ void runtime_advance_step(Runtime* rt, Stage* stage, int mouseX, int mouseY) {
     }
 
     execute_block(rt, rt->currentBlock, stage);
+    
+    if (rt->waitTicksRemaining > 0) {
+        return;
+    }
+
     advance_to_next_block(rt);
     rt->totalTicksExecuted++;
     rt->ticksSinceLastWait++;
@@ -243,6 +374,10 @@ void runtime_tick(Runtime* rt, Stage* stage, int mouseX, int mouseY) {
     if (rt->waitTicksRemaining > 0) {
         rt->waitTicksRemaining--;
         rt->ticksSinceLastWait = 0;
+        
+        if (rt->waitTicksRemaining == 0) {
+            advance_to_next_block(rt);
+        }
         return;
     }
 
@@ -272,6 +407,11 @@ void runtime_tick(Runtime* rt, Stage* stage, int mouseX, int mouseY) {
         log_info("Last block");
         rt->waitTicksRemaining = 30;
     }
+    
+    if (rt->waitTicksRemaining > 0) {
+        return;
+    }
+
     advance_to_next_block(rt);
     rt->totalTicksExecuted++;
     rt->ticksSinceLastWait++;
@@ -348,7 +488,7 @@ bool evaluate_condition(Runtime* rt, Block* b) {
         } else if (b->args[0] == "y" && rt->targetSprite) {
             left = rt->targetSprite->y;
         } else {
-            left = (float)std::atof(b->args[0].c_str());
+left = resolve_argument(rt, b->args[0]);
         }
 
         if (b->args[2] == "x" && rt->targetSprite) {
@@ -356,7 +496,7 @@ bool evaluate_condition(Runtime* rt, Block* b) {
         } else if (b->args[2] == "y" && rt->targetSprite) {
             right = rt->targetSprite->y;
         } else {
-            right = (float)std::atof(b->args[2].c_str());
+right = resolve_argument(rt, b->args[2]);
         }
 
         if (op == ">" || op == "gt") return left > right;
@@ -368,41 +508,6 @@ bool evaluate_condition(Runtime* rt, Block* b) {
     }
 
     return true;
-}
-
-void pen_draw_line(SDL_Renderer* renderer, Sprite* sprite, float oldX, float oldY, float newX, float newY) {
-    if (!renderer || !sprite) return;
-    SDL_SetRenderDrawColor(renderer, sprite->penR, sprite->penG, sprite->penB, 255);
-    int size = sprite->penSize;
-    if (size < 1) size = 1;
-    for (int w = -(size / 2); w <= (size / 2); w++) {
-        SDL_RenderDrawLine(renderer,
-            (int)oldX + w, (int)oldY,
-            (int)newX + w, (int)newY);
-        SDL_RenderDrawLine(renderer,
-            (int)oldX, (int)oldY + w,
-            (int)newX, (int)newY + w);
-    }
-}
-
-void pen_clear(SDL_Renderer* renderer, Stage* stage) {
-    if (!renderer || !stage) return;
-    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-    SDL_Rect rect = {STAGE_X, STAGE_Y, STAGE_WIDTH, STAGE_HEIGHT};
-    SDL_RenderFillRect(renderer, &rect);
-}
-
-void pen_stamp(SDL_Renderer* renderer, Sprite* sprite) {
-    if (!renderer || !sprite) return;
-    SDL_SetRenderDrawColor(renderer, sprite->penR, sprite->penG, sprite->penB, 255);
-    int stampSize = sprite->penSize * 5;
-    if (stampSize < 10) stampSize = 10;
-    SDL_Rect r;
-    r.x = (int)sprite->x - stampSize / 2;
-    r.y = (int)sprite->y - stampSize / 2;
-    r.w = stampSize;
-    r.h = stampSize;
-    SDL_RenderFillRect(renderer, &r);
 }
 
 void execute_block(Runtime* rt, Block* b, Stage* stage) {
@@ -435,15 +540,15 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
             hasChanged = true;
 
             if (rt->targetSprite->isPenDown && stage && stage->renderer) {
-                pen_draw_line(stage->renderer, rt->targetSprite, oldX, oldY,
-                              rt->targetSprite->x, rt->targetSprite->y);
+                pen_draw_line(stage->renderer, oldX, oldY,
+                              rt->targetSprite->x, rt->targetSprite->y, *rt->targetSprite);
             }
             break;
         }
         case CMD_TURN: {
-            float degrees =  evaluate_block_argument(rt, b, 0);
+            float degrees = evaluate_block_argument(rt, b, 0);
             rt->targetSprite->angle += degrees;
-
+            
             while (rt->targetSprite->angle >= 360.0f) rt->targetSprite->angle -= 360.0f;
             while (rt->targetSprite->angle < 0.0f) rt->targetSprite->angle += 360.0f;
             break;
@@ -460,8 +565,8 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
             hasChanged = true;
 
             if (rt->targetSprite->isPenDown && stage && stage->renderer) {
-                pen_draw_line(stage->renderer, rt->targetSprite, oldX, oldY,
-                              rt->targetSprite->x, rt->targetSprite->y);
+                pen_draw_line(stage->renderer, oldX, oldY,
+                              rt->targetSprite->x, rt->targetSprite->y, *rt->targetSprite);
             }
             break;
         }
@@ -469,7 +574,10 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
         // Control:
         case CMD_WAIT: {
             float seconds = evaluate_block_argument(rt, b, 0);
-            rt->waitTicksRemaining = (int)(seconds * rt->tickRate);
+            int ticks = (int)(seconds * rt->tickRate);
+            if (ticks < 1 && seconds > 0) ticks = 1;
+            
+            rt->waitTicksRemaining = ticks;
 
             rt->ticksSinceLastWait = 0;
             for (size_t i = 0; i < rt->loopStack.size(); i++) {
@@ -479,7 +587,23 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
         }
         case CMD_SAY: {
             std::string msg = "Hello!";
-            if (!b->args.empty()) msg = b->args[0];
+            
+            if (!b->argBlocks.empty() && b->argBlocks[0]) {
+                execute_block(rt, b->argBlocks[0], stage);
+                if (!rt->lastStringResult.empty()) {
+                    msg = rt->lastStringResult;
+                } else {
+                    msg = std::to_string(rt->lastResult);
+                }
+                
+                b->argBlocks[0]->is_running = false;
+            } 
+            else if (!b->args.empty()) {
+                msg = resolve_string_variable(rt, b->args[0]);
+            }
+            
+            rt->targetSprite->sayText = msg;
+            rt->targetSprite->sayStartTime = SDL_GetTicks();
             log_info("Sprite says: " + msg);
             break;
         }
@@ -529,8 +653,8 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
             hasChanged = true;
 
             if (rt->targetSprite->isPenDown && stage && stage->renderer) {
-                pen_draw_line(stage->renderer, rt->targetSprite, oldX, oldY,
-                              rt->targetSprite->x, rt->targetSprite->y);
+                pen_draw_line(stage->renderer, oldX, oldY,
+                              rt->targetSprite->x, rt->targetSprite->y, *rt->targetSprite);
             }
             break;
         }
@@ -543,8 +667,8 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
             hasChanged = true;
 
             if (rt->targetSprite->isPenDown && stage && stage->renderer) {
-                pen_draw_line(stage->renderer, rt->targetSprite, oldX, oldY,
-                              rt->targetSprite->x, rt->targetSprite->y);
+                pen_draw_line(stage->renderer, oldX, oldY,
+                              rt->targetSprite->x, rt->targetSprite->y, *rt->targetSprite);
             }
             break;
         }
@@ -557,8 +681,8 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
             hasChanged = true;
 
             if (rt->targetSprite->isPenDown && stage && stage->renderer) {
-                pen_draw_line(stage->renderer, rt->targetSprite, oldX, oldY,
-                              rt->targetSprite->x, rt->targetSprite->y);
+                pen_draw_line(stage->renderer, oldX, oldY,
+                              rt->targetSprite->x, rt->targetSprite->y, *rt->targetSprite);
             }
             break;
         }
@@ -571,8 +695,8 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
             hasChanged = true;
 
             if (rt->targetSprite->isPenDown && stage && stage->renderer) {
-                pen_draw_line(stage->renderer, rt->targetSprite, oldX, oldY,
-                              rt->targetSprite->x, rt->targetSprite->y);
+                pen_draw_line(stage->renderer, oldX, oldY,
+                              rt->targetSprite->x, rt->targetSprite->y, *rt->targetSprite);
             }
             break;
         }
@@ -602,6 +726,8 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
         // Pen:
         case CMD_PEN_DOWN: {
             rt->targetSprite->isPenDown = 1;
+            rt->targetSprite->prevPenX = rt->targetSprite->x;
+            rt->targetSprite->prevPenY = rt->targetSprite->y;
             log_info("Pen down");
             break;
         }
@@ -612,7 +738,7 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
         }
         case CMD_PEN_CLEAR: {
             if (stage && stage->renderer) {
-                pen_clear(stage->renderer, stage);
+                pen_clear(stage->renderer);
             }
             log_info("Pen cleared");
             break;
@@ -648,7 +774,7 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
         }
         case CMD_PEN_STAMP: {
             if (stage && stage->renderer) {
-                pen_stamp(stage->renderer, rt->targetSprite);
+                pen_stamp(stage->renderer, *rt->targetSprite);
             }
             log_info("Stamp");
             break;
@@ -735,13 +861,68 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
             ctx.stage = stage;
             ctx.mouseX = rt->mouseX;
             ctx.mouseY = rt->mouseY;
+            ctx.runtime = rt;
             execute_operator_block(b, ctx);
+            rt->lastResult = ctx.lastResult;
+            rt->lastStringResult = ctx.lastStringResult;
             break;
         }
 
-        default:
-            log_warning("Unknown block type encountered: " + std::to_string(b->type));
+
+        // Custom Blocks:
+        case CMD_DEFINE_BLOCK: {
+            if (b->args.size() > 0) {
+                std::string name = b->args[0];
+                custom_blocks_register(name, b);
+                log_info("Registered custom block: " + name);
+            }
             break;
+        }
+
+        case CMD_CALL_BLOCK: {
+            if (b->args.empty()) {
+                log_warning("CALL_BLOCK has no function name");
+                break;
+            }
+            
+            std::string name = b->args[0];
+            Block* def = custom_blocks_get(name);
+
+            if (!def) {
+                log_error("Custom block not found: " + name);
+                break;
+            }
+                
+            log_info("Calling custom block: " + name);
+            
+            std::vector<std::string> paramNames;
+            for(size_t i=1; i<def->args.size(); i++) {
+                paramNames.push_back(def->args[i]);
+            }
+
+            std::vector<std::string> values;
+            for(size_t i=0; i<paramNames.size(); i++) {
+                if (i < b->argBlocks.size() && b->argBlocks[i]) {
+                    float val = evaluate_block_argument(rt, b, (int)i);
+                        values.push_back(std::to_string(val));
+                    log_debug("Arg " + std::to_string(i) + " from argBlocks: " + std::to_string(val));
+                } else if (i+1 < b->args.size()) {
+                    float val = resolve_argument(rt, b->args[i+1]);
+                        values.push_back(std::to_string(val));
+                    log_debug("Arg " + std::to_string(i) + " from args: " + std::to_string(val));
+                } else {
+                    values.push_back("0");
+                    log_debug("Arg " + std::to_string(i) + " default: 0");
+                    }
+                }
+
+                push_scope(rt, paramNames, values);
+
+                rt->callStack.push_back(b->next);
+            log_debug("Pushed to callStack, size: " + std::to_string(rt->callStack.size()));
+
+            break;
+        }
     }
     if (hasChanged) {
         clamp_sprite_to_stage(*rt->targetSprite, *stage);
@@ -765,9 +946,50 @@ void advance_to_next_block(Runtime* rt) {
         }
     }
 
+    if (cur->type == CMD_CALL_BLOCK) {
+        std::string name = cur->args.empty() ? "" : cur->args[0];
+        Block* def = custom_blocks_get(name);
+
+        if (def && def->inner) {
+            rt->currentBlock = def->inner;
+            log_debug("Jumping to function body");
+            return;
+        } else {
+            log_debug("Function has no body, returning immediately");
+            
+            if (!rt->callStack.empty()) {
+                Block* returnTo = rt->callStack.back();
+                rt->callStack.pop_back();
+                pop_scope(rt);
+                
+                if (returnTo) {
+                    rt->currentBlock = returnTo;
+                    log_debug("Returning from function to block #" + std::to_string(returnTo->id));
+                    return;
+                }
+            }
+            rt->currentBlock = nullptr;
+            return;
+        }
+    }
+
     if (cur->next) {
         rt->currentBlock = cur->next;
         return;
+    }
+
+    if (!rt->callStack.empty()) {
+        Block* returnTo = rt->callStack.back();
+        rt->callStack.pop_back();
+        pop_scope(rt);
+        
+        if (returnTo) {
+            rt->currentBlock = returnTo;
+                log_debug("Returning from function, continuing at block #" + std::to_string(returnTo->id));
+            return;
+        }
+
+        log_debug("Returning from function with null return address, checking loopStack");
     }
 
     while (!rt->loopStack.empty()) {
@@ -785,6 +1007,7 @@ void advance_to_next_block(Runtime* rt) {
             
             if (ctx.loopBlock->inner) {
                 rt->currentBlock = ctx.loopBlock->inner;
+                log_debug("REPEAT: continuing iteration " + std::to_string(ctx.remainingIterations) + " remaining");
                 return;
             } else {
                 rt->currentBlock = nullptr;
@@ -794,12 +1017,15 @@ void advance_to_next_block(Runtime* rt) {
 
         Block* parentBlock = ctx.loopBlock;
         rt->loopStack.pop_back();
+        log_debug("Popped loop context for block #" + std::to_string(parentBlock->id));
 
         if (parentBlock->next) {
             rt->currentBlock = parentBlock->next;
+            log_debug("Continuing after loop at block #" + std::to_string(parentBlock->next->id));
             return;
         }
     }
 
     rt->currentBlock = nullptr;
+    log_debug("No more blocks, execution finished");
 }

@@ -38,6 +38,7 @@
 #include <map>
 #include "frontend/sound_manager.h"
 #include "frontend/sound_manager_integration.h"
+#include "backend/custom_blocks.h"
 
 Sprite sprite;
 Runtime gRuntime;
@@ -46,6 +47,16 @@ TTF_Font* g_font = nullptr;
 ConfirmDialog g_dialog;
 MenuAction g_pending_action = MENU_ACTION_NONE;
 CostumeEditor g_costume_editor;
+
+static void register_all_definitions(std::list<Block>& blocks) {
+    for (Block& b : blocks) {
+        if (b.type == CMD_DEFINE_BLOCK) {
+            if (!b.args.empty()) {
+                custom_blocks_register(b.args[0], &b);
+            }
+        }
+    }
+}
 
 void init_program(SDL_Renderer& renderer) {
     syslog_init();
@@ -408,6 +419,16 @@ int main(int argc, char* argv[]) {
 
     std::vector<Runtime> activeRuntimes;
 
+    for (Block& b : blocks) {
+        if (b.type == CMD_DEFINE_BLOCK) {
+            if (!b.args.empty()) {
+                custom_blocks_register(b.args[0], &b);
+            }
+        }
+    }
+
+    register_all_definitions(blocks);
+
     while (running) {
 
         while (SDL_PollEvent(&event)) {
@@ -513,6 +534,8 @@ int main(int argc, char* argv[]) {
 
                                 if (!was_paused) {
                             activeRuntimes.clear();
+                            custom_blocks_clear();
+                            register_all_definitions(blocks);
                             for (Block& b : blocks) {
                                 b.has_executed = false;
                                 if (b.type == CMD_START && b.next) {
@@ -540,6 +563,32 @@ int main(int argc, char* argv[]) {
                             activeRuntimes.clear();
                             log_info("STOP: All runtimes stopped");
                             break;
+                        }
+
+                        bool clicked_sprite = false;
+                        if (sprite.visible && sprite.texture) {
+                            float halfW = (sprite.width * sprite.scale) / 2.0f;
+                            float halfH = (sprite.height * sprite.scale) / 2.0f;
+                            
+                            if (mx >= sprite.x - halfW && mx <= sprite.x + halfW &&
+                                my >= sprite.y - halfH && my <= sprite.y + halfH) {
+                                clicked_sprite = true;
+                            }
+                        }
+
+                        if (clicked_sprite) {
+                            register_all_definitions(blocks);
+                            for (Block& b : blocks) {
+                                if (b.type == CMD_EVENT_CLICK) {
+                                    if (b.next) {
+                                        Runtime rt;
+                                        runtime_init(&rt, b.next, &sprite);
+                                        runtime_start(&rt);
+                                        activeRuntimes.push_back(rt);
+                                        log_info("EVENT: Started script from CMD_EVENT_CLICK");
+                                    }
+                                }
+                            }
                         }
 
                         if (my >= CATEGORY_BAR_Y &&
@@ -579,6 +628,7 @@ int main(int argc, char* argv[]) {
                                               next_block_id, palette_scroll_offset, text_state);
                         }
                     }
+                    
                     break;
 
                 case SDL_MOUSEBUTTONUP:
@@ -632,6 +682,48 @@ int main(int argc, char* argv[]) {
                         if (text_state.active) {
                             on_key_input(text_state, event.key.keysym.sym, blocks);
                         } else {
+                            SDL_Keycode keycode = event.key.keysym.sym;
+                            const char* keyName = SDL_GetKeyName(keycode);
+                            std::string keyStr = (keyName) ? keyName : "";
+                            
+                            for (auto & c: keyStr) c = tolower(c);
+                            
+                            register_all_definitions(blocks);
+                            
+                            for (Block& b : blocks) {
+                                if (b.type == CMD_EVENT_KEY) {
+                                    bool match = false;
+                                    
+                                    if (!b.args.empty()) {
+                                        std::string target = b.args[0];
+                                        for (auto & c: target) c = tolower(c); 
+                                        
+                                        if (target == "any") {
+                                            match = true;
+                                        }
+                                        else if (target == "space" && keycode == SDLK_SPACE) {
+                                            match = true;
+                                        }
+                                        else if (target == "up arrow" && keycode == SDLK_UP) match = true;
+                                        else if (target == "down arrow" && keycode == SDLK_DOWN) match = true;
+                                        else if (target == "left arrow" && keycode == SDLK_LEFT) match = true;
+                                        else if (target == "right arrow" && keycode == SDLK_RIGHT) match = true;
+                                        else if (keyStr == target) {
+                                            match = true;
+                                        }
+                                    }
+                                    
+                                    if (match) {
+                                        if (b.next) {
+                                            Runtime rt;
+                                            runtime_init(&rt, b.next, &sprite);
+                                            runtime_start(&rt);
+                                            activeRuntimes.push_back(rt);
+                                            log_info("EVENT: Started script from CMD_EVENT_KEY (" + b.args[0] + ")");
+                                        }
+                                    }
+                                }
+                            }
                                 if (event.key.keysym.sym == SDLK_e) {
                                     if (sprite.currentCostumeIndex >= 0 && sprite.currentCostumeIndex < (int)sprite.costumes.size()) {
                                         ceditor_open(&g_costume_editor, sprite.currentCostumeIndex, sprite.costumes[sprite.currentCostumeIndex].texture, renderer);
