@@ -236,19 +236,16 @@ static void draw_section_header(SDL_Renderer* r, const std::string& title,
 static void draw_data_row_rounded(SDL_Renderer* r, const std::string& label, const std::string& value,
                                     int x, int y, int w, int h, bool alt, PanelColor dotColor,
                                     bool isFirst, bool isLast) {
-    int topRad = isFirst ? 5 : 0;
-    int botRad = isLast  ? 5 : 0;
-
     PanelColor bg = alt ? COL_BG_ROW_B : COL_BG_ROW_A;
 
-    if (topRad > 0 && botRad > 0) {
+    if (isFirst && isLast) {
         fill_rounded_rect(r, x, y, w, h, 5, bg);
-    } else if (topRad > 0) {
-        fill_rounded_rect(r, x, y, w, h + 5, 5, bg);
-        fill_rect(r, x, y + h - 5, w, 5, bg);
-    } else if (botRad > 0) {
-        fill_rounded_rect(r, x, y - 5, w, h + 5, 5, bg);
+    } else if (isFirst) {
+        fill_rounded_rect(r, x, y, w, h + 10, 5, bg);
+        fill_rect(r, x, y + h - 1, w, 1, bg);
+    } else if (isLast) {
         fill_rect(r, x, y, w, 5, bg);
+        fill_rounded_rect(r, x, y, w, h, 5, bg);
     } else {
         fill_rect(r, x, y, w, h, bg);
     }
@@ -265,6 +262,7 @@ static void draw_data_row_rounded(SDL_Renderer* r, const std::string& label, con
         draw_text_right(r, s_panelFont, value, x + w - 12, y + (h - 13) / 2, COL_TEXT_VALUE);
     }
 }
+
 
 static std::string float_to_str(float v, int decimals = 1) {
     char buf[64];

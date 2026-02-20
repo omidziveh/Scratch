@@ -660,7 +660,7 @@ int main(int argc, char* argv[]) {
 
                 case MENU_ACTION_LOAD:
                     g_pending_action = MENU_ACTION_LOAD;
-                    cdialog_show(&g_dialog, "Load Project", "Load project? Unsaved changes will be lost.");
+                    cdialog_show(&g_dialog, "Load Project", "Load? Unsaved changes will be lost.");
                     break;
 
             case MENU_ACTION_EXIT:
