@@ -355,7 +355,7 @@ struct ExecutionContext {
     bool    lastCondition;
     std::string lastStringResult;
     Runtime* runtime;
-
+    bool hasError = false;
     ExecutionContext()
         : sprite(nullptr)
         , stage(nullptr)

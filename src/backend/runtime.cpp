@@ -17,12 +17,17 @@ float evaluate_block_argument(Runtime* rt, Block* host, int argIndex) {
 
     if (argIndex < (int)host->argBlocks.size() && host->argBlocks[argIndex] != nullptr) {
         Block* subBlock = host->argBlocks[argIndex];
-        
+
         execute_block(rt, subBlock, rt->stage);
         float result = rt->lastResult;
 
+        if (rt->lastError && rt->targetSprite) {
+            rt->targetSprite->sayText = rt->lastErrorMessage;
+            rt->targetSprite->sayStartTime = SDL_GetTicks();
+            rt->lastError = false;
+            rt->lastErrorMessage = "";
+        }
         subBlock->is_running = false;
-
         return result;
     }
 
@@ -32,6 +37,7 @@ float evaluate_block_argument(Runtime* rt, Block* host, int argIndex) {
 
     return 0.0f;
 }
+
 
 std::string resolve_string_variable(Runtime* rt, const std::string& arg) {
 if (!rt || !rt->targetSprite) return arg;
@@ -587,26 +593,33 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
         }
         case CMD_SAY: {
             std::string msg = "Hello!";
-            
+
             if (!b->argBlocks.empty() && b->argBlocks[0]) {
                 execute_block(rt, b->argBlocks[0], stage);
+                
+                if (rt->targetSprite && rt->targetSprite->sayText.find("Error!") == 0) {
+                    log_info("Sprite shows error: " + rt->targetSprite->sayText);
+                    b->argBlocks[0]->is_running = false;
+                    break;
+                }                
                 if (!rt->lastStringResult.empty()) {
                     msg = rt->lastStringResult;
                 } else {
                     msg = std::to_string(rt->lastResult);
                 }
-                
+
                 b->argBlocks[0]->is_running = false;
-            } 
+            }
             else if (!b->args.empty()) {
                 msg = resolve_string_variable(rt, b->args[0]);
             }
-            
+
             rt->targetSprite->sayText = msg;
             rt->targetSprite->sayStartTime = SDL_GetTicks();
             log_info("Sprite says: " + msg);
             break;
         }
+
         case CMD_REPEAT: {
             int times = (int)evaluate_block_argument(rt, b, 0);
             if (times <= 0) {

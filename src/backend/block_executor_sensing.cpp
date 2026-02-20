@@ -78,7 +78,17 @@ bool execute_operator_block(Block* block, ExecutionContext& ctx) {
             if (ctx.runtime) {
                  return resolve_argument(ctx.runtime, block->args[idx]);
             }
-            try { return std::stof(block->args[idx]); } catch (...) { return 0.0f; }
+            try { 
+                return std::stof(block->args[idx]); 
+            } catch (...) { 
+                if (ctx.runtime && ctx.runtime->targetSprite) {
+                    ctx.runtime->targetSprite->sayText = "Error: Invalid number '" + block->args[idx] + "'";
+                    ctx.runtime->targetSprite->sayStartTime = SDL_GetTicks();
+                }
+                log_error("Invalid numeric input: " + block->args[idx]);
+                return 0.0f; 
+            }
+
         }
         return 0.0f;
     };
@@ -116,14 +126,46 @@ bool execute_operator_block(Block* block, ExecutionContext& ctx) {
         case OP_ADD: ctx.lastResult = op_add(getFloat(0), getFloat(1)); return true;
         case OP_SUB: ctx.lastResult = op_sub(getFloat(0), getFloat(1)); return true;
         case OP_MUL: ctx.lastResult = op_mul(getFloat(0), getFloat(1)); return true;
-        case OP_DIV: ctx.lastResult = op_div(getFloat(0), getFloat(1), success); return true;
-        case OP_MOD: ctx.lastResult = op_mod(getFloat(0), getFloat(1), success); return true;
+        case OP_DIV: {
+            float a = getFloat(0);
+            float b = getFloat(1);
+            ctx.lastResult = op_div(a, b, success);
+            if (!success && ctx.runtime && ctx.runtime->targetSprite) {
+                ctx.runtime->targetSprite->sayText = "Error! Division by zero";
+                ctx.runtime->targetSprite->sayStartTime = SDL_GetTicks();
+                ctx.runtime->targetSprite->sayDuration = 3000;
+                log_error("Division by zero");
+            }
+            return true;
+        }
 
-        // Math Unary
+        case OP_MOD: {
+            float a = getFloat(0);
+            float b = getFloat(1);
+            ctx.lastResult = op_mod(a, b, success);
+            if (!success && ctx.runtime && ctx.runtime->targetSprite) {
+                ctx.runtime->targetSprite->sayText = "Error! Division by zero";
+                ctx.runtime->targetSprite->sayStartTime = SDL_GetTicks();
+                ctx.runtime->targetSprite->sayDuration = 3000;
+                log_error("Mod by zero");
+            }
+            return true;
+        }
         case OP_ABS:   ctx.lastResult = op_abs(getFloat(0)); return true;
         case OP_FLOOR: ctx.lastResult = op_floor(getFloat(0)); return true;
         case OP_CEIL:  ctx.lastResult = op_ceil(getFloat(0)); return true;
-        case OP_SQRT:  ctx.lastResult = op_sqrt(getFloat(0), success); return true;
+        case OP_SQRT: {
+            float a = getFloat(0);
+            ctx.lastResult = op_sqrt(a, success);
+            if (!success && ctx.runtime && ctx.runtime->targetSprite) {
+                ctx.runtime->targetSprite->sayText = "Error! Sqrt of negative";
+                ctx.runtime->targetSprite->sayStartTime = SDL_GetTicks();
+                ctx.runtime->targetSprite->sayDuration = 3000;
+                log_error("Sqrt of negative");
+            }
+            return true;
+        }
+
         case OP_SIN:   ctx.lastResult = op_sin(getFloat(0)); return true;
         case OP_COS:   ctx.lastResult = op_cos(getFloat(0)); return true;
 

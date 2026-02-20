@@ -39,6 +39,8 @@ struct Runtime {
     std::string lastStringResult;
     std::vector<Block*> callStack;
     std::vector<std::map<std::string, std::string>> scopeStack;
+    bool lastError = false;
+    std::string lastErrorMessage = "";
 };
 
 void runtime_init(Runtime* rt, Block* head, Sprite* sprite);
