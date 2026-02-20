@@ -1,4 +1,4 @@
-# Scratch-like Visual Programming Environment
+# Blocky: Scratch-like Visual Programming Environment
 
 A desktop application implementing a visual programming environment similar to Scratch, built entirely in **C++** using the **SDL2** library. This project serves as a final project for the Fundamentals of Programming course, demonstrating object-oriented design, event-driven programming, and graphics rendering.
 
