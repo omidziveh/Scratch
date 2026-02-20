@@ -41,6 +41,9 @@ struct Runtime {
     std::vector<std::map<std::string, std::string>> scopeStack;
     bool lastError = false;
     std::string lastErrorMessage = "";
+    Block* lastExecutedBlock = nullptr;
+    int highlightDelayTicks = 0;       
+    int highlightDelayDuration = 60; 
 };
 
 void runtime_init(Runtime* rt, Block* head, Sprite* sprite);

@@ -178,6 +178,9 @@ void runtime_reset(Runtime* rt) {
     rt->ticksSinceLastWait = 0;
     rt->waitingForStep = false;
     rt->watchdogTriggered = false;
+    rt->lastExecutedBlock = nullptr;
+    rt->highlightDelayTicks = 0;
+
     rt->callStack.clear();
     rt->scopeStack.clear();
 }
@@ -264,6 +267,11 @@ void runtime_start(Runtime* rt) {
 }
 
 void runtime_stop(Runtime* rt) {
+    if (rt->lastExecutedBlock) {
+        rt->lastExecutedBlock->is_running = false;
+        rt->lastExecutedBlock = nullptr;
+    }
+    rt->highlightDelayTicks = 0;
     rt->state = RUNTIME_STOPPED;
     rt->waitingForStep = false;
     rt->watchdogTriggered = false;
@@ -380,22 +388,49 @@ void runtime_tick(Runtime* rt, Stage* stage, int mouseX, int mouseY) {
         return;
     }
 
+    if (rt->highlightDelayTicks > 0) {
+        rt->highlightDelayTicks--;
+        
+        if (rt->highlightDelayTicks == 0) {
+            if (rt->lastExecutedBlock) {
+                rt->lastExecutedBlock->is_running = false;
+                rt->lastExecutedBlock = nullptr;
+            }
+            advance_to_next_block(rt);
+            rt->totalTicksExecuted++;
+            rt->ticksSinceLastWait++;
+        }
+        return; 
+    }
+
+    
     if (rt->waitTicksRemaining > 0) {
         rt->waitTicksRemaining--;
         rt->ticksSinceLastWait = 0;
         
         if (rt->waitTicksRemaining == 0) {
+            if (rt->lastExecutedBlock) {
+                rt->lastExecutedBlock->is_running = false;
+                rt->lastExecutedBlock = nullptr;
+            }
             advance_to_next_block(rt);
         }
         return;
     }
 
+
     if (!rt->currentBlock) {
+        // خاموش کردن آخرین بلوک
+        if (rt->lastExecutedBlock) {
+            rt->lastExecutedBlock->is_running = false;
+            rt->lastExecutedBlock = nullptr;
+        }
         rt->state = RUNTIME_FINISHED;
         log_info("Program finished");
         return;
     }
 
+    
     if (runtime_check_watchdog(rt)) {
         rt->state = RUNTIME_STOPPED;
         rt->watchdogTriggered = true;
@@ -403,6 +438,7 @@ void runtime_tick(Runtime* rt, Stage* stage, int mouseX, int mouseY) {
         return;
     }
 
+  
     if (rt->currentBlock->hasBreakpoint) {
         rt->breakpointHit = true;
         rt->state = RUNTIME_PAUSED;
@@ -410,21 +446,30 @@ void runtime_tick(Runtime* rt, Stage* stage, int mouseX, int mouseY) {
         return;
     }
 
-    bool isLastBlock = (rt->currentBlock->next == nullptr && rt->loopStack.empty());
-    execute_block(rt, rt->currentBlock, stage);
-    if (isLastBlock) {
-        log_info("Last block");
-        rt->waitTicksRemaining = 30;
-    }
     
+    if (rt->lastExecutedBlock) {
+        rt->lastExecutedBlock->is_running = false;
+        rt->lastExecutedBlock = nullptr;
+    }
+
+    Block* current = rt->currentBlock;
+    
+    execute_block(rt, current, stage);
+
+    rt->lastExecutedBlock = current;
+
     if (rt->waitTicksRemaining > 0) {
         return;
     }
 
-    advance_to_next_block(rt);
-    rt->totalTicksExecuted++;
-    rt->ticksSinceLastWait++;
+    bool isLastBlock = (current->next == nullptr && rt->loopStack.empty());
+    if (isLastBlock) {
+        rt->highlightDelayTicks = rt->highlightDelayDuration;
+        return;
+    }
+    rt->highlightDelayTicks = rt->highlightDelayDuration;
 }
+
 
 bool runtime_check_watchdog(Runtime* rt) {
     if (rt->totalTicksExecuted >= rt->maxTicksAllowed) {
@@ -1030,13 +1075,14 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
     if (hasChanged) {
         clamp_sprite_to_stage(*rt->targetSprite, *stage);
     }
+    rt->lastExecutedBlock = b;
+
 }
 
 void advance_to_next_block(Runtime* rt) {
     if (!rt->currentBlock) return;
 
     Block* cur = rt->currentBlock;
-    cur->is_running = false;
 
     bool isLoopHeader = (cur->type == CMD_REPEAT || cur->type == CMD_IF);
 
