@@ -1,13 +1,13 @@
 #include "file_io.h"
 #include "memory.h"
 #include "../utils/logger.h"
+#include "../frontend/block_utils.h"
 #include <fstream>
 #include <sstream>
 #include <map>
-#include "../frontend/block_utils.h"
-#include <cmath>
-#include <cstdlib>
 #include <algorithm>
+#include <cstdlib>
+
 
 std::string blocktype_to_string(BlockType type) {
     switch (type) {
@@ -213,7 +213,7 @@ static void save_block_recursive(std::ofstream& file, Block* b, int parentId, in
     save_block_recursive(file, b->next, b->id, 1);
 }
 
-bool save_project(const std::string& filename, Block* head, const Sprite& sprite) {
+bool save_project(const std::string& filename, const std::list<Block>& blocks, const Sprite& sprite) {
     std::ofstream file(filename);
     if (!file.is_open()) {
         log_error("Cannot open file for writing: " + filename);
@@ -226,6 +226,13 @@ bool save_project(const std::string& filename, Block* head, const Sprite& sprite
          << sprite.y << " " 
          << sprite.angle << " "
          << sprite.visible << " "
+         << sprite.scale << " "
+         << sprite.volume << " "
+         << sprite.isPenDown << " "
+         << (int)sprite.penR << " "
+         << (int)sprite.penG << " "
+         << (int)sprite.penB << " "
+         << sprite.penSize << " "
          << sprite.currentCostumeIndex << "\n";
 
     // 2. Save Variables
@@ -234,24 +241,61 @@ bool save_project(const std::string& filename, Block* head, const Sprite& sprite
     }
 
     // 3. Save Blocks
-    save_block_recursive(file, head, -1, 1);
+    for (const auto& b : blocks) {
+        int parentId = -1;
+        int slot = -1; // 0=inner, 1=next, -1=root/arg
+
+        if (b.parent) {
+            parentId = b.parent->id;
+            if (b.parent->next == &b) slot = 1;
+            else if (b.parent->inner == &b) slot = 0;
+            else {
+                // It's an argument block. 
+                // We don't save this connection via PARENT line, 
+                // we rely on ARG_LINK from the host block to catch it.
+                parentId = -1; 
+            }
+        }
+
+        file << "BLOCK "
+             << b.id << " "
+             << blocktype_to_string(b.type) << " "
+             << b.x << " " << b.y << " "
+             << b.width << " " << b.height << " "
+             << parentId << " " << slot << " "
+             << b.args.size();
+
+        for (const auto& arg : b.args) {
+            file << " " << arg.length() << " " << arg;
+        }
+        file << "\n";
+
+        // Save Argument Block Links
+        for (size_t i = 0; i < b.argBlocks.size(); i++) {
+            if (b.argBlocks[i]) {
+                file << "ARG_LINK " << b.id << " " << i << " " << b.argBlocks[i]->id << "\n";
+            }
+        }
+    }
 
     file.close();
     log_success("Saved project to " + filename);
     return true;
 }
 
-Block* load_project(const std::string& filename, Sprite& sprite) {
+bool load_project(const std::string& filename, std::list<Block>& blocks, Sprite& sprite, int& next_block_id) {
     std::ifstream file(filename);
     if (!file.is_open()) {
         log_error("Cannot open file for reading: " + filename);
-        return nullptr;
+        return false;
     }
 
-    std::map<int, Block*> blocks;
-    std::vector<std::tuple<int, int, int>> links; // childId, parentId, slot
-    std::vector<std::tuple<int, int, int>> argLinks; // hostId, slot, childId
-
+    blocks.clear();
+    sprite.variables.clear();
+    
+    std::map<int, Block*> idToPointer;
+    std::vector<std::tuple<int, int, int>> pendingLinks;
+    std::vector<std::tuple<int, int, int>> pendingArgLinks;
     std::string line;
     while (std::getline(file, line)) {
         std::stringstream ss(line);
@@ -259,7 +303,14 @@ Block* load_project(const std::string& filename, Sprite& sprite) {
         ss >> type;
 
         if (type == "SPRITE") {
-            ss >> sprite.x >> sprite.y >> sprite.angle >> sprite.visible >> sprite.currentCostumeIndex;
+            int r, g, b;
+            ss >> sprite.x >> sprite.y >> sprite.angle >> sprite.visible 
+               >> sprite.scale >> sprite.volume >> sprite.isPenDown
+               >> r >> g >> b >> sprite.penSize >> sprite.currentCostumeIndex;
+            
+            sprite.penR = (Uint8)r;
+            sprite.penG = (Uint8)g;
+            sprite.penB = (Uint8)b;
         } 
         else if (type == "VAR") {
             std::string name, value;
@@ -274,75 +325,86 @@ Block* load_project(const std::string& filename, Sprite& sprite) {
 
             ss >> id >> typeStr >> x >> y >> w >> h >> parentId >> slot >> argCount;
 
-            Block* b = create_block(string_to_blocktype(typeStr));
+            blocks.push_back(Block()); 
+            Block* b = &blocks.back();
+            
             b->id = id;
+            b->type = string_to_blocktype(typeStr);
             b->x = x;
             b->y = y;
             b->width = w;
             b->height = h;
-            b->args.clear();
-            b->argBlocks.resize(get_arg_count(b->type), nullptr);
-
+            b->color = block_get_color(b->type);
+            
+            int expectedArgs = get_arg_count(b->type);
+            if (expectedArgs > 0) b->argBlocks.resize(expectedArgs, nullptr);
+            
             for (int i = 0; i < argCount; i++) {
-                std::string arg;
-                ss >> arg;
+                size_t len;
+                ss >> len;
+                ss.ignore(1); 
+                
+                std::string arg(len, ' ');
+                ss.read(&arg[0], len);
                 b->args.push_back(arg);
             }
 
-            blocks[id] = b;
+            idToPointer[id] = b;
             if (parentId != -1) {
-                links.push_back({id, parentId, slot});
+                pendingLinks.push_back({id, parentId, slot});
             }
         }
         else if (type == "ARG_LINK") {
             int hostId, slot, childId;
             ss >> hostId >> slot >> childId;
-            argLinks.push_back({hostId, slot, childId});
+            pendingArgLinks.push_back({hostId, slot, childId});
         }
     }
 
-    for (auto& link : links) {
+    for (auto& link : pendingLinks) {
         int childId = std::get<0>(link);
         int parentId = std::get<1>(link);
         int slot = std::get<2>(link);
 
-        if (blocks.find(childId) != blocks.end() && blocks.find(parentId) != blocks.end()) {
-            Block* child = blocks[childId];
-            Block* parent = blocks[parentId];
+        if (idToPointer.count(childId) && idToPointer.count(parentId)) {
+            Block* child = idToPointer[childId];
+            Block* parent = idToPointer[parentId];
             
             child->parent = parent;
             if (slot == 0) parent->inner = child;
-            else parent->next = child;
+            else if (slot == 1) parent->next = child;
         }
     }
 
-    for (auto& link : argLinks) {
+    for (auto& link : pendingArgLinks) {
         int hostId = std::get<0>(link);
         int slot = std::get<1>(link);
         int childId = std::get<2>(link);
 
-        if (blocks.count(hostId) && blocks.count(childId)) {
-            Block* host = blocks[hostId];
-            Block* child = blocks[childId];
-            if (slot < (int)host->argBlocks.size()) {
-                host->argBlocks[slot] = child;
-                child->parent = host;
-                child->is_snapped = true;
+        if (idToPointer.count(hostId) && idToPointer.count(childId)) {
+            Block* host = idToPointer[hostId];
+            Block* child = idToPointer[childId];
+            
+            if (slot >= (int)host->argBlocks.size()) {
+                host->argBlocks.resize(slot + 1, nullptr);
             }
+            
+            host->argBlocks[slot] = child;
+            child->parent = host;
+            child->is_snapped = true;
         }
     }
 
     file.close();
     
-    if (!blocks.empty()) {
-        auto last = blocks.rbegin();
-        reset_block_counter(last->first + 1);
+    if (!idToPointer.empty()) {
+        auto last = idToPointer.rbegin();
+        next_block_id = last->first + 1;
+        reset_block_counter(next_block_id);
+    } else {
+        next_block_id = 1;
     }
 
     log_success("Loaded project from " + filename);
-    
-    for (auto& pair : blocks) {
-        if (pair.second->parent == nullptr) return pair.second;
-    }
-    return nullptr;
+    return true;
 }

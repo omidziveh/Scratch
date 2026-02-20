@@ -1,5 +1,6 @@
 #include "runtime.h"
 #include "../utils/logger.h"
+#include "../utils/system_logger.h"
 #include "../common/globals.h"
 #include <cmath>
 #include <cstdlib>
@@ -14,6 +15,7 @@
 #include <cstdlib>
 #include <cmath>
 #include <ctime>
+#include "../frontend/block_utils.h"
 
 float evaluate_block_argument(Runtime* rt, Block* host, int argIndex) {
     if (!host) return 0.0f;
@@ -43,53 +45,53 @@ float evaluate_block_argument(Runtime* rt, Block* host, int argIndex) {
 
 
 std::string resolve_string_variable(Runtime* rt, const std::string& arg) {
-if (!rt || !rt->targetSprite) return arg;
+    if (!rt || !rt->targetSprite) return arg;
 
-if (arg.find('%') == std::string::npos) {
-return arg;
-}
+    if (arg.find('%') == std::string::npos) {
+        return arg;
+    }
 
-std::string result;
-result.reserve(arg.size());
-size_t i = 0;
+    std::string result;
+    result.reserve(arg.size());
+    size_t i = 0;
 
-while (i < arg.length()) {
-if (arg[i] == '%') {
-size_t start = i + 1;
-size_t end = start;
+    while (i < arg.length()) {
+        if (arg[i] == '%') {
+            size_t start = i + 1;
+            size_t end = start;
 
-while (end < arg.length() && (isalnum(arg[end]) || arg[end] == '_')) {
-end++;
-}
+            while (end < arg.length() && (isalnum(arg[end]) || arg[end] == '_')) {
+                end++;
+            }
 
-if (end > start) {
-std::string varName = arg.substr(start, end - start);
-bool found = false;
+            if (end > start) {
+                std::string varName = arg.substr(start, end - start);
+                bool found = false;
 
-for (const auto& var : rt->targetSprite->variables) {
-if (var.name == varName) {
-result += var.value;
-found = true;
-break;
-}
-}
+                for (const auto& var : rt->targetSprite->variables) {
+                    if (var.name == varName) {
+                        result += var.value;
+                        found = true;
+                        break;
+                    }
+                }
 
-if (!found) {
-result += arg.substr(i, end - i);
-}
+                if (!found) {
+                    result += arg.substr(i, end - i);
+                }
 
-i = end;
-} else {
-result += '%';
-i++;
-}
-} else {
-result += arg[i];
-i++;
-}
-}
+                i = end;
+            } else {
+                result += '%';
+                i++;
+            }
+        } else {
+            result += arg[i];
+            i++;
+        }
+    }
 
-return result;
+    return result;
 }
 
 float resolve_argument(Runtime* rt, const std::string& arg) {
@@ -102,15 +104,15 @@ float resolve_argument(Runtime* rt, const std::string& arg) {
             return val;
         }
     } catch (...) {
-}
+    }
 
-std::string resolved = resolve_string_variable(rt, arg);
+    std::string resolved = resolve_string_variable(rt, arg);
 
-            try {
-return std::stof(resolved);
-            } catch (...) {
-                return 0.0f;
-        }
+    try {
+        return std::stof(resolved);
+    } catch (...) {
+        return 0.0f;
+    }
 }
 
 void sprite_set_variable(Sprite* sprite, const std::string& name, const std::string& value) {
@@ -414,13 +416,16 @@ void runtime_tick(Runtime* rt, Stage* stage, int mouseX, int mouseY) {
                 rt->lastExecutedBlock = nullptr;
             }
             advance_to_next_block(rt);
+            
+            if (rt->stepMode) {
+                rt->waitingForStep = true;
+            }
         }
         return;
     }
 
 
     if (!rt->currentBlock) {
-        // خاموش کردن آخرین بلوک
         if (rt->lastExecutedBlock) {
             rt->lastExecutedBlock->is_running = false;
             rt->lastExecutedBlock = nullptr;
@@ -463,11 +468,16 @@ void runtime_tick(Runtime* rt, Stage* stage, int mouseX, int mouseY) {
     }
 
     bool isLastBlock = (current->next == nullptr && rt->loopStack.empty());
-    if (isLastBlock) {
+    
+    if (rt->stepMode) {
+        rt->waitingForStep = true;
+    } else {
+        if (isLastBlock) {
+            rt->highlightDelayTicks = rt->highlightDelayDuration;
+            return;
+        }
         rt->highlightDelayTicks = rt->highlightDelayDuration;
-        return;
     }
-    rt->highlightDelayTicks = rt->highlightDelayDuration;
 }
 
 
@@ -542,7 +552,7 @@ bool evaluate_condition(Runtime* rt, Block* b) {
         } else if (b->args[0] == "y" && rt->targetSprite) {
             left = rt->targetSprite->y;
         } else {
-left = resolve_argument(rt, b->args[0]);
+            left = resolve_argument(rt, b->args[0]);
         }
 
         if (b->args[2] == "x" && rt->targetSprite) {
@@ -550,7 +560,7 @@ left = resolve_argument(rt, b->args[0]);
         } else if (b->args[2] == "y" && rt->targetSprite) {
             right = rt->targetSprite->y;
         } else {
-right = resolve_argument(rt, b->args[2]);
+            right = resolve_argument(rt, b->args[2]);
         }
 
         if (op == ">" || op == "gt") return left > right;
@@ -570,6 +580,8 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
     b->has_executed = true;
     b->is_running = true;
     b->glow_start_time = SDL_GetTicks();
+
+    syslog_log(b->id, block_get_label(b->type));
 
     for (size_t i = 0; i < rt->loopStack.size(); i++) {
         rt->loopStack[i].ticksWithoutWait++;
@@ -664,6 +676,7 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
 
             rt->targetSprite->sayText = msg;
             rt->targetSprite->sayStartTime = SDL_GetTicks();
+            rt->targetSprite->sayDuration = -1.0f;
             log_info("Sprite says: " + msg);
             break;
         }

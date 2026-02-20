@@ -11,6 +11,7 @@
 #include <fstream>
 #include <cstdlib>
 #include <cstring>
+#include <sstream>
 #include "frontend/sprite_panel.h"
 #include "common/definitions.h"
 #include "common/globals.h"
@@ -72,147 +73,6 @@ void init_program(SDL_Renderer& renderer) {
     ceditor_init(&g_costume_editor, &renderer, 50, 50);
     sound_manager_init(&renderer, WINDOW_WIDTH/2 - 100, WINDOW_HEIGHT/2 - 200, 200, 400);
     // sound_manager_set_visible(true);
-}
-
-static void save_project(const char* filename,
-                         const std::list<Block>& blocks,
-                         const Sprite& sprite)
-{
-    std::ofstream file(filename, std::ios::binary);
-    if (!file.is_open()) {
-        log_warning("SAVE: Failed to open file for saving");
-        return;
-    }
-
-    int count = (int)blocks.size();
-    file.write(reinterpret_cast<const char*>(&count), sizeof(count));
-
-    for (const auto& b : blocks) {
-        file.write(reinterpret_cast<const char*>(&b.id),   sizeof(b.id));
-        file.write(reinterpret_cast<const char*>(&b.type), sizeof(b.type));
-        file.write(reinterpret_cast<const char*>(&b.x),    sizeof(b.x));
-        file.write(reinterpret_cast<const char*>(&b.y),    sizeof(b.y));
-
-        int argCount = (int)b.args.size();
-        file.write(reinterpret_cast<const char*>(&argCount), sizeof(argCount));
-        for (const auto& arg : b.args) {
-            int len = (int)arg.size();
-            file.write(reinterpret_cast<const char*>(&len), sizeof(len));
-            file.write(arg.c_str(), len);
-        }
-    }
-
-    int varCount = (int)sprite.variables.size();
-    file.write(reinterpret_cast<const char*>(&varCount), sizeof(varCount));
-    for (const auto& var : sprite.variables) {
-        int len = (int)var.name.size();
-        file.write(reinterpret_cast<const char*>(&len), sizeof(len));
-        file.write(var.name.c_str(), len);
-        
-        len = (int)var.value.size();
-        file.write(reinterpret_cast<const char*>(&len), sizeof(len));
-        file.write(var.value.c_str(), len);
-    }
-
-    file.write(reinterpret_cast<const char*>(&sprite.x),     sizeof(sprite.x));
-    file.write(reinterpret_cast<const char*>(&sprite.y),     sizeof(sprite.y));
-    file.write(reinterpret_cast<const char*>(&sprite.angle), sizeof(sprite.angle));
-    file.write(reinterpret_cast<const char*>(&sprite.visible), sizeof(sprite.visible));
-    file.write(reinterpret_cast<const char*>(&sprite.currentCostumeIndex),
-               sizeof(sprite.currentCostumeIndex));
-
-    file.close();
-    log_info("SAVE: Project saved with variables");
-}
-
-static bool load_project(const char* filename,
-                          std::list<Block>& blocks,
-                          Sprite& sprite,
-                          int& next_block_id)
-{
-    std::ifstream file(filename, std::ios::binary);
-    if (!file.is_open()) {
-        log_warning("LOAD: Failed to open file for loading");
-        return false;
-    }
-
-    blocks.clear();
-    next_block_id = 1;
-
-    int count = 0;
-    file.read(reinterpret_cast<char*>(&count), sizeof(count));
-    std::map<int, Block*> idToPointer;
-    std::vector<std::pair<Block*, int>> pendingConnectionsNext;
-    std::vector<std::pair<Block*, int>> pendingConnectionsInner;
-    std::vector<std::pair<Block*, int>> pendingConnectionsParent;
-
-    for (int i = 0; i < count; i++) {
-        Block b;
-        file.read(reinterpret_cast<char*>(&b.id),   sizeof(b.id));
-        file.read(reinterpret_cast<char*>(&b.type), sizeof(b.type));
-        file.read(reinterpret_cast<char*>(&b.x),    sizeof(b.x));
-        file.read(reinterpret_cast<char*>(&b.y),    sizeof(b.y));
-
-        b.is_running = false;
-        b.glow_start_time = 0;
-        b.next = nullptr;
-        b.inner = nullptr;
-        b.parent = nullptr;
-
-        int argCount = 0;
-        file.read(reinterpret_cast<char*>(&argCount), sizeof(argCount));
-        for (int j = 0; j < argCount; j++) {
-            int len = 0;
-            file.read(reinterpret_cast<char*>(&len), sizeof(len));
-            std::string arg(len, '\0');
-            file.read(&arg[0], len);
-            b.args.push_back(arg);
-        }
-
-        blocks.push_back(b);
-        Block& added = blocks.back();
-        idToPointer[added.id] = &added;
-
-        if (added.id >= next_block_id) {
-            next_block_id = added.id + 1;
-        }
-    }
-
-    file.read(reinterpret_cast<char*>(&sprite.x),     sizeof(sprite.x));
-    file.read(reinterpret_cast<char*>(&sprite.y),     sizeof(sprite.y));
-    file.read(reinterpret_cast<char*>(&sprite.angle), sizeof(sprite.angle));
-    file.read(reinterpret_cast<char*>(&sprite.visible), sizeof(sprite.visible));
-    file.read(reinterpret_cast<char*>(&sprite.currentCostumeIndex),
-              sizeof(sprite.currentCostumeIndex));
-
-    if (sprite.currentCostumeIndex >= 0 &&
-        sprite.currentCostumeIndex < (int)sprite.costumes.size()) {
-        sprite.texture = sprite.costumes[sprite.currentCostumeIndex].texture;
-        sprite.width   = sprite.costumes[sprite.currentCostumeIndex].width;
-        sprite.height  = sprite.costumes[sprite.currentCostumeIndex].height;
-    }
-
-    int varCount = 0;
-    file.read(reinterpret_cast<char*>(&varCount), sizeof(varCount));
-    sprite.variables.clear();
-    for (int i = 0; i < varCount; i++) {
-        Variable var;
-        int len = 0;
-        
-        file.read(reinterpret_cast<char*>(&len), sizeof(len));
-        var.name.resize(len);
-        file.read(&var.name[0], len);
-        
-        file.read(reinterpret_cast<char*>(&len), sizeof(len));
-        var.value.resize(len);
-        file.read(&var.value[0], len);
-        
-        sprite.variables.push_back(var);
-    }
-
-    file.close();
-    log_info("LOAD: Project loaded with variables");
-    return true;
 }
 
 static void new_project(std::list<Block>& blocks,
@@ -480,11 +340,12 @@ int main(int argc, char* argv[]) {
                                 } else if (g_pending_action == MENU_ACTION_LOAD) {
                                     activeRuntimes.clear();
                                     blocks.clear();
-                                    {
-                                        load_project("project.scratch", blocks, sprite, next_block_id);
+                                    if (load_project("project.scratch", blocks, sprite, next_block_id)) {
                                         g_execution_index = -1;
                                         g_is_executing = false;
                                         log_info("LOAD: Project loaded successfully");
+                                    } else {
+                                        log_error("LOAD: Failed to load project");
                                     }
                                 }
                             }
@@ -764,6 +625,12 @@ int main(int argc, char* argv[]) {
                     break;
             }
         }
+
+        if (!sprite.sayText.empty() && sprite.sayDuration > 0) {
+            if ((float)(SDL_GetTicks() - sprite.sayStartTime) > (sprite.sayDuration * 1000.0f)) {
+                sprite.sayText.clear();
+            }
+        }
         
         if (!g_costume_editor.is_open && g_costume_editor.target_costume_index != -1) {
             SDL_Texture* result = ceditor_get_result(&g_costume_editor);
@@ -783,27 +650,18 @@ int main(int argc, char* argv[]) {
                 cdialog_show(&g_dialog, "New Project", "Create new project?");
                 break;
 
-            case MENU_ACTION_SAVE:
-                if (!blocks.empty()) {
-                    Block* headToSave = nullptr;
-                    for(auto& b : blocks) {
-                        if(!b.parent) {
-                            headToSave = &b;
-                            break;
-                        }
-                    }
-                    if(headToSave) {
+                case MENU_ACTION_SAVE:
+                    if (!blocks.empty()) {
                         save_project("project.scratch", blocks, sprite);
+                    } else {
+                        log_warning("SAVE: No blocks to save");
                     }
-                } else {
-                    log_warning("SAVE: No blocks to save");
-                }
-                break;
+                    break;
 
-            case MENU_ACTION_LOAD:
-                g_pending_action = MENU_ACTION_LOAD;
-                cdialog_show(&g_dialog, "Load Project", "Load project? Unsaved changes will be lost.");
-                break;
+                case MENU_ACTION_LOAD:
+                    g_pending_action = MENU_ACTION_LOAD;
+                    cdialog_show(&g_dialog, "Load Project", "Load project? Unsaved changes will be lost.");
+                    break;
 
             case MENU_ACTION_EXIT:
                 g_pending_action = MENU_ACTION_EXIT;
@@ -812,19 +670,34 @@ int main(int argc, char* argv[]) {
 
             case MENU_ACTION_SYSTEM_LOGGER:
                 syslog_toggle();
+                syslog_log(0, "UI: Logger Toggled");
                 break;
 
-            case MENU_ACTION_DEBUG_INFO:
-                log_info("DEBUG: Blocks=" + std::to_string(blocks.size()) +
-                         " Sprite=(" + std::to_string((int)sprite.x) + "," +
-                         std::to_string((int)sprite.y) + ")" +
-                         " Angle=" + std::to_string((int)sprite.angle) +
-                         " Variables=" + std::to_string(sprite.variables.size()));
-                break;
+            case MENU_ACTION_DEBUG_INFO: {
+                std::stringstream debug;
+                debug << "Blocks=" << blocks.size() 
+                      << " X=" << (int)sprite.x 
+                      << " Y=" << (int)sprite.y
+                      << " Angle=" << (int)sprite.angle;
+                
+                syslog_log(0, "DEBUG: " + debug.str());
 
-            case MENU_ACTION_ABOUT:
-                log_info("ABOUT: Blocky v1.0 - Scratch Clone built with SDL2");
+                sprite.sayText = debug.str();
+                sprite.sayStartTime = SDL_GetTicks();
+                sprite.sayDuration = 3.0f;
                 break;
+            }
+
+            case MENU_ACTION_ABOUT: {
+                std::string msg = "Blocky v1.0 - SDL2 Clone";
+
+                syslog_log(0, "ABOUT: " + msg);
+
+                sprite.sayText = msg;
+                sprite.sayStartTime = SDL_GetTicks();
+                sprite.sayDuration = 3.0f;
+                break;
+            }
 
             case MENU_ACTION_NONE:
             default:

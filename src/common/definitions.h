@@ -174,6 +174,9 @@ struct Sprite {
         , penG(0)
         , penB(255)
         , penSize(1)
+        , sayText("")
+        , sayStartTime(0)
+        , sayDuration(-1.0f)
     {}
 };
 

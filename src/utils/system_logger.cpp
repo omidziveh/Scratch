@@ -75,7 +75,7 @@ void syslog_render(SDL_Renderer* renderer) {
     hlineRGBA(renderer, bx + 5, bx + bw - 5, by + 22, 0, 255, 0, 200);
 
     if (entry_count == 0) {
-        draw_text(renderer, bx + 10, by + 50, "No blocks executed", COLOR_GRAY);
+        draw_text(renderer, bx + 10, by + 50, "No actions recorded", COLOR_GRAY);
         return;
     }
 
