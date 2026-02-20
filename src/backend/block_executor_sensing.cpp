@@ -52,6 +52,18 @@ bool execute_sensing_block(Block* block, ExecutionContext& ctx) {
             log_info("Timer reset");
             return true;
         }
+        case SENSE_DISTANCE_TO_MOUSE: {
+            float spriteX = ctx.sprite->x;
+            float spriteY = ctx.sprite->y;
+            float mouseX = (float)ctx.mouseX;
+            float mouseY = (float)ctx.mouseY;
+            float ddx = spriteX - mouseX;
+            float ddy = spriteY - mouseY;
+            ctx.lastResult = sqrt(ddx * ddx + ddy * ddy);
+            log_info("Sensing: distance to mouse = " + std::to_string((int)ctx.lastResult));
+            return true;
+        }
+
         default:
             return false;
     }
@@ -187,12 +199,12 @@ bool execute_operator_block(Block* block, ExecutionContext& ctx) {
         }
         case OP_STR_CHAR: {
             ctx.lastStringResult = op_str_char(getString(0), getFloat(1));
-            ctx.lastResult = ctx.lastStringResult.empty() ? 0.0f : 1.0f; 
+            ctx.lastResult = 0.0f ;
             return true;
         }
         case OP_STR_CONCAT: {
             ctx.lastStringResult = op_str_concat(getString(0), getString(1));
-            ctx.lastResult = (float)ctx.lastStringResult.length();
+            ctx.lastResult = 0.0f ;
             return true;
         }
         

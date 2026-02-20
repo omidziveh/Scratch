@@ -11,6 +11,9 @@
 #include "block_executor_looks.h"
 #include "custom_blocks.h"
 #include "../frontend/pen.h"
+#include <cstdlib>
+#include <cmath>
+#include <ctime>
 
 float evaluate_block_argument(Runtime* rt, Block* host, int argIndex) {
     if (!host) return 0.0f;
@@ -936,6 +939,93 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
 
             break;
         }
+        case CMD_GOTO_RANDOM: {
+            Sprite& sp = *rt->targetSprite;
+            float stageLeft = (float)STAGE_X;
+            float stageRight = (float)(STAGE_X + STAGE_WIDTH);
+            float stageTop = (float)STAGE_Y;
+            float stageBottom = (float)(STAGE_Y + STAGE_HEIGHT);
+
+            float marginX = (sp.width * sp.scale) / 2.0f;
+            float marginY = (sp.height * sp.scale) / 2.0f;
+
+            float minX = stageLeft + marginX;
+            float maxX = stageRight - marginX;
+            float minY = stageTop + marginY;
+            float maxY = stageBottom - marginY;
+
+            if (maxX > minX)
+                sp.x = minX + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / (maxX - minX)));
+            else
+                sp.x = (stageLeft + stageRight) / 2.0f;
+
+            if (maxY > minY)
+                sp.y = minY + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / (maxY - minY)));
+            else
+                sp.y = (stageTop + stageBottom) / 2.0f;
+
+            hasChanged = true;
+            log_info("Motion: go to random (" + std::to_string((int)sp.x) + ", " + std::to_string((int)sp.y) + ")");
+            break;
+        }
+
+        case CMD_GOTO_MOUSE: {
+            Sprite& sp = *rt->targetSprite;
+            int mx, my;
+            SDL_GetMouseState(&mx, &my);
+            float oldX = sp.x;
+            float oldY = sp.y;
+            sp.x = (float)mx;
+            sp.y = (float)my;
+            hasChanged = true;
+
+            if (sp.isPenDown && stage && stage->renderer) {
+                pen_draw_line(stage->renderer, oldX, oldY, sp.x, sp.y, sp);
+            }
+            log_info("Motion: go to mouse (" + std::to_string(mx) + ", " + std::to_string(my) + ")");
+            break;
+        }
+        case CMD_IF_ON_EDGE_BOUNCE: {
+            Sprite& sp = *rt->targetSprite;
+            float halfW = (sp.width * sp.scale) / 2.0f;
+            float halfH = (sp.height * sp.scale) / 2.0f;
+
+            float leftEdge = (float)STAGE_X;
+            float rightEdge = (float)(STAGE_X + STAGE_WIDTH);
+            float topEdge = (float)STAGE_Y;
+            float bottomEdge = (float)(STAGE_Y + STAGE_HEIGHT);
+
+            float rad = sp.angle * 3.14159265f / 180.0f;
+            float dx = sinf(rad);
+            float dy = -cosf(rad);
+            bool bounced = false;
+
+            if ((sp.x - halfW <= leftEdge && dx < 0) ||
+                (sp.x + halfW >= rightEdge && dx > 0)) {
+                dx = -dx;
+                bounced = true;
+                if (sp.x - halfW < leftEdge) sp.x = leftEdge + halfW;
+                if (sp.x + halfW > rightEdge) sp.x = rightEdge - halfW;
+            }
+
+            if ((sp.y - halfH <= topEdge && dy < 0) ||
+                (sp.y + halfH >= bottomEdge && dy > 0)) {
+                dy = -dy;
+                bounced = true;
+                if (sp.y - halfH < topEdge) sp.y = topEdge + halfH;
+                if (sp.y + halfH > bottomEdge) sp.y = bottomEdge - halfH;
+            }
+
+            if (bounced) {
+                sp.angle = atan2f(dx, -dy) * 180.0f / 3.14159265f;
+                if (sp.angle < 0) sp.angle += 360.0f;
+                hasChanged = true;
+                log_info("Motion: bounced, new angle = " + std::to_string((int)sp.angle));
+            }
+            break;
+        }
+
+
     }
     if (hasChanged) {
         clamp_sprite_to_stage(*rt->targetSprite, *stage);

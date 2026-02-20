@@ -257,7 +257,12 @@ enum BlockType {
 
     // Custom
     CMD_DEFINE_BLOCK,
-    CMD_CALL_BLOCK
+    CMD_CALL_BLOCK,
+    CMD_GOTO_RANDOM,
+    CMD_GOTO_MOUSE,
+    CMD_IF_ON_EDGE_BOUNCE,
+
+    SENSE_DISTANCE_TO_MOUSE,
 };
 
 struct Block {

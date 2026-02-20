@@ -42,11 +42,18 @@ BlockCategory get_block_category(BlockType type) {
             return CAT_PEN;
         case OP_ADD:
         case OP_SUB:
+        case CMD_GOTO_RANDOM:       
+        case CMD_GOTO_MOUSE:           
+        case CMD_IF_ON_EDGE_BOUNCE:   
+            return CAT_MOTION;
         case OP_DIV:
             return CAT_OPERATORS;
+        case OP_MUL:
         case CMD_SET_VAR:
         case CMD_CHANGE_VAR:
             return CAT_VARIABLES;
+        case SENSE_DISTANCE_TO_MOUSE: 
+            return CAT_SENSING;
         default:
             return CAT_NONE;
     }
@@ -101,6 +108,9 @@ void init_palette(std::vector<PaletteItem>& items) {
         {CMD_SET_Y,         "Set y to (0)"},
         {CMD_CHANGE_X,      "Change x by (10)"},
         {CMD_CHANGE_Y,      "Change y by (10)"},
+        {CMD_GOTO_RANDOM,       "Go to random pos"},     
+        {CMD_GOTO_MOUSE,        "Go to mouser"},       
+        {CMD_IF_ON_EDGE_BOUNCE, "If on edge, bounce"},   
         {CMD_REPEAT,        "Repeat (10)"},
         {CMD_IF,            "If <> then"},
         {CMD_WAIT,          "Wait (1) secs"},
@@ -126,6 +136,7 @@ void init_palette(std::vector<PaletteItem>& items) {
         {SENSE_MOUSE_Y,     "mouse y"},
         {SENSE_TIMER,       "timer"},
         {SENSE_RESET_TIMER, "reset timer"},
+        {SENSE_DISTANCE_TO_MOUSE,"Dist to mouse"}, 
         {OP_ADD,        "( + )"},
         {OP_SUB,        "( - )"},
         {OP_MUL,        "( * )"},

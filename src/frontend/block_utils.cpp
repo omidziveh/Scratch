@@ -70,6 +70,10 @@ std::string block_get_label(BlockType type) {
         case CMD_CALL_BLOCK:   return "Call [name] with:(val)";
         case CMD_EVENT_CLICK: return "When sprite clicked";
         case CMD_EVENT_KEY:   return "When [key] key pressed";
+        case CMD_GOTO_RANDOM: return "go to random pos";
+        case CMD_GOTO_MOUSE: return "go to mouse";
+        case CMD_IF_ON_EDGE_BOUNCE: return "if on edge, bounce";
+        case SENSE_DISTANCE_TO_MOUSE: return "Dist to mouse";
 
         default:           return "Unknown";
     }
@@ -213,7 +217,13 @@ SDL_Color block_get_color(BlockType type) {
         case CMD_DEFINE_BLOCK:
         case CMD_CALL_BLOCK:
             return COLOR_CUSTOM;
-        
+        case CMD_GOTO_RANDOM:
+        case CMD_GOTO_MOUSE:
+        case CMD_IF_ON_EDGE_BOUNCE:
+            return COLOR_MOTION;
+        case SENSE_DISTANCE_TO_MOUSE:
+            return COLOR_SENSING;
+
         default:
             return COLOR_GRAY;
     }
@@ -316,6 +326,10 @@ int get_arg_count(BlockType type) {
         case CMD_NONE:
         case CMD_EVENT_CLICK:
             return 0;
+        case CMD_GOTO_RANDOM: return 0;
+        case CMD_GOTO_MOUSE: return 0;
+        case CMD_IF_ON_EDGE_BOUNCE: return 0;
+        case SENSE_DISTANCE_TO_MOUSE: return 0;
 
         default:
             return 0;

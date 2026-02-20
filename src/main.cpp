@@ -275,6 +275,7 @@ void draw_variables(SDL_Renderer* renderer, const Sprite& sprite) {
 int main(int argc, char* argv[]) {
     (void)argc;
     (void)argv;
+    srand((unsigned int)time(nullptr));
 
     int  g_execution_index   = -1;
     bool g_is_executing      = false;

@@ -77,7 +77,11 @@ std::string blocktype_to_string(BlockType type) {
 
         case CMD_DEFINE_BLOCK: return "DEFINE_BLOCK";
         case CMD_CALL_BLOCK:   return "CALL_BLOCK";
-        
+        case CMD_GOTO_RANDOM: return "GOTO_RANDOM";
+        case CMD_GOTO_MOUSE: return "GOTO_MOUSE";
+        case CMD_IF_ON_EDGE_BOUNCE: return "IF_ON_EDGE_BOUNCE";
+        case SENSE_DISTANCE_TO_MOUSE: return "SENSE_DISTANCE_MOUSE";
+
         default: return "UNKNOWN";
     }
 }
@@ -96,7 +100,7 @@ BlockType string_to_blocktype(const std::string& str) {
     if (str == "SAY") return CMD_SAY;
     if (str == "START") return CMD_START;
     if (str == "EVENT_CLICK") return CMD_EVENT_CLICK;
-        if (str == "EVENT_KEY") return CMD_EVENT_KEY;
+    if (str == "EVENT_KEY") return CMD_EVENT_KEY;
     
     if (str == "SWITCH_COSTUME") return CMD_SWITCH_COSTUME;
     if (str == "NEXT_COSTUME") return CMD_NEXT_COSTUME;
@@ -152,6 +156,10 @@ BlockType string_to_blocktype(const std::string& str) {
 
     if (str == "DEFINE_BLOCK") return CMD_DEFINE_BLOCK;
     if (str == "CALL_BLOCK")   return CMD_CALL_BLOCK;
+    if (str == "GOTO_RANDOM") return CMD_GOTO_RANDOM;
+    if (str == "GOTO_MOUSE") return CMD_GOTO_MOUSE;
+    if (str == "IF_ON_EDGE_BOUNCE") return CMD_IF_ON_EDGE_BOUNCE;
+    if (str == "SENSE_DISTANCE_MOUSE") return SENSE_DISTANCE_TO_MOUSE;
 
     return CMD_NONE;
 }
