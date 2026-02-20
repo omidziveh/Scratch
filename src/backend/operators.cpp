@@ -90,6 +90,68 @@ float op_eq(float a, float b) {
 }
 
 // --- String ---
+float op_round(float a) {
+    return std::round(a);
+}
+
+float op_tan(float degrees) {
+    return std::tan(degrees * 3.14159265358979323846 / 180.0);
+}
+
+float op_asin(float a, bool& success) {
+    if (a < -1.0f || a > 1.0f) {
+        success = false;
+        return 0.0f;
+    }
+    success = true;
+    return std::asin(a) * 180.0 / 3.14159265358979323846;
+}
+
+float op_acos(float a, bool& success) {
+    if (a < -1.0f || a > 1.0f) {
+        success = false;
+        return 0.0f;
+    }
+    success = true;
+    return std::acos(a) * 180.0 / 3.14159265358979323846;
+}
+
+float op_atan(float a) {
+    return std::atan(a) * 180.0 / 3.14159265358979323846;
+}
+
+float op_ln(float a, bool& success) {
+    if (a <= 0.0f) {
+        success = false;
+        return 0.0f;
+    }
+    success = true;
+    return std::log(a);
+}
+
+float op_log(float a, bool& success) {
+    if (a <= 0.0f) {
+        success = false;
+        return 0.0f;
+    }
+    success = true;
+    return std::log10(a);
+}
+
+float op_e_pow(float a) {
+    return std::exp(a);
+}
+
+float op_ten_pow(float a) {
+    return std::pow(10.0f, a);
+}
+
+float op_random(float min, float max) {
+    if (min > max) std::swap(min, max);
+    float range = max - min;
+    float random = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
+    return min + random * range;
+}
 
 float op_str_len(const std::string& s) {
     return (float)s.length();

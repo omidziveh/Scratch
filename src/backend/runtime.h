@@ -14,6 +14,7 @@ struct LoopContext {
     Block* loopBlock;
     int remainingIterations;
     int ticksWithoutWait;
+    bool isRepeatUntil = false;
 };
 
 struct Runtime {

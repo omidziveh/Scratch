@@ -1069,6 +1069,28 @@ void execute_block(Runtime* rt, Block* b, Stage* stage) {
             }
             break;
         }
+        case CMD_FOREVER: {
+            if (b->inner) {
+                LoopContext ctx;
+                ctx.loopBlock = b;
+                ctx.remainingIterations = 999999; 
+                ctx.ticksWithoutWait = 0;
+                rt->loopStack.push_back(ctx);
+            }
+            break;
+        }
+        case CMD_REPEAT_UNTIL: {
+            bool condition = evaluate_condition(rt, b);
+            if (!condition && b->inner) {
+                LoopContext ctx;
+                ctx.loopBlock = b;
+                ctx.remainingIterations = 999999;
+                ctx.isRepeatUntil = true; 
+                ctx.ticksWithoutWait = 0;
+                rt->loopStack.push_back(ctx);
+            }
+            break;
+        }
 
 
     }
@@ -1084,7 +1106,7 @@ void advance_to_next_block(Runtime* rt) {
 
     Block* cur = rt->currentBlock;
 
-    bool isLoopHeader = (cur->type == CMD_REPEAT || cur->type == CMD_IF);
+    bool isLoopHeader = (cur->type == CMD_REPEAT || cur->type == CMD_IF || cur->type == CMD_REPEAT_UNTIL);
 
     if (isLoopHeader && !rt->loopStack.empty() && rt->loopStack.back().loopBlock == cur) {
         if (cur->inner) {
@@ -1105,12 +1127,12 @@ void advance_to_next_block(Runtime* rt) {
             return;
         } else {
             log_debug("Function has no body, returning immediately");
-            
+
             if (!rt->callStack.empty()) {
                 Block* returnTo = rt->callStack.back();
                 rt->callStack.pop_back();
                 pop_scope(rt);
-                
+
                 if (returnTo) {
                     rt->currentBlock = returnTo;
                     log_debug("Returning from function to block #" + std::to_string(returnTo->id));
@@ -1131,10 +1153,10 @@ void advance_to_next_block(Runtime* rt) {
         Block* returnTo = rt->callStack.back();
         rt->callStack.pop_back();
         pop_scope(rt);
-        
+
         if (returnTo) {
             rt->currentBlock = returnTo;
-                log_debug("Returning from function, continuing at block #" + std::to_string(returnTo->id));
+            log_debug("Returning from function, continuing at block #" + std::to_string(returnTo->id));
             return;
         }
 
@@ -1143,6 +1165,37 @@ void advance_to_next_block(Runtime* rt) {
 
     while (!rt->loopStack.empty()) {
         LoopContext& ctx = rt->loopStack.back();
+
+        if (ctx.isRepeatUntil && ctx.loopBlock->type == CMD_REPEAT_UNTIL) {
+            if (ctx.ticksWithoutWait >= LOOP_WATCHDOG_LIMIT) {
+                log_error("REPEAT_UNTIL watchdog: forcing break");
+                rt->loopStack.pop_back();
+                rt->watchdogTriggered = true;
+                rt->state = RUNTIME_STOPPED;
+                return;
+            }
+
+            bool condition = evaluate_condition(rt, ctx.loopBlock);
+            if (condition) {
+                Block* loopParent = ctx.loopBlock;
+                rt->loopStack.pop_back();
+
+                if (loopParent->next) {
+                    rt->currentBlock = loopParent->next;
+                    return;
+                }
+                continue;
+            } else {
+                if (ctx.loopBlock->inner) {
+                    rt->currentBlock = ctx.loopBlock->inner;
+                    return;
+                } else {
+                    rt->currentBlock = nullptr;
+                    return;
+                }
+            }
+        }
+
         ctx.remainingIterations--;
 
         if (ctx.remainingIterations > 0 && ctx.loopBlock->type == CMD_REPEAT) {
@@ -1153,7 +1206,7 @@ void advance_to_next_block(Runtime* rt) {
                 rt->state = RUNTIME_STOPPED;
                 return;
             }
-            
+
             if (ctx.loopBlock->inner) {
                 rt->currentBlock = ctx.loopBlock->inner;
                 log_debug("REPEAT: continuing iteration " + std::to_string(ctx.remainingIterations) + " remaining");
@@ -1164,13 +1217,13 @@ void advance_to_next_block(Runtime* rt) {
             }
         }
 
-        Block* parentBlock = ctx.loopBlock;
+        Block* loopEnd = ctx.loopBlock;
         rt->loopStack.pop_back();
-        log_debug("Popped loop context for block #" + std::to_string(parentBlock->id));
+        log_debug("Popped loop context for block #" + std::to_string(loopEnd->id));
 
-        if (parentBlock->next) {
-            rt->currentBlock = parentBlock->next;
-            log_debug("Continuing after loop at block #" + std::to_string(parentBlock->next->id));
+        if (loopEnd->next) {
+            rt->currentBlock = loopEnd->next;
+            log_debug("Continuing after loop at block #" + std::to_string(loopEnd->next->id));
             return;
         }
     }

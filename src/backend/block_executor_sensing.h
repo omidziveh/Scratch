@@ -3,6 +3,9 @@
 
 #include "../common/definitions.h"
 #include <string>
+#include <cmath>
+#include <cstdlib>
+#include <algorithm>
 
 
 bool execute_sensing_block(Block* block, ExecutionContext& ctx);

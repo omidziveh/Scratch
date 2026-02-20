@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <cmath>
 #include <SDL2/SDL.h>
+#include <algorithm>
 
 extern float g_timer_value;
 static Uint32 g_timer_start_time = 0;
@@ -207,7 +208,17 @@ bool execute_operator_block(Block* block, ExecutionContext& ctx) {
             ctx.lastResult = 0.0f ;
             return true;
         }
-        
+        case OP_ROUND: ctx.lastResult = op_round(getFloat(0)); return true;
+        case OP_TAN: ctx.lastResult = op_tan(getFloat(0)); return true;
+        case OP_ASIN: ctx.lastResult = op_asin(getFloat(0), success); return true;
+        case OP_ACOS: ctx.lastResult = op_acos(getFloat(0), success); return true;
+        case OP_ATAN: ctx.lastResult = op_atan(getFloat(0)); return true;
+        case OP_LN: ctx.lastResult = op_ln(getFloat(0), success); return true;
+        case OP_LOG: ctx.lastResult = op_log(getFloat(0), success); return true;
+        case OP_E_POW: ctx.lastResult = op_e_pow(getFloat(0)); return true;
+        case OP_TEN_POW: ctx.lastResult = op_ten_pow(getFloat(0)); return true;
+        case OP_RANDOM: ctx.lastResult = op_random(getFloat(0), getFloat(1)); return true;
+
         default:
             return false;
     }

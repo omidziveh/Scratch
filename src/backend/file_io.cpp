@@ -5,6 +5,9 @@
 #include <sstream>
 #include <map>
 #include "../frontend/block_utils.h"
+#include <cmath>
+#include <cstdlib>
+#include <algorithm>
 
 std::string blocktype_to_string(BlockType type) {
     switch (type) {
@@ -81,6 +84,16 @@ std::string blocktype_to_string(BlockType type) {
         case CMD_GOTO_MOUSE: return "GOTO_MOUSE";
         case CMD_IF_ON_EDGE_BOUNCE: return "IF_ON_EDGE_BOUNCE";
         case SENSE_DISTANCE_TO_MOUSE: return "SENSE_DISTANCE_MOUSE";
+        case OP_ROUND: return "OP_ROUND";
+        case OP_TAN: return "OP_TAN";
+        case OP_ASIN: return "OP_ASIN";
+        case OP_ACOS: return "OP_ACOS";
+        case OP_ATAN: return "OP_ATAN";
+        case OP_LN: return "OP_LN";
+        case OP_LOG: return "OP_LOG";
+        case OP_E_POW: return "OP_E_POW";
+        case OP_TEN_POW: return "OP_TEN_POW";
+        case OP_RANDOM: return "OP_RANDOM";
 
         default: return "UNKNOWN";
     }
@@ -160,6 +173,16 @@ BlockType string_to_blocktype(const std::string& str) {
     if (str == "GOTO_MOUSE") return CMD_GOTO_MOUSE;
     if (str == "IF_ON_EDGE_BOUNCE") return CMD_IF_ON_EDGE_BOUNCE;
     if (str == "SENSE_DISTANCE_MOUSE") return SENSE_DISTANCE_TO_MOUSE;
+    if (str == "OP_ROUND") return OP_ROUND;
+    if (str == "OP_TAN") return OP_TAN;
+    if (str == "OP_ASIN") return OP_ASIN;
+    if (str == "OP_ACOS") return OP_ACOS;
+    if (str == "OP_ATAN") return OP_ATAN;
+    if (str == "OP_LN") return OP_LN;
+    if (str == "OP_LOG") return OP_LOG;
+    if (str == "OP_E_POW") return OP_E_POW;
+    if (str == "OP_TEN_POW") return OP_TEN_POW;
+    if (str == "OP_RANDOM") return OP_RANDOM;
 
     return CMD_NONE;
 }

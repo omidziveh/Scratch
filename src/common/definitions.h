@@ -242,7 +242,17 @@ enum BlockType {
     OP_SIN,
     OP_COS,
     OP_XOR,
-    
+    OP_ROUND,
+    OP_TAN,
+    OP_ASIN,
+    OP_ACOS,
+    OP_ATAN,
+    OP_LN,
+    OP_LOG,
+    OP_E_POW,
+    OP_TEN_POW,
+    OP_RANDOM,
+
     // Pen
     CMD_PEN_DOWN,
     CMD_PEN_UP,
@@ -263,6 +273,9 @@ enum BlockType {
     CMD_IF_ON_EDGE_BOUNCE,
 
     SENSE_DISTANCE_TO_MOUSE,
+    CMD_FOREVER,
+    CMD_REPEAT_UNTIL,
+
 };
 
 struct Block {
