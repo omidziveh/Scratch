@@ -12,12 +12,19 @@ if(WIN32)
 else()
 endif()
 
-# 2. Find official libraries
 find_package(SDL2 REQUIRED)
 find_package(SDL2_ttf REQUIRED)
 find_package(SDL2_image REQUIRED)
 
-file(GLOB SOURCES "src/*.cpp" "src/backend/*.cpp" "src/frontend/*.cpp" "src/common/*.cpp" "src/utils/*.cpp" "src/gfx/*.c")
+file(GLOB SOURCES
+    "src/*.cpp"
+    "src/backend/*.cpp"
+    "src/frontend/*.cpp"
+    "src/common/*.cpp"
+    "src/utils/*.cpp"
+    "src/ui/*.cpp"
+    "src/gfx/*.c"
+)
 
 if(WIN32)
     list(APPEND SOURCES "${CMAKE_SOURCE_DIR}/app.rc")
@@ -30,10 +37,8 @@ endforeach()
 
 add_executable(${PROJECT_NAME} ${SOURCES})
 
-# ✅ این خط باید بعد از add_executable باشد!
 target_link_options(${PROJECT_NAME} PRIVATE -Wl,--allow-multiple-definition)
 
-# 5. Include Headers
 target_include_directories(${PROJECT_NAME} PRIVATE "src/gfx")
 
 target_include_directories(${PROJECT_NAME} PRIVATE

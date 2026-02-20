@@ -11,7 +11,7 @@
 #include <fstream>
 #include <cstdlib>
 #include <cstring>
-
+#include "frontend/sprite_panel.h"
 #include "common/definitions.h"
 #include "common/globals.h"
 #include "frontend/draw.h"
@@ -871,6 +871,7 @@ int main(int argc, char* argv[]) {
         draw_palette(renderer, palette_items, palette_scroll_offset);
         draw_coding_area(renderer);
         draw_stage(renderer, sprite);
+        render_sprite_panel(renderer, sprite);
         pen_render(renderer);
         draw_variables(renderer, sprite);
 

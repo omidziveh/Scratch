@@ -31,5 +31,6 @@ void draw_arg_boxes(SDL_Renderer* renderer, const Block& block, const TextInputS
 void draw_cursor(SDL_Renderer* renderer, int x, int y, int height, SDL_Color color);
 
 void draw_category_bar(SDL_Renderer* renderer, const std::vector<CategoryItem>& categories, int selected_index);
+void render_sprite_panel(SDL_Renderer* renderer, const Sprite& sprite);
 
 #endif
